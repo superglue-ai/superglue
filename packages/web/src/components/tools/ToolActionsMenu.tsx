@@ -1,6 +1,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient } from "@/src/lib/client-utils";
+import { cn } from "@/src/lib/general-utils";
 import { Tool } from "@superglue/shared";
 import { Archive, ArchiveRestore, CopyPlus, Edit2, MoreVertical } from "lucide-react";
 import { useState } from "react";
@@ -75,13 +76,14 @@ export function ToolActionsMenu({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="ghost"
+            variant="glass"
             size={showLabel ? "sm" : "icon"}
             disabled={disabled}
             onClick={(e) => e.stopPropagation()}
-            className={
-              showLabel ? "h-8 gap-1.5 text-muted-foreground hover:text-foreground" : undefined
-            }
+            className={cn(
+              "rounded-xl border-none shadow-none",
+              showLabel && "h-8 gap-1.5 text-muted-foreground hover:text-foreground",
+            )}
           >
             <MoreVertical className={showLabel ? "h-3.5 w-3.5" : "h-4 w-4"} />
             {showLabel && <span className="text-xs">More</span>}

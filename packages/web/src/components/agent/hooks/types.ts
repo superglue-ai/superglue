@@ -1,12 +1,10 @@
-import { ConfirmationAction, Message, ToolCall } from "@superglue/shared";
+import { Message, ToolCall } from "@superglue/shared";
 import { Conversation } from "../ConversationHistory";
 import { AgentType } from "@/src/lib/agent/registry/agents";
-import { UserAction } from "@/src/lib/agent/agent-types";
+import { UserAction, ExecutionMode } from "@/src/lib/agent/agent-types";
 
 export interface ToolConfirmationMetadata {
-  timing: "before" | "after";
-  validActions: ConfirmationAction[];
-  shouldAutoExecute?: boolean;
+  executionMode: ExecutionMode;
 }
 
 export interface UploadedFile {
@@ -105,8 +103,8 @@ export interface PlaygroundToolContext {
 
 export interface AgentConfig {
   agentId: AgentType;
-  agentParams?: Record<string, any>;
   hiddenContextBuilder?: () => string;
+  initialMessages?: Message[];
   chatEndpoint?: string;
   getAuthToken?: () => string;
 }

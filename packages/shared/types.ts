@@ -594,12 +594,14 @@ export enum ConfirmationAction {
   CONFIRMED = "confirmed",
   DECLINED = "declined",
   PARTIAL = "partial",
+  OAUTH_SUCCESS = "oauth_success",
+  OAUTH_FAILURE = "oauth_failure",
 }
 
 export interface AgentRequest {
   agentId: string;
   messages: Message[];
-  runtimeContext?: string;
+  hiddenContext?: string;
   agentParams?: Record<string, any>;
   filePayloads?: Record<string, any>;
 }

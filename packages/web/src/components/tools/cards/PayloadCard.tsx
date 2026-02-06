@@ -1,7 +1,7 @@
 import JsonSchemaEditor from "@/src/components/editors/JsonSchemaEditor";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { FileChip } from "@/src/components/ui/FileChip";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS } from "@/src/lib/file-utils";

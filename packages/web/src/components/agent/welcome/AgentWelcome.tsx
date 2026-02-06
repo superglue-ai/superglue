@@ -12,15 +12,10 @@ const EXAMPLES = {
     title: "What can superglue do for you?",
     description: "Explain superglue's capabilities",
     user: "What can I do with superglue?",
-    system:
-      "Dont answer using emojies! You are explaining Superglue's capabilities to a new user. Be comprehensive but concise. Answer in a nice Markdown format. To the first question, answer in about 10 sentences. Dont use emohies like the rocket or checkmarks or any other.",
   },
   TEMPLATES: {
     title: "What are other people building?",
     description: "Explore a library of production ready tools",
-    user: "What are other people building with superglue?",
-    system:
-      "Very important:When the user asks what other people are building with superglue, tell the user, that the tool library will be comming very soon. Dont do any web searches or think of any examples. Only tell the user that the tool library will be comming very soon.",
   },
 };
 
@@ -117,6 +112,7 @@ export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
           openApiUrl: config.openApiUrl,
           preferredAuthType: config.preferredAuthType,
           hasOAuth: !!config.oauth,
+          systemSpecificInstructions: config.systemSpecificInstructions,
         },
       });
       const prompt = `I want to set up ${label}`;
@@ -141,7 +137,11 @@ export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mx-auto max-w-3xl">
         <GlassButton
-          onClick={() => onStartPrompt(EXAMPLES.CAPABILITIES.user, EXAMPLES.CAPABILITIES.system)}
+          onClick={() =>
+            onStartPrompt(EXAMPLES.CAPABILITIES.user, undefined, {
+              hideUserMessage: true,
+            })
+          }
           icon={<Lightbulb className="w-5 h-5" />}
           title={EXAMPLES.CAPABILITIES.title}
           description={EXAMPLES.CAPABILITIES.description}

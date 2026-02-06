@@ -9,6 +9,7 @@ import {
 } from "@/src/components/ui/dropdown-menu";
 import { cn } from "@/src/lib/general-utils";
 import {
+  AlertCircle,
   Check,
   CheckCircle,
   ChevronDown,
@@ -21,7 +22,6 @@ import {
   Plus,
   Square,
   X,
-  XCircle,
 } from "lucide-react";
 import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -394,9 +394,9 @@ export function DiffApprovalComponent({
           (isRunning ? (
             <Button
               size="sm"
-              variant="outline"
+              variant="glass"
               onClick={onAbortTest}
-              className="h-7 text-xs text-orange-600 border-orange-300 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-900/20"
+              className="h-7 text-xs text-orange-600 dark:text-orange-400"
             >
               <Square className="w-3 h-3 mr-1" />
               Stop
@@ -406,7 +406,7 @@ export function DiffApprovalComponent({
               <div className="flex">
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="glass"
                   onClick={handleRunWithApproved}
                   className="h-7 text-xs rounded-r-none"
                 >
@@ -416,7 +416,7 @@ export function DiffApprovalComponent({
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="glass"
                     className="h-7 px-1.5 text-xs rounded-l-none border-l-0"
                   >
                     <ChevronDown className="w-3 h-3" />
@@ -515,9 +515,9 @@ export function DiffApprovalComponent({
                   />
                 </div>
               ) : (
-                <div className="flex items-start gap-2 p-2 bg-red-50/50 dark:bg-red-950/20 rounded border border-red-200/60 dark:border-red-900/40">
-                  <XCircle className="w-3 h-3 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-[11px] text-red-600/80 dark:text-red-400/80 break-words">
+                <div className="flex items-start gap-2 p-2 border border-red-200/40 dark:border-red-700/40 rounded">
+                  <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-[11px] text-red-800 dark:text-red-200 break-words min-w-0 max-h-40 overflow-y-auto">
                     {testResult.error && testResult.error.length > 300
                       ? `${testResult.error.slice(0, 300)}...`
                       : testResult.error}

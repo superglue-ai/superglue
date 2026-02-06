@@ -781,4 +781,120 @@ describe("ToolFixer", () => {
       });
     });
   });
+
+  describe("Deeply Nested Patches on Stringified Schemas", () => {
+    const COMPLEX_STRINGIFIED_SCHEMA = JSON.stringify({
+      type: "object",
+      required: ["payload", "credentials"],
+      properties: {
+        payload: {
+          type: "object",
+          required: ["start_path"],
+          properties: {
+            start_path: { type: "string" },
+          },
+        },
+        credentials: {
+          type: "object",
+          required: ["my_sftp_server_password", "my_sftp_server_username"],
+          properties: {
+            my_sftp_server_password: { type: "string" },
+            my_sftp_server_username: { type: "string" },
+          },
+        },
+      },
+    });
+
+    it("should handle deeply nested replace on originally-stringified schema", async () => {
+      const tool: any = {
+        ...createBaseTool(),
+        inputSchema: COMPLEX_STRINGIFIED_SCHEMA,
+      };
+
+      vi.mocked(LanguageModel.generateObject).mockResolvedValue({
+        success: true,
+        response: {
+          patches: [
+            {
+              op: "replace",
+              path: "/inputSchema/properties/payload/properties/start_path",
+              value: { type: "string", description: "The starting path for SFTP" },
+            },
+          ],
+        },
+        messages: [],
+      } as any);
+
+      const fixer = new ToolFixer({
+        tool,
+        fixInstructions: "Add description to start_path",
+        systems: [mockSystem],
+        metadata: mockMetadata,
+      });
+
+      const result = await fixer.fixTool();
+
+      expect(result.tool.inputSchema.properties.payload.properties.start_path).toEqual({
+        type: "string",
+        description: "The starting path for SFTP",
+      });
+      expect(result.tool.inputSchema.properties.credentials).toBeDefined();
+    });
+
+    it("should handle add op on nested path within originally-stringified schema", async () => {
+      const tool: any = {
+        ...createBaseTool(),
+        inputSchema: COMPLEX_STRINGIFIED_SCHEMA,
+      };
+
+      vi.mocked(LanguageModel.generateObject).mockResolvedValue({
+        success: true,
+        response: {
+          patches: [
+            {
+              op: "add",
+              path: "/inputSchema/properties/payload/properties/new_field",
+              value: { type: "string" },
+            },
+          ],
+        },
+        messages: [],
+      } as any);
+
+      const fixer = new ToolFixer({
+        tool,
+        fixInstructions: "Add new_field to payload",
+        systems: [mockSystem],
+        metadata: mockMetadata,
+      });
+
+      const result = await fixer.fixTool();
+
+      expect(result.tool.inputSchema.properties.payload.properties.new_field).toEqual({
+        type: "string",
+      });
+      expect(result.tool.inputSchema.properties.payload.properties.start_path).toEqual({
+        type: "string",
+      });
+    });
+
+    it("should normalize deeply nested stringified schema so typeof is object not string", async () => {
+      const tool: any = {
+        ...createBaseTool(),
+        inputSchema: COMPLEX_STRINGIFIED_SCHEMA,
+      };
+
+      const fixer = new ToolFixer({
+        tool,
+        fixInstructions: "test",
+        systems: [mockSystem],
+        metadata: mockMetadata,
+      });
+
+      expect(typeof fixer["tool"].inputSchema).toBe("object");
+      expect(fixer["tool"].inputSchema.properties.payload.properties.start_path).toEqual({
+        type: "string",
+      });
+    });
+  });
 });

@@ -2,13 +2,14 @@
 
 import { Message, ToolCall } from "@superglue/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { UseAgentMessagesReturn, ToolConfirmationMetadata } from "./types";
+import type { UseAgentMessagesReturn } from "./types";
 
 export function useAgentMessages(
   stopDrip: () => void,
   streamDripBufferRef: React.MutableRefObject<string>,
+  initialMessages?: Message[],
 ): UseAgentMessagesReturn {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages || []);
   const [isLoading, setIsLoading] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
@@ -17,6 +18,12 @@ export function useAgentMessages(
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    if (initialMessages && initialMessages.length > 0 && messages.length === 0) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages, messages.length]);
 
   const createStreamingAssistantMessage = useCallback(
     (idOffset = 0): Message => ({
@@ -41,19 +48,18 @@ export function useAgentMessages(
 
         case "tool_call_start": {
           const existingToolIndex = msg.tools?.findIndex((t) => t.id === data.toolCall.id);
-          const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
-          const requiresConfirmationBefore = confirmation?.timing === "before";
-          const shouldAutoExecute = confirmation?.shouldAutoExecute === true;
+          const status =
+            data.executionMode === "confirm_before_execution"
+              ? "awaiting_confirmation"
+              : data.toolCall.input
+                ? "running"
+                : "pending";
 
           const newTool: ToolCall = {
             id: data.toolCall.id,
             name: data.toolCall.name,
             input: data.toolCall.input,
-            status: data.toolCall.input
-              ? requiresConfirmationBefore && !shouldAutoExecute
-                ? "awaiting_confirmation"
-                : "running"
-              : "pending",
+            status,
             startTime: new Date(),
           };
 
@@ -157,20 +163,16 @@ export function useAgentMessages(
                 : data.toolCall.output;
           } catch {}
 
-          const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
-          const hasConfirmableContent = parsedOutput?.diffs?.length > 0 || parsedOutput?.newPayload;
-          const needsPostExecConfirmation =
-            confirmation?.timing === "after" &&
-            parsedOutput?.success === true &&
-            hasConfirmableContent;
+          const isErrorOutput = parsedOutput?.success === false && parsedOutput?.error;
 
-          const isPendingUserConfirmation =
-            parsedOutput?.confirmationState === "PENDING_USER_CONFIRMATION";
+          let finalStatus: "completed" | "declined" | "awaiting_confirmation" | "error" =
+            data.toolCall.status || "completed";
 
-          const finalStatus: "completed" | "declined" | "awaiting_confirmation" =
-            needsPostExecConfirmation || isPendingUserConfirmation
-              ? "awaiting_confirmation"
-              : data.toolCall.status || "completed";
+          if (isErrorOutput && finalStatus === "completed") {
+            finalStatus = "error";
+          }
+
+          const needsConfirmation = finalStatus === "awaiting_confirmation";
 
           const completedTools =
             msg.tools?.map((tool) =>
@@ -179,7 +181,8 @@ export function useAgentMessages(
                     ...tool,
                     status: finalStatus,
                     output: data.toolCall.output,
-                    endTime: needsPostExecConfirmation ? undefined : new Date(),
+                    error: isErrorOutput ? parsedOutput.error : undefined,
+                    endTime: needsConfirmation ? undefined : new Date(),
                   }
                 : tool,
             ) || [];
@@ -193,44 +196,14 @@ export function useAgentMessages(
                       ...part.tool,
                       status: finalStatus,
                       output: data.toolCall.output,
-                      endTime: needsPostExecConfirmation ? undefined : new Date(),
+                      error: isErrorOutput ? parsedOutput.error : undefined,
+                      endTime: needsConfirmation ? undefined : new Date(),
                     },
                   }
                 : part,
             ) || [];
 
           return { ...msg, tools: completedTools, parts: updatedParts };
-        }
-
-        case "tool_call_error": {
-          const errorTools =
-            msg.tools?.map((tool) =>
-              tool.id === data.toolCall.id
-                ? {
-                    ...tool,
-                    status: "error" as const,
-                    error: data.toolCall.error,
-                    endTime: new Date(),
-                  }
-                : tool,
-            ) || [];
-
-          const errorParts =
-            msg.parts?.map((part) =>
-              part.type === "tool" && part.tool?.id === data.toolCall.id
-                ? {
-                    ...part,
-                    tool: {
-                      ...part.tool,
-                      status: "error" as const,
-                      error: data.toolCall.error,
-                      endTime: new Date(),
-                    },
-                  }
-                : part,
-            ) || [];
-
-          return { ...msg, tools: errorTools, parts: errorParts };
         }
 
         case "done": {

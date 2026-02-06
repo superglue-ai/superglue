@@ -15,6 +15,7 @@ import {
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { SuperglueClient, Tool, ToolCall } from "@superglue/shared";
 import {
+  AlertCircle,
   CheckCircle,
   ChevronDown,
   Hammer,
@@ -23,7 +24,6 @@ import {
   Save,
   Square,
   Wrench,
-  XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
@@ -252,11 +252,11 @@ export function ToolBuilderComponent({
       const bufferFailure = (errorMsg: string) => {
         if (bufferAction) {
           bufferAction({
-            type: "tool_execution_feedback",
+            type: "tool_event",
             toolCallId: tool.id,
-            toolName: toolNameForFeedback,
-            feedback: "manual_run_failure",
-            data: {
+            toolName: tool.name,
+            event: "manual_run_failure",
+            payload: {
               toolId: toolIdForFeedback,
               error: errorMsg,
               appliedChanges: appliedChangesCount,
@@ -305,6 +305,13 @@ export function ToolBuilderComponent({
           runId,
           traceId: runId,
         });
+        console.log("[ToolBuilderComponent] runToolConfig result:", {
+          success: result.success,
+          hasData: !!result.data,
+          error: result.error,
+          hasTool: !!result.tool,
+          toolId: result.tool?.id,
+        });
 
         setRunResult({
           success: result.success,
@@ -313,7 +320,7 @@ export function ToolBuilderComponent({
         });
 
         if (bufferAction) {
-          const feedbackType = result.success ? "manual_run_success" : "manual_run_failure";
+          const eventType = result.success ? "manual_run_success" : "manual_run_failure";
           const truncatedResult =
             result.data !== undefined ? JSON.stringify(result.data).substring(0, 500) : undefined;
           const truncatedError =
@@ -322,11 +329,11 @@ export function ToolBuilderComponent({
               : result.error;
 
           bufferAction({
-            type: "tool_execution_feedback",
+            type: "tool_event",
             toolCallId: tool.id,
-            toolName: toolNameForFeedback,
-            feedback: feedbackType,
-            data: {
+            toolName: tool.name,
+            event: eventType,
+            payload: {
               toolId: toolIdForFeedback,
               result: result.success ? truncatedResult : undefined,
               error: truncatedError,
@@ -374,6 +381,13 @@ export function ToolBuilderComponent({
     setCurrentConfig(savedTool);
     setToolSaved(true);
     refreshTools();
+    bufferAction?.({
+      type: "tool_event",
+      toolCallId: tool.id,
+      toolName: "build_tool",
+      event: "manual_save_success",
+      payload: { toolId: savedTool?.id },
+    });
   };
 
   // Running state (build/fix in progress, or run_tool executing)
@@ -402,7 +416,7 @@ export function ToolBuilderComponent({
         onApplyChanges?.(newConfig, result.approvedDiffs);
       }
 
-      const action = result.approved ? "confirmed" : result.partial ? "partial" : "declined";
+      const event = result.approved ? "confirmed" : result.partial ? "partial" : "declined";
       onToolUpdate?.(tool.id, {
         status: result.approved || result.partial ? "completed" : "declined",
       });
@@ -410,11 +424,11 @@ export function ToolBuilderComponent({
       sendAgentRequest(undefined, {
         userActions: [
           {
-            type: "tool_confirmation",
+            type: "tool_event",
             toolCallId: tool.id,
             toolName: "edit_tool",
-            action,
-            data: {
+            event,
+            payload: {
               appliedChanges: result.approvedDiffs,
               rejectedChanges: result.rejectedDiffs,
             },
@@ -512,13 +526,13 @@ export function ToolBuilderComponent({
               <span className="text-sm font-medium">Review Changes</span>
             </div>
             {awaitingConfirmationDiffs?.error ? (
-              <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
-                <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                  <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
                     Failed to Process Changes
                   </div>
-                  <div className="text-sm text-red-600/80 dark:text-red-400/80 break-words mt-1">
+                  <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
                     {awaitingConfirmationDiffs.error}
                   </div>
                 </div>
@@ -541,7 +555,7 @@ export function ToolBuilderComponent({
                 No changes to review.
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="glass"
                   className="ml-3"
                   onClick={() =>
                     handleDiffApprovalComplete({
@@ -570,13 +584,13 @@ export function ToolBuilderComponent({
 
                   if (completedDiffs?.error) {
                     return (
-                      <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
-                        <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                      <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                          <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
                             Failed to Display Changes
                           </div>
-                          <div className="text-sm text-red-600/80 dark:text-red-400/80 break-words mt-1">
+                          <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
                             {completedDiffs.error}
                           </div>
                         </div>
@@ -621,13 +635,13 @@ export function ToolBuilderComponent({
 
             {/* Run results - only show errors */}
             {runResult && !runResult.success && runResult.error && (
-              <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
-                <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                  <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
                     Execution Failed
                   </div>
-                  <div className="text-sm text-red-600/80 dark:text-red-400/80 break-words mt-1">
+                  <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
                     {runResult.error.length > 300
                       ? `${runResult.error.slice(0, 300)}...`
                       : runResult.error}
@@ -641,7 +655,7 @@ export function ToolBuilderComponent({
                 {/* Run/Stop Tool button with payload dropdown */}
                 {isRunning ? (
                   <Button
-                    variant="outline"
+                    variant="glass"
                     onClick={handleStopExecution}
                     className="h-9 px-3 text-sm font-medium"
                   >
@@ -703,16 +717,25 @@ export function ToolBuilderComponent({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-                {/* Save: default if run succeeded, outline otherwise */}
-                <Button
-                  variant={runResult?.success ? "default" : "outline"}
-                  onClick={() => setShowSaveDialog(true)}
-                  disabled={isRunning || toolSaved}
-                  className="h-9 px-3 text-sm font-medium hidden md:flex"
-                >
-                  <Save className="w-4 h-4 mr-1.5" />
-                  {toolSaved ? "Saved" : "Save"}
-                </Button>
+                {/* Save: default if run succeeded, glass otherwise */}
+                {!toolSaved ? (
+                  <Button
+                    variant={runResult?.success ? "default" : "glass"}
+                    onClick={() => setShowSaveDialog(true)}
+                    disabled={isRunning}
+                    className="h-9 px-3 text-sm font-medium hidden md:flex"
+                  >
+                    <Save className="w-4 h-4 mr-1.5" />
+                    Save
+                  </Button>
+                ) : (
+                  <DeployButton
+                    tool={currentConfig}
+                    payload={tool.input?.payload || {}}
+                    disabled={isRunning}
+                    className="h-9 px-3 text-sm font-medium hidden md:flex"
+                  />
+                )}
                 {/* Request Fix: shown if run failed */}
                 {runResult && !runResult.success && !isRunning && !fixRequested && (
                   <Button
@@ -726,11 +749,11 @@ export function ToolBuilderComponent({
                       sendAgentRequest?.(undefined, {
                         userActions: [
                           {
-                            type: "tool_execution_feedback",
+                            type: "tool_event",
                             toolCallId: tool.id,
-                            toolName: "run_tool",
-                            feedback: "request_fix",
-                            data: truncatedError,
+                            toolName: "edit_tool",
+                            event: "request_fix",
+                            payload: { error: truncatedError },
                           },
                         ],
                       });
@@ -757,17 +780,17 @@ export function ToolBuilderComponent({
         {/* Error state */}
         {(tool.status === "error" || (tool.status === "completed" && !isSuccess)) && (
           <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
-              <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
                   {mode === "build"
                     ? "Build Failed"
                     : mode === "fix"
                       ? "Fix Failed"
                       : "Execution Failed"}
                 </div>
-                <div className="text-sm text-red-600/80 dark:text-red-400/80 break-words mt-1">
+                <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
                   {(() => {
                     const error = parsedOutput?.error || tool.error || "Unknown error";
                     return error.length > 300 ? `${error.slice(0, 300)}...` : error;

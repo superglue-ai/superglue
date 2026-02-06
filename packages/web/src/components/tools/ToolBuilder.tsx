@@ -1,7 +1,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { useSystems } from "@/src/app/systems-context";
 import { getAuthBadge } from "@/src/app/systems/page";
-import { FileChip } from "@/src/components/ui/FileChip";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { useToast } from "@/src/hooks/use-toast";
 import {
   formatBytes,
@@ -13,7 +13,7 @@ import { SystemIcon } from "@/src/components/ui/system-icon";
 import { SystemCarousel } from "@/src/components/ui/rotating-icon-gallery";
 import { cn, composeUrl, inputErrorStyles } from "@/src/lib/general-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import { System, SystemInput, Tool, SuperglueClient, SystemConfig } from "@superglue/shared";
+import { System, SystemInput, Tool, SuperglueClient } from "@superglue/shared";
 import { ALLOWED_FILE_EXTENSIONS, generateDefaultFromSchema } from "@superglue/shared";
 import { Validator } from "jsonschema";
 import {
@@ -67,10 +67,14 @@ interface ToolBuilderProps {
 
 const FADE_IN_STYLE = { animationDelay: "0ms", animationFillMode: "backwards" } as const;
 
-const ACTIVE_SECTION_STYLE = "bg-[#FFD700]/40 border-[#FF8C00] text-foreground";
-const INACTIVE_FILLED_STYLE = "bg-[#FFD700]/40 border-[#FFA500] text-foreground";
-const ACTIVE_EMPTY_STYLE = "border-foreground/70 text-foreground hover:bg-accent/50";
-const INACTIVE_EMPTY_STYLE = "border-border text-muted-foreground hover:bg-accent/50";
+const ACTIVE_SECTION_STYLE =
+  "bg-gradient-to-br from-muted/60 to-muted/40 dark:from-muted/60 dark:to-muted/40 backdrop-blur-sm border-foreground/30 text-foreground shadow-sm";
+const INACTIVE_FILLED_STYLE =
+  "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm border-border/50 dark:border-border/70 text-foreground/90 shadow-sm";
+const ACTIVE_EMPTY_STYLE =
+  "border-foreground/40 text-foreground hover:bg-muted/40 backdrop-blur-sm";
+const INACTIVE_EMPTY_STYLE =
+  "border-border/50 text-muted-foreground hover:bg-muted/30 backdrop-blur-sm";
 
 const toSystemInput = (i: System): SystemInput => ({
   id: i.id,
@@ -400,8 +404,8 @@ export function ToolBuilder({
     if (!isPayloadValid && enforceInputSchema && inputSchemaMode === "custom" && inputSchema) {
       return "Input Does Not Match Schema";
     }
-    if (isEmptyPayload) return "Attach Tool Input";
-    return isValidPayloadJson ? "Tool Input Attached" : "Invalid Input JSON";
+    if (isEmptyPayload) return "Tool Input";
+    return isValidPayloadJson ? "Tool Input" : "Invalid Input JSON";
   };
 
   if (view === "systems") {
@@ -417,7 +421,7 @@ export function ToolBuilder({
             </p>
           </div>
 
-          <div className="border rounded-2xl bg-card p-6 space-y-4">
+          <div className="border border-border/50 dark:border-border/70 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm p-6 space-y-4 shadow-sm">
             <div className="flex items-center gap-3">
               <Input
                 placeholder="Search systems..."
@@ -425,12 +429,7 @@ export function ToolBuilder({
                 onChange={(e) => setSystemSearch(e.target.value)}
                 className="h-10 flex-1"
               />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 shrink-0"
-                onClick={handleAddSystem}
-              >
+              <Button variant="glass" size="sm" className="h-10 shrink-0" onClick={handleAddSystem}>
                 <Plus className="mr-2 h-4 w-4" /> Add System
               </Button>
             </div>
@@ -448,6 +447,7 @@ export function ToolBuilder({
                         openApiUrl: config.openApiUrl,
                         preferredAuthType: config.preferredAuthType,
                         hasOAuth: !!config.oauth,
+                        systemSpecificInstructions: config.systemSpecificInstructions,
                       },
                     });
                     openAgentModal({
@@ -592,7 +592,7 @@ export function ToolBuilder({
 
             <div className="flex justify-end mt-3">
               <Button
-                variant="outline"
+                variant="glass-primary"
                 onClick={() => setView("instructions")}
                 className="h-8 px-4 rounded-full flex-shrink-0"
               >
@@ -638,10 +638,12 @@ export function ToolBuilder({
                 }}
                 disabled={isBuilding}
                 className={cn(
-                  "group flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border transition-all",
+                  "group flex items-center gap-2 px-3 py-1.5 rounded-full transition-all",
+                  "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30",
+                  "backdrop-blur-sm border border-border/50 dark:border-border/70 shadow-sm",
                   isBuilding
                     ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-red-500/10 hover:border-red-500/50",
+                    : "hover:border-red-500/50 hover:shadow",
                 )}
                 title={isBuilding ? "Cannot modify while building" : "Click to remove"}
               >
@@ -656,10 +658,10 @@ export function ToolBuilder({
             onClick={() => !isBuilding && setView("systems")}
             disabled={isBuilding}
             className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-dashed border-border transition-all",
-              isBuilding
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-muted/80 hover:border-border/80",
+              "flex items-center gap-2 px-3 py-1.5 rounded-full transition-all",
+              "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30",
+              "backdrop-blur-sm border border-dashed border-border/50 dark:border-border/70",
+              isBuilding ? "opacity-50 cursor-not-allowed" : "hover:shadow hover:border-border/80",
             )}
             title={isBuilding ? "Cannot modify while building" : "Add systems"}
           >
@@ -668,7 +670,7 @@ export function ToolBuilder({
           </button>
         </div>
 
-        <div className="relative border rounded-2xl bg-card p-4">
+        <div className="relative border border-border/50 dark:border-border/70 rounded-2xl bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm p-4 shadow-sm">
           <Textarea
             ref={textareaRef}
             id="instruction"
@@ -724,6 +726,7 @@ export function ToolBuilder({
             </div>
 
             <Button
+              variant="glass-primary"
               onClick={handleBuildTool}
               disabled={isBuilding || !instruction.trim() || !isPayloadValid}
               className="h-8 px-4 rounded-full flex-shrink-0 flex items-center gap-2"
@@ -749,7 +752,7 @@ export function ToolBuilder({
 
         {showPayloadSection && (
           <div
-            className="space-y-3 border rounded-lg p-4 bg-card animate-fade-in mt-3"
+            className="space-y-3 border border-border/50 dark:border-border/70 rounded-2xl p-4 bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm shadow-sm animate-fade-in mt-3"
             style={FADE_IN_STYLE}
           >
             <div className="space-y-3">
@@ -873,7 +876,7 @@ export function ToolBuilder({
 
               <div className="flex justify-center pt-2">
                 <Button
-                  variant="outline"
+                  variant="glass"
                   size="sm"
                   onClick={() => document.getElementById("file-upload-builder")?.click()}
                   disabled={isProcessingFiles}
@@ -967,7 +970,10 @@ export function ToolBuilder({
         )}
 
         {showResponseSchemaSection && (
-          <div className="border rounded-lg p-4 bg-card animate-fade-in mt-3" style={FADE_IN_STYLE}>
+          <div
+            className="border border-border/50 dark:border-border/70 rounded-2xl p-4 bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm shadow-sm animate-fade-in mt-3"
+            style={FADE_IN_STYLE}
+          >
             <h4 className="font-medium text-sm mb-3">Tool Result Schema</h4>
             <p className="text-xs text-muted-foreground mt-2">
               Define a JSON Schema to validate the tool's response

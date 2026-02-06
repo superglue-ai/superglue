@@ -4,18 +4,20 @@ import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
+import { MiniCard } from "@/src/components/ui/mini-card";
 import { SystemIcon } from "@/src/components/ui/system-icon";
+import { RequestStepConfig, ToolStep, Tool, isRequestConfig } from "@superglue/shared";
+import { cn } from "@/src/lib/general-utils";
 import {
   AlertCircle,
   CheckCircle,
   ChevronRight,
-  Code,
-  Copy,
-  Database,
+  FileJson,
+  FilePlay,
   RotateCcw,
   Save,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 
 interface ToolStep {
   id: string;
@@ -74,8 +76,6 @@ export function ToolCallToolDisplay({
   hasOutdatedResults = false,
   showPayload = false,
 }: ToolCallToolDisplayProps) {
-  const [copied, setCopied] = useState<string | null>(null);
-
   // Parse output if it's a string (unified logic from ExecuteToolToolCall)
   const parsedOutput = useMemo(() => {
     if (!output) return null;
@@ -112,11 +112,11 @@ export function ToolCallToolDisplay({
   const displayOutput = parsedOutput?.data || parsedOutput;
   const hasParseError = parsedOutput?.parseError;
 
-  // Compute result display height (max 500px)
+  // Compute result display height (max 200px - smaller for agent context)
   const resultDisplayHeight = useMemo(() => {
-    if (!displayOutput || hasParseError) return "300px";
+    if (!displayOutput || hasParseError) return "150px";
     const resultJson = JSON.stringify(displayOutput, null, 2);
-    return `${Math.min(Math.max(resultJson.split("\n").length * 18 + 24, 60), 500)}px`;
+    return `${Math.min(Math.max(resultJson.split("\n").length * 18 + 24, 60), 200)}px`;
   }, [displayOutput, hasParseError]);
 
   // Get steps from the correct location in the data structure
@@ -125,33 +125,6 @@ export function ToolCallToolDisplay({
 
   // Get the effective tool ID - either from props or from the tool object
   const effectiveToolId = toolId || tool?.id || tool?.config?.id;
-
-  const copyToClipboard = async (content: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(id);
-      setTimeout(() => setCopied(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
-  const getMethodColor = (method: string) => {
-    switch (method.toUpperCase()) {
-      case "GET":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "POST":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      case "PUT":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case "DELETE":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      case "PATCH":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -217,95 +190,92 @@ export function ToolCallToolDisplay({
           <div className="overflow-x-auto">
             <div className="flex items-stretch gap-2 pb-2 min-w-max">
               {/* Payload Step - Always show on the left */}
-              <Card className="p-4 w-64 flex-shrink-0">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4" />
-                    <span className="font-medium text-sm">Payload</span>
+              <MiniCard isActive={false} onClick={() => {}} width={170} height={125}>
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="p-2 rounded-full bg-primary/10">
+                    <FileJson className="h-4 w-4 text-primary" />
                   </div>
-                  {payload && (
-                    <button
-                      onClick={() => copyToClipboard(JSON.stringify(payload, null, 2), "payload")}
-                      className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
-                      title="Copy payload"
-                    >
-                      {copied === "payload" ? (
-                        <div className="w-4 h-4 text-green-500">✓</div>
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
+                  <span className="text-[11px] font-semibold mt-1.5">Tool Input</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {payload
-                    ? typeof payload === "string"
-                      ? payload
-                      : "JSON Object"
-                    : "Optional payload - none provided"}
+                <div className="flex items-center justify-center">
+                  <span className="text-[9px] font-medium text-muted-foreground">
+                    {payload && Object.keys(payload).length > 0 ? "Provided" : "Empty"}
+                  </span>
                 </div>
-              </Card>
+              </MiniCard>
 
               {/* Arrow after payload */}
-              <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 self-center" />
 
               {/* Tool Steps */}
-              {steps.map((step, index) => (
-                <React.Fragment key={step.id || `step-${index}`}>
-                  <Card className="p-4 w-64 flex-shrink-0 relative">
-                    <div className="mb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        {/* System Icon - Left of Step ID */}
-                        <SystemIcon
-                          system={{ id: step.systemId, urlHost: step.apiConfig?.urlHost }}
-                          size={16}
-                        />
-                        <span className="font-medium text-sm">{step.id || "New Step"}</span>
-
-                        {/* Loop Icon - Right side (if LOOP) */}
-                        {step.executionMode === "LOOP" && (
-                          <RotateCcw className="w-4 h-4 text-orange-500 ml-auto" />
+              {steps.map((step: ToolStep, index: number) => {
+                const stepConfig =
+                  step.config && isRequestConfig(step.config)
+                    ? (step.config as RequestStepConfig)
+                    : null;
+                const systemId = stepConfig?.systemId;
+                return (
+                  <React.Fragment key={step.id || `step-${index}`}>
+                    <MiniCard isActive={false} onClick={() => {}} width={170} height={125}>
+                      <div className="h-full flex flex-col relative w-full">
+                        <div className="absolute top-0 left-0 flex items-center h-4">
+                          <span className="text-[9px] px-1 py-0.5 rounded font-medium bg-primary/10 text-primary">
+                            {index + 1}
+                          </span>
+                        </div>
+                        {step.dataSelector && (
+                          <div className="absolute top-0 right-0 flex items-center h-4">
+                            <RotateCcw className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                          </div>
                         )}
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                            <SystemIcon system={{ id: systemId }} size={18} />
+                          </div>
+                          {systemId && (
+                            <span
+                              className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
+                              title={systemId}
+                            >
+                              {systemId}
+                            </span>
+                          )}
+                          <span
+                            className="text-[11px] font-semibold mt-1 truncate max-w-[140px]"
+                            title={step.id || `Step ${index + 1}`}
+                          >
+                            {step.id || `Step ${index + 1}`}
+                          </span>
+                        </div>
                       </div>
-                      {step.apiConfig?.method && (
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded font-medium ${getMethodColor(step.apiConfig.method)}`}
-                        >
-                          {step.apiConfig.method}
-                        </span>
-                      )}
-                    </div>
+                    </MiniCard>
 
-                    <div className="space-y-2">
-                      <div className="text-xs text-muted-foreground">
-                        <div className="font-medium">System:</div>
-                        <div className="truncate">{step.systemId || "Not configured"}</div>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Arrow after each step (except the last one) */}
-                  {index < steps.length - 1 && (
-                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
-                  )}
-                </React.Fragment>
-              ))}
+                    {index < steps.length - 1 && (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 self-center" />
+                    )}
+                  </React.Fragment>
+                );
+              })}
 
               {/* Arrow before final transform (if there are steps) */}
               {steps.length > 0 && (
-                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 self-center" />
               )}
 
               {/* Final Transform Step - Always show on the right */}
-              <Card className="p-4 w-64 flex-shrink-0">
-                <div className="flex items-center gap-2 mb-3">
-                  <Code className="w-4 h-4" />
-                  <span className="font-medium text-sm">Final Transform</span>
+              <MiniCard isActive={false} onClick={() => {}} width={170} height={125}>
+                <div className="flex-1 flex flex-col items-center justify-center">
+                  <div className="p-2 rounded-full bg-primary/10">
+                    <FilePlay className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-[11px] font-semibold mt-1.5">Tool Result</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {displayTool.finalTransform ? "Transform applied" : "No transform configured"}
+                <div className="flex items-center justify-center">
+                  <span className="text-[9px] font-medium text-muted-foreground">
+                    {displayTool.outputTransform ? "Transform applied" : "No transform"}
+                  </span>
                 </div>
-              </Card>
+              </MiniCard>
             </div>
           </div>
         </div>
@@ -315,7 +285,7 @@ export function ToolCallToolDisplay({
       {showPayload && payloadDisplayInfo && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Database className="w-4 h-4" />
+            <FileJson className="w-4 h-4" />
             <span className="font-medium text-sm">Tool Input</span>
           </div>
           <JsonCodeEditor
@@ -331,7 +301,7 @@ export function ToolCallToolDisplay({
       {showOutput && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <FilePlay className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-sm">Execution Results</span>
             {hasOutdatedResults && (
               <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded flex items-center gap-1">
@@ -354,17 +324,17 @@ export function ToolCallToolDisplay({
 
       {/* Error Display */}
       {error && (
-        <Card className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-            <span className="text-sm font-semibold text-red-800 dark:text-red-200">
+        <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
               Execution Error
-            </span>
+            </div>
+            <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
+              {typeof error === "string" ? error : JSON.stringify(error, null, 2)}
+            </div>
           </div>
-          <div className="text-sm text-red-700 dark:text-red-300">
-            {typeof error === "string" ? error : JSON.stringify(error, null, 2)}
-          </div>
-        </Card>
+        </div>
       )}
     </div>
   );

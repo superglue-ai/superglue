@@ -93,10 +93,10 @@ export function EditPayloadComponent({
     sendAgentRequest(undefined, {
       userActions: [
         {
-          type: "tool_confirmation",
+          type: "tool_event",
           toolCallId: tool.id,
           toolName: "edit_payload",
-          action: "confirmed",
+          event: "confirmed",
         },
       ],
     });
@@ -112,10 +112,10 @@ export function EditPayloadComponent({
     sendAgentRequest(undefined, {
       userActions: [
         {
-          type: "tool_confirmation",
+          type: "tool_event",
           toolCallId: tool.id,
           toolName: "edit_payload",
-          action: "declined",
+          event: "declined",
         },
       ],
     });

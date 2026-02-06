@@ -29,7 +29,7 @@ function checkPayloadKeysReferenced(
     if (!pattern) {
       const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       pattern = new RegExp(
-        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]`,
+        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]|<<\\s*${escaped}\\s*>>`,
       );
       patternCache.set(key, pattern);
     }
@@ -41,19 +41,21 @@ function checkPayloadKeysReferenced(
     return payloadKeys.some((key) => buildPatternForKey(key).test(str));
   };
 
-  const checkObjectForAnyKey = (obj: Record<string, any> | undefined): boolean => {
-    if (!obj) return false;
-    return checkStringForAnyKey(JSON.stringify(obj));
+  const checkValueForAnyKey = (val: unknown): boolean => {
+    if (!val) return false;
+    const str = typeof val === "string" ? val : JSON.stringify(val);
+    return checkStringForAnyKey(str);
   };
 
   for (const step of steps) {
-    const { apiConfig, loopSelector } = step;
-    if (checkStringForAnyKey(apiConfig.urlPath)) return true;
-    if (checkStringForAnyKey(apiConfig.urlHost)) return true;
-    if (checkStringForAnyKey(apiConfig.body)) return true;
-    if (checkStringForAnyKey(loopSelector)) return true;
-    if (checkObjectForAnyKey(apiConfig.queryParams)) return true;
-    if (checkObjectForAnyKey(apiConfig.headers)) return true;
+    const { dataSelector } = step;
+    if (checkStringForAnyKey(dataSelector)) return true;
+
+    const config = step.config as RequestStepConfig;
+    if (checkValueForAnyKey(config.url)) return true;
+    if (checkValueForAnyKey(config.body)) return true;
+    if (checkValueForAnyKey(config.queryParams)) return true;
+    if (checkValueForAnyKey(config.headers)) return true;
   }
 
   if (checkStringForAnyKey(finalTransform)) return true;

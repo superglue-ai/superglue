@@ -4,9 +4,8 @@ import { tokenRegistry } from "@/src/lib/token-registry";
 import {
   AgentRequest,
   UserAction,
-  ToolConfirmationAction,
-  ToolExecutionFeedback,
-  FileUploadAction,
+  ToolEventAction,
+  GlobalEventAction,
   ToolExecutionPolicies,
 } from "@/src/lib/agent/agent-types";
 import { truncateFileContent } from "@/src/lib/file-utils";
@@ -75,14 +74,19 @@ export function useAgentRequest({
     return Object.keys(result).length > 0 ? result : undefined;
   }, [uploadedFiles, filePayloads]);
 
-  const buildFileUploadAction = useCallback((): FileUploadAction | undefined => {
+  const buildFileUploadAction = useCallback((): GlobalEventAction | undefined => {
     if (Object.keys(filePayloads).length === 0) return undefined;
 
     const FILE_PREVIEW_MAX_CHARS = 2000;
 
-    const files = Object.entries(filePayloads).map(([key, content]) => {
+    const fileList: string[] = [];
+    const previews: string[] = [];
+
+    for (const [key, content] of Object.entries(filePayloads)) {
       const file = uploadedFiles.find((f) => f.key === key);
       const fileName = file?.name || key;
+
+      fileList.push(`- ${fileName} => file::${key}`);
 
       let contentStr: string;
       try {
@@ -92,14 +96,20 @@ export function useAgentRequest({
         contentStr = "[Unable to serialize]";
       }
 
-      return {
-        key,
-        name: fileName,
-        contentPreview: truncateFileContent(contentStr, FILE_PREVIEW_MAX_CHARS).truncated,
-      };
-    });
+      const truncated = truncateFileContent(contentStr, FILE_PREVIEW_MAX_CHARS).truncated;
+      previews.push(`### ${fileName} (file::${key})\n\`\`\`\n${truncated}\n\`\`\``);
+    }
 
-    return files.length > 0 ? { type: "file_upload" as const, files } : undefined;
+    if (fileList.length === 0) return undefined;
+
+    return {
+      type: "global_event",
+      event: "file_upload",
+      payload: {
+        fileList: fileList.join("\n"),
+        previews: previews.join("\n\n"),
+      },
+    };
   }, [uploadedFiles, filePayloads]);
 
   const sendAgentRequest = useCallback(
@@ -109,26 +119,24 @@ export function useAgentRequest({
     ) => {
       let actionsToSend: UserAction[];
       if (options?.userActions) {
-        // Merge buffered actions with explicit actions (buffered first to preserve chronological order)
         actionsToSend = [...actionBufferRef.current.splice(0), ...options.userActions];
       } else {
         actionsToSend = actionBufferRef.current.splice(0);
       }
       const hasMessage = userMessage && userMessage.trim().length > 0;
       const hasActions = actionsToSend.length > 0;
+      const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
+      const hasHiddenContext = !!hiddenContext;
 
-      if (!hasMessage && !hasActions) {
-        console.warn("sendAgentRequest called with no userMessage or userActions");
+      if (!hasMessage && !hasActions && !hasHiddenContext) {
+        console.warn("sendAgentRequest called with no userMessage, userActions, or hiddenContext");
         return;
       }
 
-      const confirmationAction = actionsToSend.find(
-        (a): a is ToolConfirmationAction => a.type === "tool_confirmation",
+      const toolEventAction = actionsToSend.find(
+        (a): a is ToolEventAction => a.type === "tool_event",
       );
-      const feedbackAction = actionsToSend.find(
-        (a): a is ToolExecutionFeedback => a.type === "tool_execution_feedback",
-      );
-      const resumeToolId = confirmationAction?.toolCallId || feedbackAction?.toolCallId;
+      const resumeToolId = toolEventAction?.toolCallId;
 
       const shouldResume = resumeToolId && !hasMessage;
 
@@ -145,6 +153,7 @@ export function useAgentRequest({
 
       if (hasMessage) {
         const readyPendingFiles = pendingFiles.filter((f) => f.status === "ready");
+
         const userMessageObj: Message = {
           id: Date.now().toString(),
           content: userMessage!.trim(),
@@ -160,11 +169,11 @@ export function useAgentRequest({
       setIsLoading(true);
 
       let assistantMessage: Message | null = null;
-      if (hasMessage) {
-        assistantMessage = createStreamingAssistantMessage(1);
-        setMessages((prev) => [...prev, assistantMessage!]);
-      } else if (shouldResume) {
+      if (shouldResume) {
         assistantMessage = findAndResumeMessageWithTool(resumeToolId);
+      } else if (hasMessage || hasHiddenContext) {
+        assistantMessage = createStreamingAssistantMessage(hasMessage ? 1 : 0);
+        setMessages((prev) => [...prev, assistantMessage!]);
       }
 
       const controller = new AbortController();
@@ -182,7 +191,6 @@ export function useAgentRequest({
         userActions: allActions.length > 0 ? allActions : undefined,
         filePayloads: buildFilePayloads(),
         hiddenContext,
-        agentParams: config.agentParams,
         toolExecutionPolicies:
           Object.keys(toolExecutionPolicies).length > 0 ? toolExecutionPolicies : undefined,
       };
@@ -202,7 +210,14 @@ export function useAgentRequest({
           if (response.status === 401) {
             throw new Error("Authentication failed. Please check your API key configuration.");
           }
-          throw new Error(`HTTP error! status: ${response.status}`);
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          try {
+            const errorBody = await response.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch {}
+          throw new Error(errorMessage);
         }
 
         if (!response.body) {

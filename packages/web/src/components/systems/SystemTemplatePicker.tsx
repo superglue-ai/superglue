@@ -396,6 +396,7 @@ export function SystemTemplatePicker({
         openApiUrl: config.openApiUrl,
         preferredAuthType: config.preferredAuthType,
         hasOAuth: !!config.oauth,
+        systemSpecificInstructions: config.systemSpecificInstructions,
       },
     };
     return JSON.stringify(context);

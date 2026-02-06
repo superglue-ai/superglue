@@ -24,6 +24,8 @@ import {
   Edit,
   Globe,
   Key,
+  KeyRound,
+  Loader2,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SystemForm } from "../../systems/SystemForm";
@@ -68,6 +70,9 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
   const [isInstructionsExpanded, setIsInstructionsExpanded] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [systemNotFound, setSystemNotFound] = useState(false);
+  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
+  const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
+  const [isExecuting, setIsExecuting] = useState(false);
   const { saveSystem, handleOAuth } = useSystemActions();
   const { toast } = useToast();
   const { systems, refreshSystems, isRefreshing } = useSystems();
@@ -176,9 +181,22 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     }
   })();
 
+  const requiredSensitiveFields = useMemo(() => {
+    if (output?.requiredSensitiveFields && output.requiredSensitiveFields.length > 0) {
+      return output.requiredSensitiveFields;
+    }
+    if (input?.sensitiveCredentials) {
+      return Object.keys(input.sensitiveCredentials);
+    }
+    return [];
+  }, [output?.requiredSensitiveFields, input?.sensitiveCredentials]);
+
+  const hasSensitiveCredentials = requiredSensitiveFields.length > 0;
+  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && hasSensitiveCredentials;
+  const isConfirming = tool.status === "running" && hasSensitiveCredentials;
   const isCompleted = tool.status === "completed" && output?.success;
   const isToolInProgress = tool.status === "running" || tool.status === "pending";
-  const hasNoOutput = !output || !output.success;
+  const showPendingMessage = isToolInProgress && !isCompleted && !hasSensitiveCredentials;
 
   // Get system from context (refreshes when OAuth completes), fallback to output/input
   const systemId = output?.system?.id || input?.id;
@@ -210,7 +228,12 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     }
   }, [isCompleted, systemId, refreshSystems]);
 
-  // Track if we've ever seen this system in context (to detect deletion)
+  useEffect(() => {
+    if (isCompleted || tool.status === "declined" || tool.status === "error") {
+      setIsExecuting(false);
+    }
+  }, [isCompleted, tool.status]);
+
   const wasFoundInContextRef = useRef(false);
   useEffect(() => {
     if (systemFromContext) {
@@ -221,6 +244,51 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
       setSystemNotFound(true);
     }
   }, [systemFromContext, isRefreshing]);
+
+  const handleConfirm = useCallback(() => {
+    if (!sendAgentRequest) return;
+
+    setIsExecuting(true);
+    onToolUpdate?.(tool.id, { status: "running" });
+
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_event",
+          toolCallId: tool.id,
+          toolName: "create_system",
+          event: "confirmed",
+          payload: {
+            systemConfig,
+            userProvidedCredentials: credentialValues,
+          },
+        },
+      ],
+    });
+  }, [sendAgentRequest, onToolUpdate, tool.id, systemConfig, credentialValues]);
+
+  const handleCancel = useCallback(() => {
+    if (!sendAgentRequest) return;
+
+    onToolUpdate?.(tool.id, { status: "declined" });
+
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_event",
+          toolCallId: tool.id,
+          toolName: "create_system",
+          event: "declined",
+        },
+      ],
+    });
+  }, [sendAgentRequest, onToolUpdate, tool.id]);
+
+  const allCredentialsProvided = useMemo(() => {
+    return requiredSensitiveFields.every(
+      (field) => credentialValues[field] && credentialValues[field].trim() !== "",
+    );
+  }, [requiredSensitiveFields, credentialValues]);
 
   if (!displaySystem) {
     if (isRefreshing || isToolInProgress) {
@@ -250,8 +318,14 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     }
   }
 
+  const wrapperStatusOverride = isToolInProgress ? "running" : undefined;
+
   return (
-    <ToolCallWrapper tool={tool} openByDefault={true}>
+    <ToolCallWrapper
+      tool={tool}
+      openByDefault={!isCompleted}
+      statusOverride={wrapperStatusOverride}
+    >
       <div className="space-y-4">
         {/* Warning Banner for Deleted System */}
         {systemNotFound && (
@@ -314,11 +388,12 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
           className={`bg-background border rounded-lg p-4 ${
             isToolInProgress || hasNoOutput
               ? "border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10"
-              : "border-border"
+              : showPendingMessage
+                ? "border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10"
+                : "border-border"
           }`}
         >
-          {/* Input Data Indicator */}
-          {(isToolInProgress || hasNoOutput) && (
+          {showPendingMessage && (
             <div className="mb-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded">
               Showing input data - system will be created shortly
             </div>
@@ -337,7 +412,9 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
             <div className="flex-1 min-w-0 space-y-3">
               {/* 1. API Endpoint */}
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">API Endpoint</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  System Endpoint
+                </div>
                 <div className="text-sm font-mono bg-muted/50 px-2 py-1 rounded">
                   {(() => {
                     // Check for different possible URL properties
@@ -416,30 +493,29 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
           </div>
         </div>
 
-        {/* Edit Modal */}
-        <Dialog
-          open={isEditModalOpen && !systemNotFound && !isToolInProgress}
-          onOpenChange={(open) => {
-            if (!open) {
-              handleModalClose();
-            }
-          }}
-        >
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Edit System</DialogTitle>
-              <DialogDescription>Modify the system settings and credentials.</DialogDescription>
-            </DialogHeader>
-            <SystemForm
-              system={displaySystem}
-              onSave={handleSystemSave}
-              onCancel={handleModalClose}
-              systemOptions={systemOptions}
-              getSimpleIcon={getSimpleIcon}
-              modal={true}
-            />
-          </DialogContent>
-        </Dialog>
+        {(isAwaitingConfirmation || isExecuting) && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="glass"
+              className="!bg-[#ffa500] hover:!bg-[#ffd700] dark:!bg-[#ffa500] dark:hover:!bg-[#ffd700] !text-black !border-amber-400/50 dark:!border-amber-500/50 font-semibold"
+              onClick={handleConfirm}
+              disabled={!allCredentialsProvided || isExecuting}
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  Creating...
+                </>
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+            <Button size="sm" variant="glass" onClick={handleCancel} disabled={isExecuting}>
+              Cancel
+            </Button>
+          </div>
+        )}
       </div>
     </ToolCallWrapper>
   );
