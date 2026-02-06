@@ -191,9 +191,11 @@ export function buildUnifiedDiff(oldValue: any, newValue: any, op: string): Diff
 export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool): EnrichedDiff[] {
   if (!diffs?.length) return [];
 
+  const normalizedConfig = originalConfig ? normalizeToolSchemas(originalConfig) : undefined;
+
   return diffs.map((diff) => {
     const target = parsePathToTarget(diff.path);
-    const oldValue = originalConfig ? getValueAtPath(originalConfig, diff.path) : undefined;
+    const oldValue = normalizedConfig ? getValueAtPath(normalizedConfig, diff.path) : undefined;
 
     // Determine context path
     const stepApiMatch = diff.path.match(/^(\/steps\/\d+\/apiConfig)(\/.*)?$/);
@@ -208,17 +210,26 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     } else if (stepMatch) {
       // For OpenAPI format, no apiConfig wrapper - use step path directly
       const stepPath = stepMatch[1];
-      const hasApiConfig = originalConfig
-        ? getValueAtPath(originalConfig, stepPath + "/apiConfig") !== undefined
+      const hasApiConfig = normalizedConfig
+        ? getValueAtPath(normalizedConfig, stepPath + "/apiConfig") !== undefined
         : false;
-      contextPath = hasApiConfig ? stepPath + "/apiConfig" : stepPath;
+      const hasConfig = normalizedConfig
+        ? getValueAtPath(normalizedConfig, stepPath + "/config") !== undefined
+        : false;
+      contextPath = hasApiConfig
+        ? stepPath + "/apiConfig"
+        : hasConfig
+          ? stepPath + "/config"
+          : stepPath;
     } else if (topMatch) {
       contextPath = topMatch[1];
     } else {
       contextPath = diff.path;
     }
 
-    const contextOldObj = originalConfig ? getValueAtPath(originalConfig, contextPath) : undefined;
+    const contextOldObj = normalizedConfig
+      ? getValueAtPath(normalizedConfig, contextPath)
+      : undefined;
 
     // Apply diff to get new context
     let contextNewObj = contextOldObj;
@@ -249,9 +260,9 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     if (
       target.type === "step" &&
       target.stepIndex !== undefined &&
-      originalConfig?.steps?.[target.stepIndex]
+      normalizedConfig?.steps?.[target.stepIndex]
     ) {
-      const step = originalConfig.steps[target.stepIndex];
+      const step = normalizedConfig.steps[target.stepIndex];
       target.stepId = step.id;
       target.systemId = step.systemId;
     }

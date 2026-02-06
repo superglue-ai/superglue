@@ -3,6 +3,7 @@
 import { useConfig } from "@/src/app/config-context";
 import { useSystems } from "@/src/app/systems-context";
 import { createSuperglueClient } from "@/src/lib/client-utils";
+import { cn } from "@/src/lib/general-utils";
 import type { System } from "@superglue/shared";
 import { Hammer, MoreVertical, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -72,13 +73,14 @@ export function SystemActionsMenu({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="ghost"
+            variant="glass"
             size={showLabel ? "sm" : "icon"}
             disabled={disabled}
             onClick={(e) => e.stopPropagation()}
-            className={
-              showLabel ? "h-8 gap-1.5 text-muted-foreground hover:text-foreground" : undefined
-            }
+            className={cn(
+              "rounded-xl border-none shadow-none",
+              showLabel && "h-8 gap-1.5 text-muted-foreground hover:text-foreground",
+            )}
           >
             <MoreVertical className={showLabel ? "h-3.5 w-3.5" : "h-4 w-4"} />
             {showLabel && <span className="text-xs">More</span>}

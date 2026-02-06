@@ -1,4 +1,8 @@
-import { System, Tool } from "@superglue/shared";
+import { Message, System, Tool } from "@superglue/shared";
+
+export const needsSystemMessage = (messages: Message[]): boolean => {
+  return !messages.some((m) => m.role === "system");
+};
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
   return {

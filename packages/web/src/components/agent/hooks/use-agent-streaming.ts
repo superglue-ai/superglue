@@ -2,7 +2,7 @@
 
 import { Message } from "@superglue/shared";
 import { useCallback, useRef } from "react";
-import type { AgentConfig, UseAgentStreamingReturn, ToolConfirmationMetadata } from "./types";
+import type { AgentConfig, UseAgentStreamingReturn } from "./types";
 
 interface UseAgentStreamingOptions {
   config: AgentConfig;
@@ -148,6 +148,18 @@ export function useAgentStreaming({
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+
+                if (data.type === "system_message") {
+                  const sysMsg: Message = {
+                    id: data.systemMessage.id,
+                    role: "system",
+                    content: data.systemMessage.content,
+                    timestamp: new Date(),
+                  };
+                  setMessages((prev) => [sysMsg, ...prev]);
+                  continue;
+                }
+
                 const msg = ensureMessage();
 
                 if (data.type === "content") {
@@ -180,27 +192,12 @@ export function useAgentStreaming({
                     );
                   }
 
-                  const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
-                  const alreadyConfirmed = parsedOutput?.confirmationState !== undefined;
-                  const hasConfirmableContent =
-                    parsedOutput?.diffs?.length > 0 || parsedOutput?.newPayload;
-
-                  const needsPostExecConfirmation =
-                    !alreadyConfirmed &&
-                    confirmation?.timing === "after" &&
-                    parsedOutput?.success === true &&
-                    hasConfirmableContent;
-
-                  const isPendingUserConfirmation =
-                    parsedOutput?.confirmationState === "PENDING_USER_CONFIRMATION";
-
-                  if (needsPostExecConfirmation || isPendingUserConfirmation) {
-                    setMessages((prev) =>
-                      prev.map((m) => (m.id === msg.id ? { ...m, isStreaming: false } : m)),
-                    );
-                    currentStreamControllerRef.current?.abort();
-                    return;
-                  }
+                  config.onToolComplete?.(data.toolCall.name, data.toolCall.id, parsedOutput);
+                } else if (data.type === "paused") {
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === msg.id ? { ...m, isStreaming: false } : m)),
+                  );
+                  return;
                 } else {
                   setMessages((prev) => prev.map((m) => updateMessageWithData(m, data, msg)));
                 }

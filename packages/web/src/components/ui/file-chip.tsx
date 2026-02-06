@@ -1,13 +1,11 @@
-import { Button } from "@/src/components/ui/button";
-import { formatBytes, type UploadedFileInfo } from "@/src/lib/file-utils";
 import { cn } from "@/src/lib/general-utils";
+import { formatBytes, type UploadedFileInfo } from "@/src/lib/file-utils";
 import {
   File,
   FileArchive,
   FileCode,
   FileJson,
   FileSpreadsheet,
-  FileText,
   X,
   FileDigit,
   FileImage,
@@ -184,47 +182,49 @@ export function FileChip({
   return (
     <div
       className={cn(
-        "flex items-center justify-between transition-all border",
+        "flex items-center justify-between transition-all",
         roundedClass,
         sizeStyles,
         fileStatus === "error"
-          ? "bg-destructive/10 border-destructive/20"
+          ? "bg-destructive/10 border border-destructive/20"
           : fileStatus === "processing"
-            ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
-            : "bg-muted/30 border-border",
+            ? "bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/50 backdrop-blur-sm"
+            : "bg-gradient-to-br from-white/60 to-white/30 dark:from-white/10 dark:to-white/5 backdrop-blur-sm border border-black/5 dark:border-white/10",
         className,
       )}
       style={maxWidth ? { maxWidth } : undefined}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <FileIcon className="h-4 w-4 text-gray-700 dark:text-gray-400 flex-shrink-0" />
+        <FileIcon className="h-4 w-4 text-foreground/60 flex-shrink-0" />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-xs font-medium truncate" title={file.name}>
+          <span className="text-xs font-medium truncate text-foreground/80" title={file.name}>
             {displayName}
           </span>
           {subtitleText && (
-            <span className="text-[10px] text-muted-foreground">{subtitleText}</span>
+            <span className="text-[10px] text-muted-foreground/70">{subtitleText}</span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-1 ml-2 relative group/actions">
         {(fileStatus === "processing" || isLoading) && (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400 dark:text-gray-500 group-hover/actions:opacity-0 transition-opacity" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/50 group-hover/actions:opacity-0 transition-opacity" />
         )}
         {onRemove && (
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
+            type="button"
+            onClick={() => onRemove(file.key)}
             className={cn(
-              "h-6 w-6 hover:bg-background/80",
+              "w-5 h-5 rounded-full flex items-center justify-center",
+              "bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20",
+              "text-muted-foreground hover:text-foreground",
+              "transition-all duration-200",
               fileStatus === "processing" || isLoading
-                ? "absolute opacity-0 group-hover/actions:opacity-100 transition-opacity"
+                ? "absolute opacity-0 group-hover/actions:opacity-100"
                 : "",
             )}
-            onClick={() => onRemove(file.key)}
           >
             <X className="h-3 w-3" />
-          </Button>
+          </button>
         )}
       </div>
     </div>

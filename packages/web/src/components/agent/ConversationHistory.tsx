@@ -282,7 +282,7 @@ export function ConversationHistory({
     <div className="relative">
       <Button
         ref={buttonRef}
-        variant="outline"
+        variant="glass"
         size="sm"
         onClick={() => setShowHistory(true)}
         data-history-button

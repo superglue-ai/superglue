@@ -4,7 +4,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { cn } from "@/src/lib/general-utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { ToolCall } from "@superglue/shared";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 
 interface ToolCallWrapperProps {
@@ -112,7 +112,7 @@ export function ToolCallWrapper({
       case "declined":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
       case "awaiting_confirmation":
-        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
+        return "bg-[#ffa500]/15 text-amber-800 dark:bg-[#ffa500]/20 dark:text-[#ffa500]";
       case "pending":
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
       default:
@@ -248,29 +248,14 @@ export function ToolCallWrapper({
                   if (parsed && parsed.success === false && !hideStatusIcon) {
                     return (
                       <div className="space-y-4 mb-4">
-                        <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0">
-                              <svg
-                                className="w-5 h-5 text-gray-600 dark:text-gray-400"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
+                        <div className="border border-red-200/40 dark:border-red-700/40 rounded-md p-3 flex items-start gap-2 overflow-hidden">
+                          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
+                              Task failed
                             </div>
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">
-                                Task failed
-                              </div>
-                              <div className="text-sm text-gray-700 dark:text-gray-300">
-                                Error:{" "}
-                                {parsed.message || parsed.error || "An unknown error occurred"}
-                              </div>
+                            <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
+                              {parsed.message || parsed.error || "An unknown error occurred"}
                             </div>
                           </div>
                         </div>
@@ -314,11 +299,11 @@ export function ToolCallWrapper({
                   <div>
                     <Collapsible open={isInputExpanded} onOpenChange={setIsInputExpanded}>
                       <CollapsibleTrigger asChild>
-                        <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        <button className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">
                           {isInputExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
+                            <ChevronDown className="w-3 h-3" />
                           ) : (
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-3 h-3" />
                           )}
                           Input used
                         </button>
@@ -339,30 +324,32 @@ export function ToolCallWrapper({
             {/* Show warning message for stale/incomplete tool calls (not for execution failures with statusOverride) */}
             {displayStatus === "error" && !statusOverride && (
               <div className="space-y-4 mb-4">
-                <div className="bg-muted/50 border border-border rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm text-muted-foreground">
-                        Tool call{" "}
-                        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
-                          {tool.id}
-                        </code>{" "}
-                        did not complete.
-                        <span className="text-xs ml-1">(connection issue or tab closed)</span>
-                      </div>
+                <div className="border border-red-200/40 dark:border-red-700/40 rounded-md p-3 flex items-start gap-2 overflow-hidden">
+                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
+                      {(() => {
+                        let errorMessage = tool.error;
+                        if (errorMessage) {
+                          try {
+                            const parsed = JSON.parse(errorMessage);
+                            errorMessage = parsed.error || parsed.message || errorMessage;
+                          } catch {}
+                        }
+                        if (errorMessage) {
+                          return <span>{errorMessage}</span>;
+                        }
+                        return (
+                          <>
+                            Tool call{" "}
+                            <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
+                              {tool.id}
+                            </code>{" "}
+                            did not complete.
+                            <span className="text-xs ml-1">(connection issue or tab closed)</span>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -372,11 +359,11 @@ export function ToolCallWrapper({
                   <div>
                     <Collapsible open={isInputExpanded} onOpenChange={setIsInputExpanded}>
                       <CollapsibleTrigger asChild>
-                        <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        <button className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">
                           {isInputExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
+                            <ChevronDown className="w-3 h-3" />
                           ) : (
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-3 h-3" />
                           )}
                           Input used
                         </button>

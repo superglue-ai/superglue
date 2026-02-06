@@ -1,8 +1,7 @@
 "use client";
 
-import { Card } from "@/src/components/ui/card";
-import { ArrowRight, ArrowUpRight, X } from "lucide-react";
-import { Button } from "@/src/components/ui/button";
+import { cn } from "@/src/lib/general-utils";
+import { ChevronRight, ExternalLink, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "@/src/hooks/use-toast";
 import { loadToolTemplate } from "@/src/lib/tool-templates/tool-templates";
@@ -111,7 +110,11 @@ Style:
 
 interface AgentWelcomeToolLibraryProps {
   onDismiss?: () => void;
-  onStartPrompt: (userPrompt: string, systemPrompt?: string) => void;
+  onStartPrompt: (
+    userPrompt: string,
+    systemPrompt?: string,
+    options?: { hideUserMessage?: boolean },
+  ) => void;
 }
 
 export function AgentWelcomeToolLibrary({
@@ -163,7 +166,9 @@ export function AgentWelcomeToolLibrary({
         template.description || template.instruction,
         template.inputSchema,
       );
-      onStartPrompt(`I want to test the "${prefixedId}" tool.`, systemPrompt);
+      onStartPrompt(`I want to test the "${prefixedId}" tool.`, systemPrompt, {
+        hideUserMessage: true,
+      });
     } catch (error: any) {
       console.error("Error setting up tool:", error);
       toast({
@@ -175,74 +180,97 @@ export function AgentWelcomeToolLibrary({
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-sm font-medium text-foreground">Trending Tools</span>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Most used by the community this week
-          </p>
-        </div>
+    <div className="max-w-3xl mx-auto">
+      <div className="relative">
         {onDismiss && (
-          <Button variant="ghost" size="sm" className="h-6 px-2" onClick={onDismiss}>
-            <X className="w-3 h-3" />
-          </Button>
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={onDismiss}
+              className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center",
+                "bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20",
+                "text-muted-foreground hover:text-foreground",
+                "transition-all duration-200",
+              )}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
         )}
-      </div>
 
-      {/* Tools Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-        {popularTools.map((tool) => (
-          <Card
-            key={tool.id}
-            className="p-3 hover:bg-muted/30 transition-colors cursor-pointer group"
-            onClick={() => handleClick(tool.id)}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                {tool.simpleIcon &&
-                  (() => {
-                    const icon = getSimpleIcon(tool.simpleIcon);
-                    return icon ? (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill={`#${icon.hex}`}
-                        key={tool.simpleIcon}
-                      >
-                        <path d={icon.path} />
-                      </svg>
-                    ) : null;
-                  })()}
-                {tool.logo && (
-                  <img
-                    width={16}
-                    height={16}
-                    src={tool.logo}
-                    className="w-4 h-4 object-contain flex-shrink-0"
-                  />
-                )}
-                <h3 className="text-sm truncate">{tool.name}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {popularTools.map((tool) => (
+            <button
+              key={tool.id}
+              onClick={() => handleClick(tool.id)}
+              className={cn(
+                "group relative w-full text-left p-3 rounded-xl transition-all duration-200",
+                "bg-gradient-to-br from-white/60 to-white/30 dark:from-white/10 dark:to-white/5",
+                "backdrop-blur-sm border border-black/5 dark:border-white/10",
+                "hover:border-black/10 dark:hover:border-white/20",
+                "hover:shadow-sm",
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                    {tool.simpleIcon &&
+                      (() => {
+                        const icon = getSimpleIcon(tool.simpleIcon);
+                        return icon ? (
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill={`#${icon.hex}`}
+                            key={tool.simpleIcon}
+                          >
+                            <path d={icon.path} />
+                          </svg>
+                        ) : null;
+                      })()}
+                    {tool.logo && (
+                      <img
+                        width={18}
+                        height={18}
+                        src={tool.logo}
+                        className="w-[18px] h-[18px] object-contain"
+                      />
+                    )}
+                  </div>
+                  <span className="text-sm text-foreground/80 group-hover:text-foreground truncate transition-colors">
+                    {tool.name}
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
+                    "bg-black/5 dark:bg-white/10 group-hover:bg-black/10 dark:group-hover:bg-white/20",
+                    "transition-all duration-200 group-hover:translate-x-0.5",
+                  )}
+                >
+                  <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-            </div>
-          </Card>
-        ))}
-      </div>
+            </button>
+          ))}
+        </div>
 
-      {/* Link to full library */}
-      <div className="pt-2 text-center">
-        <a
-          href="https://superglue.ai/tools/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Explore more tools in our tool library
-          <ArrowUpRight className="w-3 h-3" />
-        </a>
+        <div className="mt-3 text-center">
+          <a
+            href="https://superglue.ai/tools/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "inline-flex items-center gap-1.5 text-xs",
+              "text-muted-foreground/70 hover:text-foreground/80",
+              "transition-colors duration-200",
+            )}
+          >
+            Explore more tools in our library
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
     </div>
   );

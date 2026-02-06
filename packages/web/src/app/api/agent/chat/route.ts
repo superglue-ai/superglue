@@ -34,20 +34,21 @@ export async function POST(request: NextRequest) {
       abortSignal: request.signal,
     });
 
+    let validated;
     try {
-      client.validateRequest(body);
+      validated = client.validateRequest(body);
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Agent request validation failed." },
-        { status: 400 },
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : "Agent request validation failed.";
+      console.error("Agent request validation failed:", errorMessage);
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of client!.streamResponse(body)) {
+          for await (const chunk of client!.streamResponse(validated)) {
             if (request.signal.aborted) {
               break;
             }

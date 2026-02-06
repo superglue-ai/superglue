@@ -1,7 +1,7 @@
 "use client";
 
 import { ToolCall } from "@superglue/shared";
-import { Copy } from "lucide-react";
+import { AlertCircle, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 
@@ -121,10 +121,13 @@ export function DefaultComponent({ tool, onInputChange }: DefaultComponentProps)
         )}
 
         {tool.error && (
-          <div>
-            <div className="text-sm font-medium text-destructive mb-2">Error</div>
-            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-              {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
+          <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">Error</div>
+              <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
+                {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
+              </div>
             </div>
           </div>
         )}

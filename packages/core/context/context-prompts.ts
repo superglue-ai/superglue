@@ -34,7 +34,7 @@ CRITICAL: Never use any system IDs in a step that were not explicitly provided a
 
 <SYSTEM_CREDENTIAL_HANDLING>
 - There are two sourced of credentials: Those stored in the user's systems, and credentials passed as tool payloads at runtime
-- When building a tool, look carefully at the build instruction to determine which credentials to use in each step
+- If the user does not specify which credentials to use, the credentials in the payload ALWAYS take precedence.
 </SYSTEM_CREDENTIAL_HANDLING>
 
 <FILE_HANDLING>

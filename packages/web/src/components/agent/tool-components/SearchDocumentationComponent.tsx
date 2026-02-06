@@ -77,8 +77,11 @@ export function SearchDocumentationComponent({
         )}
 
         {tool.error && !hasNoDocumentation && (
-          <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-            {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
+          <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-red-800 dark:text-red-200 break-words min-w-0 max-h-40 overflow-y-auto">
+              {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
+            </div>
           </div>
         )}
       </div>

@@ -21,6 +21,7 @@ export interface SystemConfig {
     usePKCE?: boolean;
   };
   keywords?: string[];
+  systemSpecificInstructions?: string;
 }
 
 export const systems: Record<string, SystemConfig> = {
@@ -2242,6 +2243,25 @@ export const systems: Record<string, SystemConfig> = {
       "usage",
       "api key",
     ],
+    systemSpecificInstructions: `As of February 2026, these are the available OpenAI API models:
+
+    FLAGSHIP MODELS:
+    - gpt-5.2 - Latest and most capable model (recommended for most use cases)
+    - gpt-5 - Previous flagship model
+    - o4-mini - Optimized reasoning model
+
+    LEGACY MODELS (still available via API):
+    - gpt-4o - Being retired from ChatGPT but still available via API
+    - gpt-4.1 / gpt-4.1-mini - Previous generation models
+    - gpt-4-turbo - Older turbo variant
+    - gpt-3.5-turbo - Legacy model for cost-sensitive applications
+
+    SPECIALIZED MODELS:
+    - text-embedding-3-large / text-embedding-3-small - For embeddings
+    - dall-e-3 - Image generation
+    - whisper-1 - Audio transcription
+    - tts-1 / tts-1-hd - Text-to-speech
+    `,
   },
   anthropic: {
     name: "anthropic",
@@ -2261,6 +2281,31 @@ export const systems: Record<string, SystemConfig> = {
       "streaming",
       "api key",
     ],
+    systemSpecificInstructions: `As of February 2026, these are the available Anthropic Claude API models:
+
+    LATEST MODELS (Claude 4 series):
+    - claude-opus-4-6 - Most intelligent model for agents and coding
+    - claude-sonnet-4-5-20250929 (alias: claude-sonnet-4-5) - Best speed/intelligence balance  
+    - claude-haiku-4-5-20251001 (alias: claude-haiku-4-5) - Fastest model
+
+    OLDER CLAUDE 4 VERSIONS (still active):
+    - claude-opus-4-5-20251101 - Previous Opus version
+    - claude-opus-4-1-20250805 - Earlier Opus version
+    - claude-opus-4-20250514 - Original Claude 4 Opus
+    - claude-sonnet-4-20250514 - Original Claude 4 Sonnet
+
+    LEGACY MODELS (deprecated, retiring Feb 19, 2026):
+    - claude-3-7-sonnet-20250219 - Last Claude 3 Sonnet (use claude-opus-4-6 instead)
+    - claude-3-5-haiku-20241022 - Claude 3.5 Haiku (use claude-haiku-4-5 instead)
+
+    STILL AVAILABLE:
+    - claude-3-haiku-20240307 - Claude 3 Haiku (active, cheapest option)
+
+    RETIRED (no longer available):
+    - claude-3-5-sonnet-* (retired Oct 2025)
+    - claude-3-opus-20240229 (retired Jan 2026)
+    - claude-2.*, claude-3-sonnet-* (retired Jul 2025)
+`,
   },
   claude: {
     name: "claude",

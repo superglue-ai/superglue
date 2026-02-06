@@ -29,7 +29,8 @@ function TemplateNodeView(props: NodeViewProps) {
   const { node, deleteNode, updateAttributes, selected, editor } = props;
   const stepId = editor.storage.template?.stepId ?? "";
   const { getStepTemplateData, sourceDataVersion } = useExecution();
-  const { sourceData, dataSelectorOutput, canExecute } = getStepTemplateData(stepId);
+  const { sourceData, dataSelectorOutput, canExecute, categorizedVariables } =
+    getStepTemplateData(stepId);
 
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [forcePopoverOpen, setForcePopoverOpen] = useState(false);
@@ -39,6 +40,18 @@ function TemplateNodeView(props: NodeViewProps) {
     rawTemplate.startsWith("<<") && rawTemplate.endsWith(">>")
       ? rawTemplate.slice(2, -2).trim()
       : rawTemplate.trim();
+
+  const isPayloadRef = (() => {
+    const allPayloadKeys = [...categorizedVariables.toolInputs, ...categorizedVariables.fileInputs];
+    if (allPayloadKeys.length === 0) return false;
+    if (allPayloadKeys.includes(expression)) return true;
+    return allPayloadKeys.some(
+      (key) =>
+        expression.includes(`sourceData.${key}`) ||
+        expression.includes(`sourceData["${key}"]`) ||
+        expression.includes(`sourceData['${key}']`),
+    );
+  })();
 
   const needsDataSelectorOutput = expression.includes("currentItem");
   const shouldEvaluate = canExecute && (!needsDataSelectorOutput || !!dataSelectorOutput);
@@ -107,6 +120,7 @@ function TemplateNodeView(props: NodeViewProps) {
         selected={isActuallySelected}
         forcePopoverOpen={forcePopoverOpen}
         onPopoverOpenChange={handlePopoverOpenChange}
+        isPayloadRef={isPayloadRef}
       />
     </NodeViewWrapper>
   );

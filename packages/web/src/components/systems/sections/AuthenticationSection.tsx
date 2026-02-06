@@ -2,7 +2,7 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { Button } from "@/src/components/ui/button";
-import { FileChip } from "@/src/components/ui/FileChip";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { OAuthConnectButton } from "@/src/components/ui/oauth-connect-button";

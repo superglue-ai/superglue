@@ -1,7 +1,13 @@
-import { Message, Run, Tool } from "@superglue/shared";
+import { Message, Run, RunStatus, StoredRunResults, Tool, getDateMessage } from "@superglue/shared";
 import { systems } from "@superglue/shared/templates";
-import { AgentDefinition, ToolExecutionContext } from "./agent-types";
-import { SUPERGLUE_INFORMATION_PROMPT } from "./agent-prompts";
+import { truncateToolResult } from "../general-utils";
+import { SystemPromptResult, ToolExecutionContext } from "./agent-types";
+import {
+  MAIN_AGENT_SYSTEM_PROMPT,
+  TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT,
+  SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT,
+  SUPERGLUE_INFORMATION_PROMPT,
+} from "./agent-prompts";
 
 export interface DraftLookup {
   config: Tool;
@@ -97,7 +103,7 @@ export interface PlaygroundContextData {
   mergedPayload?: string;
 }
 
-export function formatPlaygroundRuntimeContext(ctx: PlaygroundContextData): string {
+export function formatPlaygroundHiddenContext(ctx: PlaygroundContextData): string {
   const truncatedPayload =
     ctx.currentPayload.length > 2000
       ? ctx.currentPayload.substring(0, 2000) +
@@ -169,17 +175,15 @@ async function getToolsForContext(ctx: ToolExecutionContext) {
       };
     }
 
-    const toolsWithTruncatedInstructions = result.map(({ reason, ...tool }: any) => ({
+    const toolsSummary = result.map(({ reason, ...tool }: any) => ({
       id: tool.id,
-      instruction: tool.instruction?.substring(0, 300) || tool.instruction,
-      systemIds: tool.systemIds,
-      inputSchema: tool.inputSchema,
+      instruction: tool.instruction?.substring(0, 200) || "",
     }));
 
     return {
       success: true,
       toolIds: result.map((t: any) => t.id),
-      tools: toolsWithTruncatedInstructions,
+      tools: toolsSummary,
     };
   } catch (error: any) {
     return {
@@ -195,24 +199,18 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
   try {
     const result = await ctx.superglueClient.listSystems(1000);
 
-    const formattedSystems = result.items.map((system: any) => {
-      const credentials = system?.credentials || {};
-      const credentialStatus = Object.entries(credentials).map(([key, value]) => ({
-        key,
-        placeholder: `<<${system?.id}_${key}>>`,
-        hasValue: !!value && value !== "",
-      }));
-
+    const systemsSummary = result.items.map((system: any) => {
+      const credentialKeys = Object.keys(system?.credentials || {});
       return {
         id: system?.id,
-        urlHost: system?.urlHost,
-        credentials: credentialStatus,
+        name: system?.displayName || system?.id,
+        credentialKeys: credentialKeys.length > 0 ? credentialKeys : undefined,
       };
     });
 
     return {
       success: true,
-      systems: formattedSystems,
+      systems: systemsSummary,
     };
   } catch (error: any) {
     return {
@@ -223,44 +221,117 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
   }
 }
 
-export async function initializeMainAgentContext(ctx: ToolExecutionContext): Promise<string> {
+export interface PlaygroundToolConfig {
+  toolId: string;
+  instruction: string;
+  steps: any[];
+  outputTransform?: string;
+  inputSchema?: any;
+  outputSchema?: any;
+  systemIds?: string[];
+}
+
+export function createPlaygroundDraftMessage(toolConfig: PlaygroundToolConfig): Message {
+  return {
+    id: `playground-draft-${Date.now()}`,
+    timestamp: new Date(),
+    role: "assistant",
+    content: "",
+    isHidden: true,
+    parts: [
+      {
+        id: `playground-draft-part-${Date.now()}`,
+        type: "tool",
+        tool: {
+          id: `playground-draft-tool-${Date.now()}`,
+          name: "build_tool",
+          input: { instruction: toolConfig.instruction },
+          output: {
+            success: true,
+            draftId: "playground-draft",
+            config: {
+              id: toolConfig.toolId,
+              instruction: toolConfig.instruction,
+              steps: toolConfig.steps,
+              outputTransform: toolConfig.outputTransform,
+              inputSchema: toolConfig.inputSchema,
+              outputSchema: toolConfig.outputSchema,
+              systemIds: toolConfig.systemIds,
+            },
+            systemIds: toolConfig.systemIds || [],
+          },
+          status: "completed",
+        },
+      },
+    ],
+  } as Message;
+}
+
+export async function generateMainAgentSystemPrompt(
+  ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
   const [toolsResult, systemsResult] = await Promise.all([
     getToolsForContext(ctx),
     getSystemsForContext(ctx),
   ]);
 
   const templateIds = Object.keys(systems);
+  const dateMessage = getDateMessage();
 
-  const result = `
-    [PRELOADED CONTEXT - The user's available superglue tools and systems are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+  const content = `${MAIN_AGENT_SYSTEM_PROMPT}
 
-    AVAILABLE SUPERGLUE TOOLS:
-    ${JSON.stringify(toolsResult.tools || [])}
+[PRELOADED CONTEXT]${SUPERGLUE_INFORMATION_PROMPT}
 
-    AVAILABLE SUPERGLUE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-    ${JSON.stringify(systemsResult.systems || [])}
+AVAILABLE TOOLS: ${JSON.stringify(toolsResult.tools || [])}
 
-    AVAILABLE SYSTEM TEMPLATES:
-    ${templateIds.join(", ")}
-    `;
-  return result;
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
+
+SYSTEM TEMPLATES: ${templateIds.join(", ")}
+
+${dateMessage.content}`;
+
+  return { content };
 }
 
-export async function initializeToolPlaygroundAgentContext(
+export async function generatePlaygroundSystemPrompt(
   ctx: ToolExecutionContext,
-): Promise<string> {
+): Promise<SystemPromptResult> {
+  const [toolsResult, systemsResult] = await Promise.all([
+    getToolsForContext(ctx),
+    getSystemsForContext(ctx),
+  ]);
+
+  const dateMessage = getDateMessage();
+
+  const content = `${TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT}
+
+[PRELOADED CONTEXT]${SUPERGLUE_INFORMATION_PROMPT}
+
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
+
+AVAILABLE TOOLS: ${JSON.stringify(toolsResult.tools || [])}
+
+${dateMessage.content}`;
+
+  return { content };
+}
+
+export async function generateSystemPlaygroundSystemPrompt(
+  ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
   const systemsResult = await getSystemsForContext(ctx);
-  const toolsResult = await getToolsForContext(ctx);
+  const templateIds = Object.keys(systems);
+  const dateMessage = getDateMessage();
 
-  return `
-    [PRELOADED CONTEXT - The user's available superglue systems and tools are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+  const content = `${SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT}
 
-    AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-    ${JSON.stringify(systemsResult.systems || [])}
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
 
-    AVAILABLE SUPERGLUE TOOLS:
-    ${JSON.stringify(toolsResult.tools || [])}
-    `;
+TEMPLATES: ${templateIds.slice(0, 30).join(", ")}${templateIds.length > 30 ? ` (+${templateIds.length - 30} more)` : ""}
+
+${dateMessage.content}`;
+
+  return { content };
 }
 
 export function getDiscoveryContext(systemIds: string[]): string {
@@ -502,28 +573,10 @@ What went wrong and how can I fix it?${toolExistsNote}`;
   return { systemPrompt, userPrompt };
 }
 
-export function resolveSystemPrompt(agent: AgentDefinition, params?: Record<string, any>): string {
-  if (typeof agent.systemPrompt === "function") {
-    return agent.systemPrompt(params || {});
-  }
-  return agent.systemPrompt;
-}
-
-export async function generateAgentInitialContext(
-  agent: AgentDefinition,
-  ctx: ToolExecutionContext,
-  agentParams?: Record<string, any>,
-): Promise<string | null> {
-  if (!agent.initialContextGenerator) {
-    return null;
-  }
-  return agent.initialContextGenerator(ctx, agentParams);
-}
-
 export { type SystemContextForAgent as SystemPlaygroundContextData } from "@/src/components/systems/context/types";
 import type { SystemContextForAgent } from "@/src/components/systems/context/types";
 
-export function formatSystemRuntimeContext(ctx: SystemContextForAgent): string {
+export function formatSystemHiddenContext(ctx: SystemContextForAgent): string {
   const credentialPlaceholders = ctx.credentialKeys
     .map((key) => `<<${ctx.systemId}_${key}>>`)
     .join(", ");
@@ -551,17 +604,4 @@ Section Status:
 
 Use edit_system with id="${ctx.systemId}" to make changes.
 Use call_system with placeholders like ${credentialPlaceholders || "<<systemId_keyName>>"} to test.`;
-}
-
-export async function initializeSystemPlaygroundContext(
-  ctx: ToolExecutionContext,
-  _agentParams?: Record<string, any>,
-): Promise<string> {
-  const systemsResult = await getSystemsForContext(ctx);
-  const templateIds = Object.keys(systems);
-
-  return `AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-${JSON.stringify(systemsResult.systems || [])}
-
-AVAILABLE TEMPLATES: ${templateIds.slice(0, 30).join(", ")}${templateIds.length > 30 ? ` (+${templateIds.length - 30} more)` : ""}`;
 }

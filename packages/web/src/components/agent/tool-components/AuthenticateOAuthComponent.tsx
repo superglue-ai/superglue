@@ -6,14 +6,9 @@ import { Button } from "@/src/components/ui/button";
 import { UserAction } from "@/src/lib/agent/agent-types";
 import { triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import {
-  SuperglueClient,
-  systems as templateSystems,
-  findTemplateForSystem,
-  ToolCall,
-} from "@superglue/shared";
-import { CheckCircle, Key, Loader2, XCircle } from "lucide-react";
-import { useCallback, useState } from "react";
+import { findTemplateForSystem, ToolCall } from "@superglue/shared";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 
 interface AuthenticateOAuthComponentProps {
@@ -30,7 +25,6 @@ export function AuthenticateOAuthComponent({
   tool,
   onInputChange,
   sendAgentRequest,
-  onAbortStream,
 }: AuthenticateOAuthComponentProps) {
   const config = useConfig();
   const { refreshSystems } = useSystems();
@@ -54,27 +48,47 @@ export function AuthenticateOAuthComponent({
   const oauthConfig = output?.oauthConfig || {};
   const system = output?.system;
 
+  const isToolExecuting = tool.status === "running" || tool.status === "pending";
+  const isOAuthCompleted = buttonState === "completed";
+  const isOAuthFailed = buttonState === "error";
+
+  const sendOAuthFailureEvent = useCallback(
+    (error: string) => {
+      sendAgentRequest?.(undefined, {
+        userActions: [
+          {
+            type: "tool_event",
+            toolCallId: tool.id,
+            toolName: "authenticate_oauth",
+            event: "oauth_failure",
+            payload: { systemId, error },
+          },
+        ],
+      });
+    },
+    [sendAgentRequest, tool.id, systemId],
+  );
+
+  const hasInitialFailure = output?.success === false && !requiresOAuth;
+  const initialFailureSentRef = useRef(false);
+
+  useEffect(() => {
+    if (hasInitialFailure && !initialFailureSentRef.current && output?.error) {
+      initialFailureSentRef.current = true;
+      sendOAuthFailureEvent(output.error);
+    }
+  }, [hasInitialFailure, output?.error, sendOAuthFailureEvent]);
+
   const handleOAuthClick = useCallback(async () => {
     if (!systemId || !oauthConfig) return;
-
-    // Stop the agent stream when user clicks action button
-    onAbortStream?.();
 
     setButtonState("loading");
     setErrorMessage(null);
 
     try {
-      // Determine if we should use template OAuth or user-provided/stored credentials
-      // Priority: user input > stored system credentials > template
-      // If oauthConfig has client_secret, it means either:
-      //   1. User provided it in tool input, OR
-      //   2. System has it stored in credentials
-      // In both cases, we should cache and use those credentials, not template
+      let templateInfo: { templateId?: string; clientId?: string } | undefined;
       const hasClientSecret = !!oauthConfig.client_secret;
 
-      let templateInfo: { templateId?: string; clientId?: string } | undefined;
-
-      // Only use template OAuth if we don't have client_secret (neither from user input nor stored)
       if (!hasClientSecret) {
         // Check if system matches a template with OAuth configured
         const templateMatch = system ? findTemplateForSystem(system) : null;
@@ -102,83 +116,32 @@ export function AuthenticateOAuthComponent({
       const handleOAuthError = (error: string) => {
         setButtonState("error");
         setErrorMessage(error);
-        sendAgentRequest?.(undefined, {
-          userActions: [
-            {
-              type: "tool_execution_feedback",
-              toolCallId: tool.id,
-              toolName: "authenticate_oauth",
-              feedback: "oauth_failure",
-              data: { systemId, error },
-            },
-          ],
-        });
+        sendOAuthFailureEvent(error);
       };
 
       const handleOAuthSuccess = async (tokens: any) => {
         if (tokens) {
-          const client = new SuperglueClient({
-            endpoint: config.superglueEndpoint,
-            apiKey: tokenRegistry.getToken(),
-            apiEndpoint: config.apiEndpoint,
+          setButtonState("completed");
+          refreshSystems();
+          sendAgentRequest?.(undefined, {
+            userActions: [
+              {
+                type: "tool_event",
+                toolCallId: tool.id,
+                toolName: "authenticate_oauth",
+                event: "oauth_success",
+                payload: { systemId, tokens },
+              },
+            ],
           });
-
-          try {
-            const currentSystem = await client.getSystem(systemId);
-            const updatedCredentials = {
-              ...currentSystem?.credentials,
-              ...(oauthConfig.client_id && { client_id: oauthConfig.client_id }),
-              ...(oauthConfig.client_secret && { client_secret: oauthConfig.client_secret }),
-              ...(oauthConfig.auth_url && { auth_url: oauthConfig.auth_url }),
-              ...(oauthConfig.token_url && { token_url: oauthConfig.token_url }),
-              ...(oauthConfig.scopes && { scopes: oauthConfig.scopes }),
-              ...(oauthConfig.grant_type && { grant_type: oauthConfig.grant_type }),
-              access_token: tokens.access_token,
-              refresh_token: tokens.refresh_token,
-              token_type: tokens.token_type,
-              expires_at: tokens.expires_at,
-              ...(tokens.tokenAuthMethod && { tokenAuthMethod: tokens.tokenAuthMethod }),
-              ...(tokens.tokenContentType && { tokenContentType: tokens.tokenContentType }),
-              ...(tokens.extraHeaders && {
-                extraHeaders:
-                  typeof tokens.extraHeaders === "string"
-                    ? tokens.extraHeaders
-                    : JSON.stringify(tokens.extraHeaders),
-              }),
-            };
-
-            await client.upsertSystem(systemId, {
-              credentials: updatedCredentials,
-            });
-
-            setButtonState("completed");
-            refreshSystems();
-            sendAgentRequest?.(undefined, {
-              userActions: [
-                {
-                  type: "tool_execution_feedback",
-                  toolCallId: tool.id,
-                  toolName: "authenticate_oauth",
-                  feedback: "oauth_success",
-                  data: { systemId },
-                },
-              ],
-            });
-          } catch (error: any) {
-            handleOAuthError(`Failed to save tokens: ${error.message}`);
-          }
         }
       };
 
-      // Trigger OAuth flow
-      // If templateInfo is set, backend will resolve credentials from template
-      // If user explicitly provided client_secret, it will be in oauthConfig and will be cached
-      // oauthConfig.client_secret will be undefined if user didn't explicitly provide it
       triggerOAuthFlow(
         systemId,
         {
           client_id: oauthConfig.client_id,
-          client_secret: oauthConfig.client_secret, // Will be undefined if user didn't provide it
+          client_secret: oauthConfig.client_secret,
           auth_url: oauthConfig.auth_url,
           token_url: oauthConfig.token_url,
           scopes: oauthConfig.scopes,
@@ -188,14 +151,14 @@ export function AuthenticateOAuthComponent({
           usePKCE: oauthConfig.usePKCE,
           extraHeaders: oauthConfig.extraHeaders,
         },
-        tokenRegistry.getToken(), // apiKey
-        "oauth", // authType
+        tokenRegistry.getToken(),
+        "oauth",
         handleOAuthError,
-        true, // forceOAuth
+        true,
         templateInfo,
         handleOAuthSuccess,
         config.superglueEndpoint,
-        undefined, // suppressErrorUI
+        undefined,
         config.apiEndpoint,
       );
     } catch (error: any) {
@@ -205,16 +168,16 @@ export function AuthenticateOAuthComponent({
   }, [
     systemId,
     oauthConfig,
+    system,
     config.superglueEndpoint,
     config.apiEndpoint,
-    onAbortStream,
     tool.id,
     refreshSystems,
     sendAgentRequest,
+    sendOAuthFailureEvent,
   ]);
 
-  // Render states
-  if (tool.status === "running" || tool.status === "pending") {
+  if (isToolExecuting) {
     return (
       <ToolCallWrapper tool={tool} openByDefault={true}>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -225,27 +188,37 @@ export function AuthenticateOAuthComponent({
     );
   }
 
-  // Show error only for actual failures (not requiresOAuth state)
   if (output?.success === false && !requiresOAuth) {
     return (
-      <ToolCallWrapper tool={tool} openByDefault={true}>
-        <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
-          <XCircle className="w-4 h-4 text-red-500 mt-0.5" />
-          <div>
-            <div className="text-sm font-medium text-red-700 dark:text-red-300">
+      <ToolCallWrapper tool={tool} openByDefault={true} statusOverride="error">
+        <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
               OAuth Setup Failed
             </div>
-            <div className="text-sm text-red-600/80 dark:text-red-400/80 mt-1">{output?.error}</div>
+            <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
+              {output?.error}
+            </div>
           </div>
         </div>
       </ToolCallWrapper>
     );
   }
 
+  const wrapperStatusOverride = isOAuthCompleted
+    ? "completed"
+    : isOAuthFailed
+      ? "error"
+      : undefined;
+
   return (
-    <ToolCallWrapper tool={tool} openByDefault={buttonState !== "completed"}>
+    <ToolCallWrapper
+      tool={tool}
+      openByDefault={!isOAuthCompleted}
+      statusOverride={wrapperStatusOverride}
+    >
       <div className="space-y-4">
-        {/* System info */}
         {system && (
           <div className="text-sm">
             <span className="text-muted-foreground">System: </span>
@@ -256,36 +229,22 @@ export function AuthenticateOAuthComponent({
           </div>
         )}
 
-        {/* OAuth button */}
-        {requiresOAuth && buttonState !== "completed" && (
-          <Button onClick={handleOAuthClick} disabled={buttonState === "loading"} className="gap-2">
-            {buttonState === "loading" ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Authenticating...
-              </>
-            ) : (
-              <>
-                <Key className="w-4 h-4" />
-                Authenticate with OAuth
-              </>
-            )}
-          </Button>
+        {requiresOAuth && !isOAuthFailed && (
+          <OAuthConnectButton
+            system={system || { id: systemId }}
+            onClick={handleOAuthClick}
+            disabled={buttonState === "loading"}
+            loading={buttonState === "loading"}
+            connected={isOAuthCompleted}
+          />
         )}
 
-        {/* Success state */}
-        {buttonState === "completed" && (
-          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-            <CheckCircle className="w-4 h-4" />
-            OAuth authentication completed
-          </div>
-        )}
-
-        {/* Error state */}
         {errorMessage && (
-          <div className="flex items-start gap-2 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
-            <XCircle className="w-4 h-4 text-red-500 mt-0.5" />
-            <div className="text-sm text-red-600/80 dark:text-red-400/80">{errorMessage}</div>
+          <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto min-w-0">
+              {errorMessage}
+            </div>
           </div>
         )}
       </div>

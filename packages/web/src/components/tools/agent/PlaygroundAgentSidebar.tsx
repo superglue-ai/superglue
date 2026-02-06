@@ -4,13 +4,21 @@ import { Button } from "@/src/components/ui/button";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import {
-  formatPlaygroundRuntimeContext,
-  formatSystemRuntimeContext,
-  SystemPlaygroundContextData,
+  createPlaygroundDraftMessage,
+  formatPlaygroundHiddenContext,
+  formatSystemHiddenContext,
+  PlaygroundToolConfig,
 } from "@/src/lib/agent/agent-context";
 import { cn } from "@/src/lib/general-utils";
-import { Tool, ExecutionStep, ToolDiff } from "@superglue/shared";
-import { BotMessageSquare, Edit2, MessagesSquare, Send, Square, User, Plus, X } from "lucide-react";
+import {
+  Tool,
+  ToolStep,
+  ToolDiff,
+  RequestStepConfig,
+  isRequestConfig,
+  Message,
+} from "@superglue/shared";
+import { MessagesSquare, Pencil, Send, Square, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextProvider";
@@ -44,7 +52,7 @@ interface PlaygroundAgentSidebarProps {
   systemConfig?: SystemContextForAgent;
 }
 
-function buildPlaygroundContext(
+function buildToolPlaygroundContext(
   toolConfig: ReturnType<typeof useToolConfig>,
   executionSummary: string,
   initialError?: string,
@@ -189,7 +197,7 @@ function PlaygroundAgentContent({
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const hasMessages = messages.length > 0;
+  const hasMessages = messages.some((m) => m.role !== "system" && !(m as any).isHidden);
   const emptyStateText =
     mode === "tool"
       ? {
@@ -225,7 +233,7 @@ function PlaygroundAgentContent({
             cacheKeyPrefix={cacheKeyPrefix}
           />
           {(messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
-            <Button variant="ghost" size="sm" onClick={startNewConversation} className="h-8 px-2">
+            <Button variant="glass" size="sm" onClick={startNewConversation} className="h-8 px-2">
               <Plus className="w-3 h-3 mr-1" />
               New
             </Button>
@@ -242,7 +250,13 @@ function PlaygroundAgentContent({
         <div className="p-4 space-y-4">
           {!hasMessages && (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-              <BotMessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <div className="h-10 w-10 rounded-full bg-white dark:bg-black flex items-center justify-center mb-3">
+                <img
+                  src="/favicon.png"
+                  alt="superglue"
+                  className="w-5 h-5 object-contain dark:invert"
+                />
+              </div>
               <p className="text-sm text-muted-foreground">{emptyStateText.title}</p>
               <p className="text-xs text-muted-foreground/70 mt-2 max-w-[240px]">
                 {emptyStateText.hint}
@@ -251,115 +265,130 @@ function PlaygroundAgentContent({
           )}
 
           {messages
-            .filter((m) => !(m as any).isHidden)
+            .filter((m) => m.role !== "system" && !(m as any).isHidden)
             .map((message) => (
-              <div key={message.id} className="space-y-1 group">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {message.role === "user" ? <User size={14} /> : <BotMessageSquare size={14} />}
-                  </div>
-                  <span className="text-sm font-medium">
-                    {message.role === "user" ? "You" : "superglue"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatTimestamp(message.timestamp)}
-                  </span>
-                  {(() => {
-                    const hasContent =
-                      message.content?.trim() ||
-                      message.parts?.some((p) => p.type === "content" && p.content?.trim());
-                    return message.isStreaming && !hasContent ? <ThinkingIndicator /> : null;
-                  })()}
-                  {message.role === "user" && !isLoading && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 p-3"
-                      onClick={() => handleEditMessage(message.id, message.content)}
-                    >
-                      <Edit2 className="w-0.5 h-0.5" />
-                    </Button>
+              <div key={message.id} className="flex gap-3 p-2 pt-3 rounded-xl group min-h-12">
+                <div
+                  className={cn(
+                    "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
+                    message.role === "user"
+                      ? "bg-neutral-100 dark:bg-neutral-900"
+                      : "bg-white dark:bg-black",
+                  )}
+                >
+                  {message.role === "user" ? (
+                    <span className="text-[10px] font-semibold text-neutral-900 dark:text-neutral-100">
+                      Y
+                    </span>
+                  ) : (
+                    <img
+                      src="/favicon.png"
+                      alt="superglue"
+                      className="w-3.5 h-3.5 object-contain dark:invert"
+                    />
                   )}
                 </div>
 
-                {editingMessageId === message.id ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      value={editingContent}
-                      onChange={(e) => setEditingContent(e.target.value)}
-                      className="min-h-[48px] max-h-[120px] resize-none text-sm focus-visible:ring-0 focus-visible:border-ring"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleSaveEdit(message.id)}
-                        disabled={!editingContent.trim() || isLoading}
+                <div className="flex-1 space-y-2 min-w-0 overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">
+                      {message.role === "user" ? "You" : "superglue"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatTimestamp(message.timestamp)}
+                    </span>
+                    {(() => {
+                      const hasContent =
+                        message.content?.trim() ||
+                        message.parts?.some((p) => p.type === "content" && p.content?.trim());
+                      return message.isStreaming && !hasContent ? <ThinkingIndicator /> : null;
+                    })()}
+                    {message.role === "user" && !isLoading && (
+                      <button
+                        type="button"
+                        onClick={() => handleEditMessage(message.id, message.content)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                        title="Edit message"
                       >
-                        Save & Restart
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleCancelEdit}
-                        disabled={isLoading}
-                      >
-                        <X className="w-3 h-3 mr-1" />
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {message.parts && message.parts.length > 0 ? (
-                      groupMessageParts(message.parts).map((grouped, idx) => {
-                        if (grouped.type === "content") {
-                          return (
-                            <div
-                              key={grouped.part.id}
-                              className={cn(
-                                "prose prose-sm max-w-none dark:prose-invert text-sm",
-                                message.isStreaming && "streaming-message",
-                              )}
-                            >
-                              <Streamdown>{grouped.part.content || ""}</Streamdown>
-                            </div>
-                          );
-                        } else if (grouped.type === "background_tools") {
-                          return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
-                        } else if (grouped.type === "tool" && grouped.part.tool) {
-                          return (
-                            <ToolCallComponent
-                              key={grouped.part.tool.id}
-                              tool={grouped.part.tool}
-                              onInputChange={handleToolInputChange}
-                              onToolUpdate={handleToolUpdate}
-                              sendAgentRequest={sendAgentRequest}
-                              bufferAction={bufferAction}
-                              onAbortStream={stopStreaming}
-                              onApplyChanges={onApplyChanges}
-                              onApplyPayload={onApplyPayload}
-                              currentPayload={currentPayload}
-                              isPlayground={mode === "tool"}
-                            />
-                          );
-                        }
-                        return null;
-                      })
-                    ) : (
-                      <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
-                        <Streamdown>{message.content}</Streamdown>
-                      </div>
+                        <Pencil className="w-3 h-3 text-muted-foreground" />
+                      </button>
                     )}
                   </div>
-                )}
+
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        className="min-h-[48px] max-h-[120px] resize-y text-sm bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20 backdrop-blur-sm border border-border/50 rounded-lg shadow-sm focus-visible:ring-0 px-3 py-2"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={() => handleSaveEdit(message.id)}
+                          disabled={!editingContent.trim() || isLoading}
+                          className="rounded-lg text-xs h-7"
+                        >
+                          Save & Restart
+                        </Button>
+                        <Button
+                          variant="glass"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          disabled={isLoading}
+                          className="rounded-lg text-xs h-7"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 message-content-wrapper break-words">
+                      {message.parts && message.parts.length > 0 ? (
+                        groupMessageParts(message.parts).map((grouped, idx) => {
+                          if (grouped.type === "content") {
+                            return (
+                              <div
+                                key={grouped.part.id}
+                                className={cn(
+                                  "prose prose-sm max-w-none dark:prose-invert text-sm",
+                                  message.isStreaming && "streaming-message",
+                                )}
+                              >
+                                <Streamdown>{grouped.part.content || ""}</Streamdown>
+                              </div>
+                            );
+                          } else if (grouped.type === "background_tools") {
+                            return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
+                          } else if (grouped.type === "tool" && grouped.part.tool) {
+                            return (
+                              <ToolCallComponent
+                                key={grouped.part.tool.id}
+                                tool={grouped.part.tool}
+                                onInputChange={handleToolInputChange}
+                                onToolUpdate={handleToolUpdate}
+                                sendAgentRequest={sendAgentRequest}
+                                bufferAction={bufferAction}
+                                onAbortStream={stopStreaming}
+                                onApplyChanges={onApplyChanges}
+                                onApplyPayload={onApplyPayload}
+                                currentPayload={currentPayload}
+                                isPlayground={mode === "tool"}
+                              />
+                            );
+                          }
+                          return null;
+                        })
+                      ) : (
+                        <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
+                          <Streamdown>{message.content}</Streamdown>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
         </div>
@@ -386,12 +415,17 @@ function PlaygroundAgentContent({
             onKeyDown={handleKeyDown}
             placeholder="Message superglue..."
             className={cn(
-              "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all",
+              "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all overflow-hidden",
+              "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30",
+              "backdrop-blur-sm border-border/50 dark:border-border/70 shadow-sm",
+              "focus:border-border/60 dark:focus:border-border/90",
+              "outline-none focus:outline-none focus-visible:outline-none",
+              "ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0",
               isHighlighted &&
-                "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 focus-visible:ring-1 focus-visible:ring-amber-500",
+                "!ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30",
             )}
             rows={1}
-            disabled={isLoading}
+            disabled={false}
             maxLength={MAX_MESSAGE_LENGTH}
           />
           <Button
@@ -499,9 +533,26 @@ function ToolPlaygroundAgentSidebar({
 
   const currentPayload = JSON.stringify(toolConfig.payload.computedPayload || {}, null, 2);
 
+  const initialMessages = useMemo<Message[]>(() => {
+    const ctx = buildToolPlaygroundContext(toolConfig, "", initialError);
+    if (!ctx.toolId || !ctx.steps || ctx.steps.length === 0) {
+      return [];
+    }
+    const draftConfig: PlaygroundToolConfig = {
+      toolId: ctx.toolId,
+      instruction: ctx.instruction,
+      steps: ctx.steps,
+      outputTransform: ctx.outputTransform,
+      inputSchema: ctx.inputSchema,
+      outputSchema: ctx.outputSchema,
+      systemIds: ctx.systemIds,
+    };
+    return [createPlaygroundDraftMessage(draftConfig)];
+  }, [toolConfig.tool.id, toolConfig.steps.length]);
+
   const hiddenContextBuilder = useCallback(() => {
     const executionSummary = execution.getExecutionStateSummary();
-    const ctx = buildPlaygroundContext(toolConfig, executionSummary, initialError);
+    const ctx = buildToolPlaygroundContext(toolConfig, executionSummary, initialError);
     const { payload } = toolConfig;
     const uploadedFiles = payload.uploadedFiles.map((f) => ({
       name: f.name,
@@ -511,7 +562,7 @@ function ToolPlaygroundAgentSidebar({
     const mergedPayload =
       uploadedFiles.length > 0 ? JSON.stringify(payload.computedPayload, null, 2) : undefined;
 
-    return formatPlaygroundRuntimeContext({
+    return formatPlaygroundHiddenContext({
       toolId: ctx.toolId,
       instruction: ctx.instruction,
       stepsCount: ctx.steps.length,
@@ -523,27 +574,12 @@ function ToolPlaygroundAgentSidebar({
   }, [toolConfig, execution, initialError]);
 
   const agentConfig = useMemo<AgentConfig>(() => {
-    const ctx = buildPlaygroundContext(
-      toolConfig,
-      execution.getExecutionStateSummary(),
-      initialError,
-    );
     return {
       agentId: AgentType.PLAYGROUND,
       hiddenContextBuilder,
-      agentParams: {
-        playgroundToolConfig: {
-          toolId: ctx.toolId,
-          instruction: ctx.instruction,
-          steps: ctx.steps,
-          finalTransform: ctx.finalTransform,
-          inputSchema: ctx.inputSchema,
-          responseSchema: ctx.responseSchema,
-          systemIds: ctx.systemIds,
-        },
-      },
+      initialMessages,
     };
-  }, [toolConfig, execution, initialError, hiddenContextBuilder]);
+  }, [hiddenContextBuilder, initialMessages]);
 
   return (
     <div className={cn("h-full", className)}>
@@ -570,23 +606,17 @@ function SystemPlaygroundAgentSidebar({
   systemConfig,
 }: Omit<PlaygroundAgentSidebarProps, "mode"> & { systemConfig: SystemContextForAgent }) {
   const hiddenContextBuilder = useCallback(() => {
-    return formatSystemRuntimeContext(systemConfig);
+    return JSON.stringify({
+      display: formatSystemHiddenContext(systemConfig),
+    });
   }, [systemConfig]);
 
   const agentConfig = useMemo<AgentConfig>(() => {
     return {
       agentId: AgentType.SYSTEM_PLAYGROUND,
       hiddenContextBuilder,
-      agentParams: {
-        systemConfig: {
-          id: systemConfig.systemId,
-          urlHost: systemConfig.urlHost,
-          urlPath: systemConfig.urlPath,
-          templateName: systemConfig.templateName,
-        },
-      },
     };
-  }, [systemConfig, hiddenContextBuilder]);
+  }, [hiddenContextBuilder]);
 
   return (
     <div className={cn("h-full", className)}>

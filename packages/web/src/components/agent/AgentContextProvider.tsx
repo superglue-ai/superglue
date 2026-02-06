@@ -163,7 +163,11 @@ export function AgentContextProvider({
   });
 
   // Messages hook needs streaming functions for drip animation
-  const messagesHook = useAgentMessages(tempStreaming.stopDrip, tempStreaming.streamDripBufferRef);
+  const messagesHook = useAgentMessages(
+    tempStreaming.stopDrip,
+    tempStreaming.streamDripBufferRef,
+    config.initialMessages,
+  );
 
   // Create updateToolCompletion at provider level (breaks circular dependency)
   const updateToolCompletion = useCallback(

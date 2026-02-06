@@ -1,7 +1,7 @@
 import { cn } from "@/src/lib/general-utils";
 import { truncateTemplateValue } from "@/src/lib/templating-utils";
 import { maskCredentials } from "@superglue/shared";
-import { Code2, X } from "lucide-react";
+import { Code2, FileJson, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { TemplateEditPopover } from "./TemplateEditPopover";
 import { useExecution } from "../context/tool-execution-context";
@@ -23,6 +23,7 @@ interface TemplateChipProps {
   hideDelete?: boolean;
   popoverTitle?: string;
   popoverHelpText?: string;
+  isPayloadRef?: boolean;
 }
 
 export function TemplateChip({
@@ -42,6 +43,7 @@ export function TemplateChip({
   hideDelete = false,
   popoverTitle,
   popoverHelpText,
+  isPayloadRef = false,
 }: TemplateChipProps) {
   const { getStepTemplateData } = useExecution();
   const { credentials, canExecute } = getStepTemplateData(stepId);
@@ -195,6 +197,11 @@ export function TemplateChip({
         )}
       </span>
       <span className="max-w-[200px] truncate">{displayText}</span>
+      {isPayloadRef && (
+        <span className="shrink-0" title="Sourced from tool input">
+          <FileJson className="h-3 w-3 opacity-80" strokeWidth={3} />
+        </span>
+      )}
     </span>
   );
 

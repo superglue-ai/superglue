@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/src/components/ui/button";
-import { FileChip } from "@/src/components/ui/FileChip";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
@@ -9,19 +9,7 @@ import { cn, handleCopyCode } from "@/src/lib/general-utils";
 import { formatBytes } from "@/src/lib/file-utils";
 import { UserAction } from "@/src/lib/agent/agent-types";
 import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
-import {
-  AlertTriangle,
-  BotMessageSquare,
-  ChevronUp,
-  Edit2,
-  Loader2,
-  Paperclip,
-  Plus,
-  Send,
-  Square,
-  User,
-  X,
-} from "lucide-react";
+import { AlertTriangle, ChevronUp, Paperclip, Pencil, Plus, Send, Square, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
@@ -79,14 +67,22 @@ const MemoMessage = React.memo(
       <div key={message.id} className={cn("flex gap-4 p-2 pt-4 rounded-xl group min-h-16")}>
         <div
           className={cn(
-            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm hidden lg:flex",
+            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center hidden lg:flex",
             message.role === "user"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background border-2 text-muted-foreground",
+              ? "bg-neutral-100 dark:bg-neutral-900"
+              : "bg-white dark:bg-black",
           )}
         >
-          {message.role === "user" && <User size={18} />}
-          {message.role === "assistant" && <BotMessageSquare size={18} />}
+          {message.role === "user" && (
+            <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Y</span>
+          )}
+          {message.role === "assistant" && (
+            <img
+              src="/favicon.png"
+              alt="superglue"
+              className="w-5 h-5 object-contain dark:invert"
+            />
+          )}
         </div>
 
         <div className="flex-1 space-y-3 min-w-0 overflow-hidden">
@@ -109,14 +105,14 @@ const MemoMessage = React.memo(
               ) : null;
             })()}
             {message.role === "user" && !isLoading && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 px-2"
+              <button
+                type="button"
                 onClick={() => handleEditMessage(message.id, message.content)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                title="Edit message"
               >
-                <Edit2 className="w-3 h-3" />
-              </Button>
+                <Pencil className="w-3 h-3 text-muted-foreground" />
+              </button>
             )}
           </div>
 
@@ -138,24 +134,31 @@ const MemoMessage = React.memo(
             )}
 
           {editingMessageId === message.id ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Textarea
                 value={editingContent}
                 onChange={(e) => setEditingContent(e.target.value)}
-                className="min-h-[48px] max-h-[120px] resize-none text-base leading-relaxed focus-visible:ring-0 focus-visible:border-ring"
+                className="min-h-[72px] max-h-[200px] resize-y text-[13px] bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20 backdrop-blur-sm border border-border/50 rounded-xl shadow-sm focus-visible:ring-0 px-3 py-2"
                 placeholder="Edit your message..."
                 autoFocus
               />
               <div className="flex gap-2">
                 <Button
+                  variant="glass"
                   size="sm"
                   onClick={() => handleSaveEdit(message.id)}
                   disabled={!editingContent.trim() || isLoading}
+                  className="rounded-xl"
                 >
                   Save & Restart
                 </Button>
-                <Button size="sm" variant="ghost" onClick={handleCancelEdit} disabled={isLoading}>
-                  <X className="w-2 h-2" />
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={handleCancelEdit}
+                  disabled={isLoading}
+                  className="rounded-xl"
+                >
                   Cancel
                 </Button>
               </div>
@@ -469,12 +472,7 @@ function AgentInterfaceContent({
         />
 
         {(chatTitle || messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={clearMessages}
-            className="h-9 px-3 rounded-xl"
-          >
+          <Button variant="glass" size="sm" onClick={clearMessages} className="h-9 px-3 rounded-xl">
             <Plus className="w-4 h-4 mr-2" />
             New
           </Button>
@@ -511,7 +509,7 @@ function AgentInterfaceContent({
           ) : (
             <>
               {messages
-                .filter((m) => !(m as any).isHidden)
+                .filter((m) => m.role !== "system" && !(m as any).isHidden)
                 .map((m) => (
                   <MemoMessage
                     key={m.id}
@@ -607,15 +605,22 @@ function AgentInterfaceContent({
                   <div
                     className={cn(
                       "flex items-center rounded-xl overflow-hidden",
-                      sessionFiles.length > 0
-                        ? "border border-border/40"
-                        : "border border-border/50",
+                      "bg-gradient-to-br from-white/60 to-white/30 dark:from-white/10 dark:to-white/5",
+                      "backdrop-blur-sm border border-black/5 dark:border-white/10",
                     )}
                   >
                     {sessionFiles.length > 0 && (
                       <Popover>
                         <PopoverTrigger asChild>
-                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted/80 bg-muted/50 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 gap-1">
+                          <button
+                            className={cn(
+                              "h-9 px-2 flex items-center justify-center gap-1.5",
+                              "bg-gradient-to-br from-white/60 to-white/30 dark:from-white/10 dark:to-white/5",
+                              "hover:from-white/80 hover:to-white/50 dark:hover:from-white/15 dark:hover:to-white/10",
+                              "text-muted-foreground hover:text-foreground transition-all",
+                              "border-r border-black/5 dark:border-white/10",
+                            )}
+                          >
                             <span className="min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
                               {sessionFiles.length}
                             </span>
@@ -623,16 +628,21 @@ function AgentInterfaceContent({
                           </button>
                         </PopoverTrigger>
                         <PopoverContent
-                          className="w-auto min-w-[250px] max-w-[250px] p-2"
+                          className={cn(
+                            "w-auto min-w-[250px] max-w-[280px] p-3",
+                            "bg-gradient-to-br from-white/90 to-white/70 dark:from-neutral-900/95 dark:to-neutral-900/80",
+                            "backdrop-blur-xl border border-black/10 dark:border-white/10",
+                            "shadow-lg shadow-black/10 dark:shadow-black/30",
+                          )}
                           align="end"
                           side="top"
                           sideOffset={8}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              Session Files ({sessionFiles.length})
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-medium text-foreground/70">
+                              Session Files
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground/60">
                               {formatBytes(sessionFiles.reduce((acc, f) => acc + (f.size || 0), 0))}
                             </span>
                           </div>
@@ -656,7 +666,11 @@ function AgentInterfaceContent({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80 bg-muted/50 border-0"
+                      className={cn(
+                        "h-9 w-9 p-0 rounded-none border-0",
+                        "bg-transparent hover:bg-black/5 dark:hover:bg-white/10",
+                        "text-muted-foreground hover:text-foreground transition-all",
+                      )}
                       onClick={() => (fileInputRef.current as any)?.click()}
                       disabled={isProcessingFiles}
                     >

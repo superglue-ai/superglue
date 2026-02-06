@@ -10,7 +10,7 @@ import {
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { UserAction, CallSystemAutoExecute } from "@/src/lib/agent/agent-types";
 import { ToolCall } from "@superglue/shared";
-import { AlertCircle, ChevronDown, Database, FolderOpen, Loader2, Terminal } from "lucide-react";
+import { AlertCircle, ChevronDown, FolderOpen, Loader2, Terminal } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 import { useAgentContext } from "../AgentContextProvider";
@@ -133,16 +133,15 @@ export function CallSystemComponent({
     if (!sendAgentRequest) return;
 
     setIsExecuting(true);
-    onAbortStream?.();
     onToolUpdate?.(tool.id, { status: "running" });
 
     sendAgentRequest(undefined, {
       userActions: [
         {
-          type: "tool_confirmation",
+          type: "tool_event",
           toolCallId: tool.id,
           toolName: "call_system",
-          action: "confirmed",
+          event: "confirmed",
         },
       ],
     });
@@ -151,16 +150,15 @@ export function CallSystemComponent({
   const handleCancel = () => {
     if (!sendAgentRequest) return;
 
-    onAbortStream?.();
     onToolUpdate?.(tool.id, { status: "declined" });
 
     sendAgentRequest(undefined, {
       userActions: [
         {
-          type: "tool_confirmation",
+          type: "tool_event",
           toolCallId: tool.id,
           toolName: "call_system",
-          action: "declined",
+          event: "declined",
         },
       ],
     });
@@ -179,9 +177,9 @@ export function CallSystemComponent({
           <Terminal className="w-4 h-4 text-muted-foreground" />
         )}
       </button>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-mono font-medium">{method}</span>
+          <span className="text-sm font-mono font-medium flex-shrink-0">{method}</span>
           <span className="text-sm font-mono text-muted-foreground truncate">{url}</span>
         </div>
       </div>
@@ -193,7 +191,6 @@ export function CallSystemComponent({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <Database className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             PostgreSQL
           </span>
@@ -355,7 +352,13 @@ export function CallSystemComponent({
             )}
 
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="success" onClick={handleConfirm} disabled={isExecuting}>
+              <Button
+                size="sm"
+                variant="glass"
+                className="!bg-[#ffa500] hover:!bg-[#ffd700] dark:!bg-[#ffa500] dark:hover:!bg-[#ffd700] !text-black !border-amber-400/50 dark:!border-amber-500/50 font-semibold"
+                onClick={handleConfirm}
+                disabled={isExecuting}
+              >
                 {isExecuting ? (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin mr-1" />
@@ -365,11 +368,11 @@ export function CallSystemComponent({
                   "Execute"
                 )}
               </Button>
-              <Button size="sm" variant="outline" onClick={handleCancel} disabled={isExecuting}>
+              <Button size="sm" variant="glass" onClick={handleCancel} disabled={isExecuting}>
                 Cancel
               </Button>
               <Select value={currentPolicy} onValueChange={handlePolicyChange}>
-                <SelectTrigger className="h-8 w-[140px] text-xs text-muted-foreground">
+                <SelectTrigger className="h-8 w-[140px] text-xs text-muted-foreground bg-gradient-to-br from-muted/50 to-muted/30 backdrop-blur-sm border-border/50 shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,7 +399,7 @@ export function CallSystemComponent({
         )}
 
         {isCompleted && hasError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-md flex items-start gap-2">
+          <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
             <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
@@ -406,7 +409,7 @@ export function CallSystemComponent({
                     ? "Query Failed"
                     : "Operation Failed"}
               </div>
-              <div className="text-sm text-red-800 dark:text-red-200 break-words">
+              <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto">
                 {typeof output.error === "string"
                   ? output.error
                   : JSON.stringify(output.error, null, 2)}
@@ -420,7 +423,7 @@ export function CallSystemComponent({
         {isCompleted && (
           <div className="flex items-center justify-end pt-2 border-t border-border/50 mt-3">
             <Select value={currentPolicy} onValueChange={handlePolicyChange}>
-              <SelectTrigger className="h-7 w-[140px] text-xs text-muted-foreground">
+              <SelectTrigger className="h-7 w-[140px] text-xs text-muted-foreground bg-gradient-to-br from-muted/50 to-muted/30 backdrop-blur-sm border-border/50 shadow-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -433,8 +436,11 @@ export function CallSystemComponent({
         )}
 
         {tool.error && (
-          <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-            {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
+          <div className="border border-red-200/40 dark:border-red-700/40 p-3 rounded-md flex items-start gap-2 overflow-hidden">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-red-800 dark:text-red-200 break-words max-h-40 overflow-y-auto min-w-0">
+              {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
+            </div>
           </div>
         )}
       </div>
