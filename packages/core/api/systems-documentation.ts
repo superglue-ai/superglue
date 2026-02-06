@@ -60,8 +60,8 @@ async function runDocumentationScrape(
     }
 
     const fileService = getFileService();
-    const processedUri = `s3://${process.env.AWS_BUCKET_NAME}/${orgId}/processed/scrape-${fileId}.txt`;
-    const rawUri = `s3://${process.env.AWS_BUCKET_NAME}/${orgId}/${process.env.AWS_BUCKET_PREFIX || "raw"}/scrape-${fileId}.txt`;
+    const rawUri = fileService.buildRawStorageUri(orgId, `${fileId}.txt`);
+    const processedUri = fileService.buildProcessedStorageUri(orgId, `${fileId}.txt`);
 
     await fileService.uploadFile(rawUri, docString, metadata, { contentType: "text/plain" });
     await fileService.uploadFile(processedUri, docString, metadata, { contentType: "text/plain" });

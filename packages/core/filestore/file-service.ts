@@ -3,6 +3,24 @@ import { S3FileService } from "./s3-file-service.js";
 
 export interface FileService {
   /**
+   * Build a storage URI for a given org and path (e.g., "processed/file.txt")
+   * Returns a properly formatted URI like s3://bucket/orgId/path
+   */
+  buildStorageUri(orgId: string, path: string): string;
+
+  /**
+   * Build a storage URI for raw files using the configured bucket prefix
+   * Returns s3://bucket/orgId/{prefix}/filename
+   */
+  buildRawStorageUri(orgId: string, filename: string): string;
+
+  /**
+   * Build a storage URI for processed files
+   * Returns s3://bucket/orgId/processed/filename
+   */
+  buildProcessedStorageUri(orgId: string, filename: string): string;
+
+  /**
    * Generate a presigned URL for uploading a file
    */
   generateUploadUrl(
@@ -50,12 +68,9 @@ export class FileServiceFactory {
 
     switch (provider) {
       case "aws":
-        return new S3FileService();
-      // Future providers can be added here:
-      // case 'azure':
-      //   return new AzureBlobFileService();
-      // case 'gcp':
-      //   return new GcsFileService();
+        return S3FileService.createForAWS();
+      case "minio":
+        return S3FileService.createForMinIO();
       default:
         throw new Error(`Unsupported file storage provider: ${provider}`);
     }
@@ -69,4 +84,15 @@ export function getFileService(): FileService {
     _fileService = FileServiceFactory.create();
   }
   return _fileService;
+}
+
+/**
+ * Check if cloud file storage is available (e.g., S3 bucket configured)
+ */
+export function isFileStorageAvailable(): boolean {
+  const provider = (process.env.FILE_STORAGE_PROVIDER || "aws").toLowerCase();
+  if (provider === "minio") {
+    return !!process.env.MINIO_BUCKET_NAME;
+  }
+  return !!process.env.AWS_BUCKET_NAME;
 }
