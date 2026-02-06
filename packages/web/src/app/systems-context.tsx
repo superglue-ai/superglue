@@ -97,3 +97,7 @@ export function useSystems() {
   }
   return context;
 }
+
+export function useSystemsOptional(): SystemsContextType | null {
+  return useContext(SystemsContext);
+}

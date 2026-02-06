@@ -9,8 +9,13 @@ import {
   SystemPickerModalProvider,
   SystemPickerModalContent,
 } from "@/src/components/systems/SystemPickerModalContext";
+import {
+  UpgradeModalProvider,
+  UpgradeModalContent,
+} from "@/src/components/upgrade/UpgradeModalContext";
 import { Toaster } from "../components/ui/toaster";
 import { ServerMonitor } from "../components/utils/ServerMonitor";
+import { OnboardingModal } from "../components/onboarding/OnboardingModal";
 import { ConfigProvider } from "./config-context";
 import { jetbrainsMono, jetbrainsSans } from "./fonts";
 import { CSPostHogProvider } from "./providers";
@@ -35,37 +40,43 @@ export function ClientWrapper({ children, config }: Props) {
           <RightSidebarProvider>
             <AgentModalProvider>
               <SystemPickerModalProvider>
-                <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
-                  {isAuthPage || isEmbeddedPage ? (
-                    children
-                  ) : (
-                    <div className="flex h-screen overflow-hidden">
-                      {token && <LeftSidebar />}
-                      <div className="relative flex-1 min-w-0 h-full">
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={pathname}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="w-full h-full overflow-y-auto"
-                          >
-                            {children}
-                          </motion.div>
-                        </AnimatePresence>
-                        <SystemPickerModalContent />
-                        <AgentModalContent />
-                      </div>
-                      {token && (
-                        <div className="hidden lg:flex h-full flex-shrink-0">
-                          <RightSidebar />
+                <UpgradeModalProvider>
+                  <div
+                    className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}
+                  >
+                    {isAuthPage || isEmbeddedPage ? (
+                      children
+                    ) : (
+                      <div className="flex h-screen overflow-hidden">
+                        {token && <LeftSidebar />}
+                        <div className="relative flex-1 min-w-0 h-full">
+                          <AnimatePresence mode="wait">
+                            <motion.div
+                              key={pathname}
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="w-full h-full overflow-y-auto"
+                            >
+                              {children}
+                            </motion.div>
+                          </AnimatePresence>
+                          <SystemPickerModalContent />
+                          <AgentModalContent />
                         </div>
-                      )}
-                    </div>
-                  )}
-                  <Toaster />
-                  {token && <ServerMonitor />}
-                </div>
+                        {token && (
+                          <div className="hidden lg:flex h-full flex-shrink-0">
+                            <RightSidebar />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <Toaster />
+                    {token && <ServerMonitor />}
+                    {token && <OnboardingModal />}
+                    {token && <UpgradeModalContent />}
+                  </div>
+                </UpgradeModalProvider>
               </SystemPickerModalProvider>
             </AgentModalProvider>
           </RightSidebarProvider>

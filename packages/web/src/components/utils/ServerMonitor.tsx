@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/src/hooks/use-toast";
 import { useConfig } from "@/src/app/config-context";
+
 export function ServerMonitor() {
   const [isServerDown, setIsServerDown] = useState(false);
+  const toastShownRef = useRef(false);
   const { toast } = useToast();
   const serverConfig = useConfig();
 
@@ -16,13 +18,15 @@ export function ServerMonitor() {
           throw new Error("Server is down");
         }
         setIsServerDown(false);
+        toastShownRef.current = false;
       } catch (error) {
         // Only show toast after 2 retries to avoid false positives during page load
-        if (retryCount >= 2) {
+        // and only if we haven't already shown it
+        if (retryCount >= 2 && !toastShownRef.current) {
+          toastShownRef.current = true;
           toast({
-            title: "Connection could not be established",
-            description: `Please check your connection.\nEndpoint: ${serverConfig.superglueEndpoint}`,
-            variant: "destructive",
+            title: "Reconnecting to server...",
+            description: "Attempting to restore connection",
           });
         }
         setIsServerDown(true);
