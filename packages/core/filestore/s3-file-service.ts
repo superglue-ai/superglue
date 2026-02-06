@@ -9,17 +9,35 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import * as Minio from "minio";
 import type { FileService } from "./file-service.js";
 
 export class S3FileService implements FileService {
   private s3Client: S3Client;
+  private minioClient?: Minio.Client;
   private bucketName: string;
   private bucketPrefix: string;
-  private expirationSeconds: number = 15 * 60; // 15 minutes
+  private expirationSeconds: number = 15 * 60;
   private maxFileSize: number;
+  private publicEndpoint?: string;
 
-  constructor() {
-    // Initialize S3 client
+  private constructor(config: {
+    s3Client: S3Client;
+    minioClient?: Minio.Client;
+    bucketName: string;
+    bucketPrefix: string;
+    maxFileSize: number;
+    publicEndpoint?: string;
+  }) {
+    this.s3Client = config.s3Client;
+    this.minioClient = config.minioClient;
+    this.bucketName = config.bucketName;
+    this.bucketPrefix = config.bucketPrefix;
+    this.maxFileSize = config.maxFileSize;
+    this.publicEndpoint = config.publicEndpoint;
+  }
+
+  static createForAWS(): S3FileService {
     const region = process.env.AWS_REGION || "us-east-1";
     const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
@@ -29,12 +47,12 @@ export class S3FileService implements FileService {
       throw new Error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set");
     }
 
-    this.bucketName = process.env.AWS_BUCKET_NAME || "";
-    if (!this.bucketName) {
+    const bucketName = process.env.AWS_BUCKET_NAME || "";
+    if (!bucketName) {
       throw new Error("AWS_BUCKET_NAME must be set");
     }
 
-    this.s3Client = new S3Client({
+    const s3Client = new S3Client({
       region,
       credentials: {
         accessKeyId,
@@ -43,12 +61,79 @@ export class S3FileService implements FileService {
       },
     });
 
-    this.maxFileSize = server_defaults.FILE_PROCESSING.MAX_FILE_SIZE_BYTES;
-
-    // Get bucket prefix for raw files (optional, defaults to empty string)
     const prefix = process.env.AWS_BUCKET_PREFIX || "";
-    // Normalize prefix: remove leading/trailing slashes, then add trailing slash if not empty
-    this.bucketPrefix = prefix ? prefix.replace(/^\/+|\/+$/g, "") + "/" : "";
+    const bucketPrefix = prefix ? prefix.replace(/^\/+|\/+$/g, "") + "/" : "";
+
+    return new S3FileService({
+      s3Client,
+      bucketName,
+      bucketPrefix,
+      maxFileSize: server_defaults.FILE_PROCESSING.MAX_FILE_SIZE_BYTES,
+    });
+  }
+
+  static createForMinIO(): S3FileService {
+    const region = process.env.AWS_REGION || "us-east-1";
+    const accessKeyId = process.env.MINIO_ROOT_USER;
+    const secretAccessKey = process.env.MINIO_ROOT_PASSWORD;
+    const endpoint = process.env.S3_ENDPOINT;
+    const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT;
+
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error("MINIO_ROOT_USER and MINIO_ROOT_PASSWORD must be set");
+    }
+
+    if (!endpoint) {
+      throw new Error("S3_ENDPOINT must be set for MinIO (e.g., http://localhost:9000)");
+    }
+
+    const bucketName = process.env.MINIO_BUCKET_NAME || "";
+    if (!bucketName) {
+      throw new Error("MINIO_BUCKET_NAME must be set");
+    }
+
+    const endpointUrl = new URL(endpoint);
+    const s3Client = new S3Client({
+      region,
+      endpoint,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
+
+    const minioClient = new Minio.Client({
+      endPoint: endpointUrl.hostname,
+      port: endpointUrl.port ? parseInt(endpointUrl.port, 10) : undefined,
+      useSSL: endpointUrl.protocol === "https:",
+      accessKey: accessKeyId,
+      secretKey: secretAccessKey,
+    });
+
+    const prefix = process.env.MINIO_BUCKET_PREFIX || process.env.AWS_BUCKET_PREFIX || "";
+    const bucketPrefix = prefix ? prefix.replace(/^\/+|\/+$/g, "") + "/" : "";
+
+    return new S3FileService({
+      s3Client,
+      minioClient,
+      bucketName,
+      bucketPrefix,
+      maxFileSize: server_defaults.FILE_PROCESSING.MAX_FILE_SIZE_BYTES,
+      publicEndpoint,
+    });
+  }
+
+  buildStorageUri(orgId: string, path: string): string {
+    return `s3://${this.bucketName}/${orgId}/${path}`;
+  }
+
+  buildRawStorageUri(orgId: string, filename: string): string {
+    return `s3://${this.bucketName}/${orgId}/${this.bucketPrefix}${filename}`;
+  }
+
+  buildProcessedStorageUri(orgId: string, filename: string): string {
+    return `s3://${this.bucketName}/${orgId}/processed/${filename}`;
   }
 
   async generateUploadUrl(
@@ -90,12 +175,19 @@ export class S3FileService implements FileService {
     // Add original filename to metadata
     blobMetadata["original-filename"] = originalFileName;
 
-    const uploadUrl = await this.generatePresignedUrl(key, {
+    let uploadUrl = await this.generatePresignedUrl(key, {
       expiresIn: this.expirationSeconds,
       contentType: metadata?.ContentType,
       contentLength: metadata?.ContentLength,
       metadata: blobMetadata,
     });
+
+    if (this.publicEndpoint) {
+      const internalEndpoint = process.env.S3_ENDPOINT;
+      if (internalEndpoint) {
+        uploadUrl = uploadUrl.replace(internalEndpoint, this.publicEndpoint);
+      }
+    }
 
     return {
       uploadUrl,
@@ -257,7 +349,17 @@ export class S3FileService implements FileService {
   ): Promise<string> {
     const expiresIn = options?.expiresIn ?? this.expirationSeconds;
 
-    const commandParams: any = {
+    if (this.minioClient) {
+      return await this.minioClient.presignedPutObject(this.bucketName, key, expiresIn);
+    }
+
+    const commandParams: {
+      Bucket: string;
+      Key: string;
+      ContentType?: string;
+      ContentLength?: number;
+      Metadata?: Record<string, string>;
+    } = {
       Bucket: this.bucketName,
       Key: key,
     };
@@ -266,24 +368,21 @@ export class S3FileService implements FileService {
       commandParams.ContentType = options.contentType;
     }
 
-    if (options?.contentLength !== undefined) {
+    if (options?.contentLength) {
       commandParams.ContentLength = options.contentLength;
     }
 
-    // Process metadata - AWS SDK v3 automatically adds x-amz-meta- prefix
-    if (options?.metadata) {
-      const customMetadata: Record<string, string> = {};
-      for (const [key, value] of Object.entries(options.metadata)) {
-        // Remove x-amz-meta- prefix if present, SDK will add it automatically
-        const cleanKey = key.startsWith("x-amz-meta-") ? key.slice(11) : key;
-        customMetadata[cleanKey] = String(value);
+    if (options?.metadata && Object.keys(options.metadata).length > 0) {
+      const cleanMetadata: Record<string, string> = {};
+      for (const [metaKey, value] of Object.entries(options.metadata)) {
+        const cleanKey = metaKey.startsWith("x-amz-meta-") ? metaKey.slice(11) : metaKey;
+        cleanMetadata[cleanKey] = String(value);
       }
-      if (Object.keys(customMetadata).length > 0) {
-        commandParams.Metadata = customMetadata;
-      }
+      commandParams.Metadata = cleanMetadata;
     }
 
     const command = new PutObjectCommand(commandParams);
+
     return await getSignedUrl(this.s3Client, command, { expiresIn });
   }
 

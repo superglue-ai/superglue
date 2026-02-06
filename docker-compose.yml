@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     ports:
-      - "3000:3000"
-      - "3001:3001"
-      - "3002:3002"
+      - "${GRAPHQL_PORT:-3000}:3000"
+      - "${WEB_PORT:-3001}:3001"
+      - "${API_PORT:-3002}:3002"
     env_file:
       - .env
     healthcheck:
@@ -14,3 +14,61 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["infra", "all"]
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USERNAME:-superglue}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-superglue}
+      POSTGRES_DB: ${POSTGRES_DB:-superglue}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME:-superglue}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["infra", "all"]
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_NOTIFY_WEBHOOK_ENABLE_SUPERGLUE: "on"
+      MINIO_NOTIFY_WEBHOOK_ENDPOINT_SUPERGLUE: ${MINIO_WEBHOOK_ENDPOINT:-http://host.docker.internal:3002/v1/file-references/process}
+      MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_SUPERGLUE: ${MINIO_WEBHOOK_AUTH_TOKEN:-}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc
+    profiles: ["infra", "all"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb --ignore-existing minio/$${MINIO_BUCKET_NAME:-superglue-files};
+      mc event add minio/$${MINIO_BUCKET_NAME:-superglue-files} arn:minio:sqs::SUPERGLUE:webhook --event put --prefix '' --suffix '' 2>/dev/null || true;
+      exit 0;
+      "
+
+volumes:
+  postgres_data:
+  minio_data:
