@@ -94,41 +94,6 @@ export function LeftSidebar() {
             );
           })}
         </nav>
-        <div className="py-3 px-2 border-t border-border space-y-0.5">
-          {/* Organization Switcher - only show in multi-tenant mode */}
-          {supabase && !isSingleTenant && currentOrgId && currentOrgName && (
-            <OrgSwitcher currentOrgId={currentOrgId} currentOrgName={currentOrgName} />
-          )}
-
-          {supabase && (
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center px-3 py-2.5 text-sm text-muted-foreground hover:bg-gradient-to-br hover:from-muted/40 hover:to-muted/20 dark:hover:from-muted/40 dark:hover:to-muted/20 hover:text-foreground rounded-xl transition-all duration-200"
-            >
-              <LogOut className="h-4 w-4 mr-3" />
-              Sign Out
-            </button>
-          )}
-          {supabase && !isPro && isPersonalOrg && (
-            <button
-              onClick={() => openUpgradeModal()}
-              className="w-full flex items-center px-3 py-2.5 text-sm font-medium bg-zinc-200 text-primary dark:bg-primary/60 dark:text-primary-foreground hover:bg-zinc-300 dark:hover:bg-primary/70 rounded-xl transition-all duration-200"
-            >
-              <Sparkles className="h-4 w-4 mr-3" />
-              Upgrade Plan
-            </button>
-          )}
-          {supabase && isPro && isPersonalOrg && (
-            <button
-              onClick={handleManageSubscription}
-              disabled={isManagingSubscription}
-              className="w-full flex items-center px-3 py-2.5 text-sm text-muted-foreground hover:bg-gradient-to-br hover:from-muted/40 hover:to-muted/20 dark:hover:from-muted/40 dark:hover:to-muted/20 hover:text-foreground rounded-xl transition-all duration-200 disabled:opacity-50"
-            >
-              <Calendar className="h-4 w-4 mr-3" />
-              {isManagingSubscription ? "Loading..." : "Subscription"}
-            </button>
-          )}
-        </div>
         <div className="pt-0 px-6 pb-6 mt-auto flex flex-col items-center w-full">
           {mounted && (
             <div className="flex gap-2">
