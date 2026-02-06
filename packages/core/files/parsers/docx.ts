@@ -1,5 +1,6 @@
 import { SupportedFileType } from "@superglue/shared";
 import * as mammoth from "mammoth";
+import { NodeHtmlMarkdown } from "node-html-markdown";
 import * as unzipper from "unzipper";
 import { DetectionPriority, FileParsingStrategy } from "../strategy.js";
 
@@ -31,6 +32,12 @@ export class DOCXStrategy implements FileParsingStrategy {
 }
 
 export async function parseDOCX(buffer: Buffer): Promise<string> {
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value;
+  // Convert DOCX to HTML first (preserves tables, headings, lists, formatting)
+  // Skip images to avoid bloating output with base64 data
+  const result = await mammoth.convertToHtml(
+    { buffer },
+    { convertImage: mammoth.images.imgElement(() => Promise.resolve({ src: "" })) },
+  );
+  // Then convert HTML to Markdown for cleaner LLM consumption
+  return NodeHtmlMarkdown.translate(result.value);
 }
