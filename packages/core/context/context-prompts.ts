@@ -126,7 +126,7 @@ Always check the documentation for the correct authentication pattern.
 Common authentication patterns are:
 - Bearer Token: headers: { "Authorization": "Bearer <<access_token>>" }
 - API Key in header: headers: { "X-API-Key": "<<api_key>>" }
-- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }
+- Basic Auth: headers: { "Authorization": "Basic <<username>>:<<password>>" }. Superglue automatically Base64-encodes "Basic user:password" format. Do NOT manually encode it.
 - OAuth: Follow the specific OAuth flow documented for the system.
 
 IMPORTANT: Modern APIs (HubSpot, Stripe, etc.) mostly expect authentication in headers, NOT query parameters. Only use query parameter authentication if explicitly required by the documentation.
@@ -293,9 +293,14 @@ When you DO configure pagination:
 2. Add the exact pagination parameters to queryParams/body/headers as specified in the docs
 
 Superglue provides these variables that you MUST use:
-- OFFSET_BASED: Use <<offset>> and <<limit>> variables
-- PAGE_BASED: Use <<page>> and <<pageSize>> or <<limit>> variables
-- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
+- offsetBased: Use <<offset>> / <<(sourceData) => sourceData.offset>> and <<limit>> variables
+- pageBased: Use <<page>> / <<(sourceData) => sourceData.page>> and <<pageSize>> or <<limit>> variables
+- cursorBased: Use <<cursor>> / <<(sourceData) => sourceData.cursor>> and <<limit>> variables - never use <<after>>
+
+stopCondition receives (response, pageInfo) where response.data is the parsed API response body:
+- "!response.data.meta.next_cursor" (stop when no next cursor)
+- "response.data.items.length === 0" (stop when empty results)
+- "response.data.hasMore === false" (stop when hasMore flag is false)
 </PAGINATION_CONFIGURATION>
 
 <POSTGRES>
@@ -502,14 +507,25 @@ Common patterns:
 
 <PAGINATION>
 Only configure pagination if verified from documentation:
-- OFFSET_BASED: Use <<offset>> and <<limit>> variables
-- PAGE_BASED: Use <<page>> and <<limit>> variables
-- CURSOR_BASED: Use <<cursor>> and <<limit>> variables
+- offsetBased: Use <<offset>> and <<limit>> variables
+- pageBased: Use <<page>> and <<limit>> variables
+- cursorBased: Use <<cursor>> and <<limit>> variables
 
-Pagination config requires:
-- type: "OFFSET_BASED" | "PAGE_BASED" | "CURSOR_BASED"
-- pageSize: number of items per page
-- stopCondition: JavaScript function (response, pageInfo) => boolean that returns true to STOP
+Pagination config fields:
+- type: "offsetBased" | "pageBased" | "cursorBased" (required)
+- pageSize: string - number of items per page (required)
+- cursorPath: string - JSONPath to extract next cursor from response (required for cursorBased, e.g., "meta.next_cursor")
+- stopCondition: string - JavaScript expression that returns true to STOP pagination (required)
+  The function receives (response, pageInfo) where:
+  - response.data = the parsed API response body (JSON object/array)
+  - response.headers = the response headers
+  - pageInfo = { page, offset, cursor, totalFetched }
+  Examples:
+  - "!response.data.meta.next_cursor" (stop when no next cursor)
+  - "response.data.items.length === 0" (stop when empty results)
+  - "response.data.hasMore === false" (stop when hasMore flag is false)
+
+IMPORTANT: Only these fields are valid. Do not forget to modify the request body / queryParams / headers to use the correct variables.
 </PAGINATION>
 
 <POSTGRES>

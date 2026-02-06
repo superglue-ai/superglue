@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, PaginationType } from "@superglue/shared";
+import { RequestStepConfig, HttpMethod, PaginationTypeValue } from "@superglue/shared";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
@@ -82,8 +82,6 @@ describe("API Utilities", () => {
       urlHost: "https://api.example.com",
       urlPath: "v1/test",
       method: HttpMethod.GET,
-      id: "test-endpoint-id",
-      instruction: "Test API call",
     };
     const testPayload = { query: "test" };
     const testCredentials = { api_key: "secret-key" };
@@ -114,7 +112,7 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.PAGE_BASED,
+          type: "pageBased" as PaginationTypeValue,
           pageSize: "2",
         },
       } as ApiConfig;
@@ -161,7 +159,7 @@ describe("API Utilities", () => {
           limit: "<<limit>>",
         },
         pagination: {
-          type: PaginationType.OFFSET_BASED,
+          type: "offsetBased" as PaginationTypeValue,
           pageSize: "2",
         },
       } as ApiConfig;
@@ -214,7 +212,7 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.CURSOR_BASED,
+          type: "cursorBased" as PaginationTypeValue,
           pageSize: "2",
           cursorPath: "meta.next_cursor",
           stopCondition: "!response.data.meta.next_cursor",
@@ -270,7 +268,7 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.PAGE_BASED,
+          type: "pageBased" as PaginationTypeValue,
           pageSize: "2",
         },
       } as ApiConfig;
@@ -301,7 +299,7 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.OFFSET_BASED,
+          type: "offsetBased" as PaginationTypeValue,
           pageSize: "1",
         },
         headers: {
@@ -332,7 +330,7 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.OFFSET_BASED,
+          type: "offsetBased" as PaginationTypeValue,
           pageSize: "1",
         },
         headers: {
@@ -640,8 +638,6 @@ describe("API Utilities", () => {
       urlHost: "https://api.example.com",
       urlPath: "v1/test",
       method: HttpMethod.GET,
-      id: "test-endpoint-id",
-      instruction: "Test API call",
     };
 
     it("SMART mode should detect JSON error keys in 200 response", async () => {

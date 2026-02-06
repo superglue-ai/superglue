@@ -265,6 +265,77 @@ export class ToolBuilder {
   }
 }
 
+// Request step config schema - for HTTP, SFTP, Postgres, etc.
+const requestStepConfigSchema = z.object({
+  type: z.literal("request").optional().describe("Step type: 'request' for API calls"),
+  systemId: z
+    .string()
+    .describe(
+      "REQUIRED for request steps: The system ID for this step (must match one of the available system IDs)",
+    ),
+  url: z
+    .string()
+    .describe(
+      "Full URL for the API endpoint (e.g., https://api.example.com/v1/users). Must not be empty.",
+    ),
+  method: z
+    .enum(Object.values(HttpMethod) as [string, ...string[]])
+    .describe(
+      "HTTP method (MUST be a literal value, not a variable or expression): GET, POST, PUT, DELETE, or PATCH",
+    ),
+  queryParams: z
+    .array(
+      z.object({
+        key: z.string(),
+        value: z.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Query parameters as key-value pairs. If pagination is configured, ensure you have included the right pagination parameters here or in the body.",
+    ),
+  headers: z
+    .array(
+      z.object({
+        key: z.string(),
+        value: z.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "HTTP headers as key-value pairs. Use <<variable>> syntax for dynamic values or JavaScript expressions",
+    ),
+  body: z
+    .string()
+    .optional()
+    .describe(
+      "Request body. Use <<variable>> syntax for dynamic values. If pagination is configured, ensure you have included the right pagination parameters here or in the queryParams.",
+    ),
+  pagination: z
+    .object({
+      type: z.enum(["offsetBased", "pageBased", "cursorBased"]),
+      pageSize: z
+        .string()
+        .describe(
+          "Number of items per page (e.g., '50', '100'). Once set, this becomes available as <<limit>> (same as pageSize).",
+        ),
+      cursorPath: z
+        .string()
+        .describe(
+          'If cursorBased: The JSONPath to the cursor in the response. If not, set this to ""',
+        ),
+      stopCondition: z
+        .string()
+        .describe(
+          "REQUIRED: JavaScript function that determines when to stop pagination. This is the primary control for pagination. Format: (response, pageInfo) => boolean. The pageInfo object contains: page (number), offset (number), cursor (any), totalFetched (number). response is the axios response object, access response data via response.data. Return true to STOP. E.g. (response, pageInfo) => !response.data.pagination.has_more",
+        ),
+    })
+    .optional()
+    .describe(
+      "OPTIONAL: Only configure if you are using pagination variables in the URL, headers, or body. For offsetBased, ALWAYS use <<offset>>. If pageBased, ALWAYS use <<page>>. If cursorBased, ALWAYS use <<cursor>>.",
+    ),
+});
+
 const toolSchema = z.object({
   id: z.string().describe("The tool ID (e.g., 'stripe-create-order')"),
   steps: z
