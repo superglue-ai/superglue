@@ -383,6 +383,97 @@ export class AgentClient {
               break;
             }
 
+            const effectiveMode = getEffectiveMode(
+              part.toolName,
+              ctx.toolExecutionPolicies,
+              toolInput,
+            );
+            const shouldAwaitConfirmation = effectiveMode === "confirm_after_execution";
+
+            if (effectiveMode === "confirm_before_execution" && part.output === undefined) {
+              const pendingOutput = getPendingOutput(part.toolName, toolInput);
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: part.toolName,
+                  input: toolInput,
+                  output: pendingOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
+              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
+            }
+
+            if (outputObj?.type === "tool_call_update") {
+              yield {
+                type: "tool_call_update",
+                toolCall: { id: toolId, name: part.toolName, logs: outputObj.toolCall?.logs },
+              };
+              break;
+            }
+
+            if (outputObj?.type === "tool_call_complete") {
+              // Don't await confirmation if the tool execution failed
+              const toolOutput = outputObj.toolCall?.output;
+              let executionFailed = false;
+              try {
+                const parsedToolOutput =
+                  typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
+                executionFailed = parsedToolOutput?.success === false;
+              } catch {
+                // If parsing fails, assume it's not a failure
+              }
+              const shouldPause = shouldAwaitConfirmation && !executionFailed;
+
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: part.toolName,
+                  input: outputObj.toolCall?.input,
+                  output: outputObj.toolCall?.output,
+                  ...(shouldPause && { status: "awaiting_confirmation" as const }),
+                },
+                ...(shouldPause && { awaitingConfirmation: true }),
+              };
+              if (shouldPause) {
+                yield { type: "paused", pauseReason: "awaiting_confirmation" };
+                return;
+              }
+              break;
+            }
+
+            const finalOutput = outputObj?.toolCall?.output ?? part.output;
+
+            // Don't await confirmation if the tool execution failed
+            let executionFailed = false;
+            try {
+              const parsedFinalOutput =
+                typeof finalOutput === "string" ? JSON.parse(finalOutput) : finalOutput;
+              executionFailed = parsedFinalOutput?.success === false;
+            } catch {
+              // If parsing fails, assume it's not a failure
+            }
+            const shouldPause = shouldAwaitConfirmation && !executionFailed;
+
+            if (shouldPause) {
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: part.toolName,
+                  output: finalOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
+              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
+            }
+
             yield {
               ...(part.output as any),
               toolCall: { ...((part.output as any).toolCall ?? {}), id: toolId },

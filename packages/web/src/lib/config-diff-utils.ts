@@ -208,10 +208,23 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     } else if (stepMatch) {
       // For OpenAPI format, no apiConfig wrapper - use step path directly
       const stepPath = stepMatch[1];
-      const hasApiConfig = originalConfig
-        ? getValueAtPath(originalConfig, stepPath + "/apiConfig") !== undefined
-        : false;
-      contextPath = hasApiConfig ? stepPath + "/apiConfig" : stepPath;
+      const subPath = stepMatch[2];
+      // If removing/adding an entire step (no subpath), use the step path directly
+      if (!subPath && (diff.op === "remove" || diff.op === "add")) {
+        contextPath = stepPath;
+      } else {
+        const hasApiConfig = normalizedConfig
+          ? getValueAtPath(normalizedConfig, stepPath + "/apiConfig") !== undefined
+          : false;
+        const hasConfig = normalizedConfig
+          ? getValueAtPath(normalizedConfig, stepPath + "/config") !== undefined
+          : false;
+        contextPath = hasApiConfig
+          ? stepPath + "/apiConfig"
+          : hasConfig
+            ? stepPath + "/config"
+            : stepPath;
+      }
     } else if (topMatch) {
       contextPath = topMatch[1];
     } else {
@@ -222,7 +235,34 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
 
     // Apply diff to get new context
     let contextNewObj = contextOldObj;
-    if (contextOldObj !== undefined && diff.value !== undefined) {
+    if (diff.op === "remove" && contextOldObj !== undefined) {
+      // For remove operations, determine what the new value should be
+      const relativePath = diff.path.replace(contextPath, "") || "/";
+      const parts = relativePath.split("/").filter(Boolean);
+      if (parts.length === 0) {
+        // Removing the entire context object (e.g., removing a whole step)
+        contextNewObj = undefined;
+      } else {
+        // Removing a property within the context object
+        let result = JSON.parse(JSON.stringify(contextOldObj));
+        let current = result;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (current[parts[i]] === undefined || current[parts[i]] === null) {
+            break;
+          }
+          current = current[parts[i]];
+        }
+        const lastKey = parts[parts.length - 1];
+        // Use splice for array indices to properly shift elements (JSON Patch remove semantics)
+        // Using delete would leave a hole that serializes to null
+        if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
+          current.splice(parseInt(lastKey, 10), 1);
+        } else {
+          delete current[lastKey];
+        }
+        contextNewObj = result;
+      }
+    } else if (contextOldObj !== undefined && diff.value !== undefined) {
       const relativePath = diff.path.replace(contextPath, "") || "/";
       let result = contextOldObj === null ? {} : JSON.parse(JSON.stringify(contextOldObj));
       const parts = relativePath.split("/").filter(Boolean);
@@ -237,8 +277,16 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
           current = current[parts[i]];
         }
         const lastKey = parts[parts.length - 1];
-        if (diff.op === "remove") delete current[lastKey];
-        else current[lastKey] = diff.value;
+        if (diff.op === "remove") {
+          // Use splice for array indices to properly shift elements (JSON Patch remove semantics)
+          if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
+            current.splice(parseInt(lastKey, 10), 1);
+          } else {
+            delete current[lastKey];
+          }
+        } else {
+          current[lastKey] = diff.value;
+        }
         contextNewObj = result;
       }
     } else if (diff.value !== undefined) {
