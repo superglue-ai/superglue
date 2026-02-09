@@ -6,9 +6,14 @@ import { useEffect, useRef, useState } from "react";
 interface TruncatableInstructionProps {
   text: string;
   className?: string;
+  maxLines?: number;
 }
 
-export function TruncatableInstruction({ text, className }: TruncatableInstructionProps) {
+export function TruncatableInstruction({
+  text,
+  className,
+  maxLines = 3,
+}: TruncatableInstructionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
@@ -24,7 +29,20 @@ export function TruncatableInstruction({ text, className }: TruncatableInstructi
 
   return (
     <div className={className}>
-      <div ref={textRef} className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-3"}>
+      <div
+        ref={textRef}
+        className={isExpanded ? "whitespace-pre-wrap" : undefined}
+        style={
+          !isExpanded
+            ? {
+                display: "-webkit-box",
+                WebkitLineClamp: maxLines,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }
+            : undefined
+        }
+      >
         {text}
       </div>
       {(isTruncated || isExpanded) && (

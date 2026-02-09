@@ -653,6 +653,13 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         summary += ` - Error: ${exec.error.substring(0, 400)}`;
       }
 
+      if (status === "completed" && exec?.result != null) {
+        const resultStr = JSON.stringify(exec.result);
+        const preview =
+          resultStr.length > 1000 ? resultStr.substring(0, 1000) + "... [truncated]" : resultStr;
+        summary += `\n  Result preview: ${preview}`;
+      }
+
       if (
         dsResult?.error &&
         (status === "completed" || status === "failed" || status === "running")

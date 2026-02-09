@@ -1,6 +1,7 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { splitUrl } from "@/src/lib/client-utils";
-import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
+import { truncateToolResult } from "@/src/lib/general-utils";
+import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
+import { ConfirmationAction, ToolResult, UpsertMode, getToolSystemIds } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -1027,7 +1028,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       headers: {
         type: "object",
         description:
-          "Optional HTTP headers (only used for HTTP/HTTPS URLs). Can use <<system_id_credential_key>> for credential injection.",
+          "HTTP headers (only used for HTTP/HTTPS URLs). Ensure to include system credentials via <<system_id_credential_key>> if this url requires authentication.",
       },
       body: {
         type: "string",
@@ -1307,93 +1308,18 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
 });
 
 const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
-  const {
-    systemId,
-    scopes,
-    client_id,
-    auth_url,
-    token_url,
-    grant_type,
-    tokenAuthMethod,
-    tokenContentType,
-    usePKCE,
-    extraHeaders,
-    sensitiveCredentials,
-  } = input;
-
   try {
-    const system = await ctx.superglueClient.getSystem(systemId);
+    const system = await ctx.superglueClient.getSystem(input.systemId);
     if (!system) {
       return {
         success: false,
-        error: `System '${systemId}' not found`,
+        error: `System '${input.systemId}' not found`,
         suggestion: "Create the system first using create_system",
       };
     }
 
-    const templateMatch = findTemplateForSystem(system);
-    const templateOAuth = templateMatch?.template.oauth;
-
-    const oauthConfig: Record<string, any> = {
-      grant_type:
-        grant_type ||
-        system.credentials?.grant_type ||
-        templateOAuth?.grant_type ||
-        "authorization_code",
-    };
-
-    if (scopes) oauthConfig.scopes = scopes;
-    else if (system.credentials?.scopes) oauthConfig.scopes = system.credentials.scopes;
-    else if (templateOAuth?.scopes) oauthConfig.scopes = templateOAuth.scopes;
-
-    if (client_id) oauthConfig.client_id = client_id;
-    else if (system.credentials?.client_id) oauthConfig.client_id = system.credentials.client_id;
-    else if (templateOAuth?.client_id) oauthConfig.client_id = templateOAuth.client_id;
-
-    if (system.credentials?.client_secret) {
-      oauthConfig.client_secret = system.credentials.client_secret;
-    }
-
-    if (auth_url) oauthConfig.auth_url = auth_url;
-    else if (system.credentials?.auth_url) oauthConfig.auth_url = system.credentials.auth_url;
-    else if (templateOAuth?.authUrl) oauthConfig.auth_url = templateOAuth.authUrl;
-
-    if (token_url) oauthConfig.token_url = token_url;
-    else if (system.credentials?.token_url) oauthConfig.token_url = system.credentials.token_url;
-    else if (templateOAuth?.tokenUrl) oauthConfig.token_url = templateOAuth.tokenUrl;
-
-    // Token exchange configuration - agent input > system credentials > template
-    if (tokenAuthMethod) oauthConfig.tokenAuthMethod = tokenAuthMethod;
-    else if (system.credentials?.tokenAuthMethod)
-      oauthConfig.tokenAuthMethod = system.credentials.tokenAuthMethod;
-    else if (templateOAuth?.tokenAuthMethod)
-      oauthConfig.tokenAuthMethod = templateOAuth.tokenAuthMethod;
-
-    if (tokenContentType) oauthConfig.tokenContentType = tokenContentType;
-    else if (system.credentials?.tokenContentType)
-      oauthConfig.tokenContentType = system.credentials.tokenContentType;
-    else if (templateOAuth?.tokenContentType)
-      oauthConfig.tokenContentType = templateOAuth.tokenContentType;
-
-    if (usePKCE !== undefined) oauthConfig.usePKCE = usePKCE;
-    else if (system.credentials?.usePKCE !== undefined)
-      oauthConfig.usePKCE = system.credentials.usePKCE;
-    else if (templateOAuth?.usePKCE) oauthConfig.usePKCE = templateOAuth.usePKCE;
-
-    if (extraHeaders) oauthConfig.extraHeaders = extraHeaders;
-    else if (system.credentials?.extraHeaders) {
-      // Parse if stored as JSON string
-      if (typeof system.credentials.extraHeaders === "string") {
-        try {
-          oauthConfig.extraHeaders = JSON.parse(system.credentials.extraHeaders);
-        } catch {
-          // Malformed JSON in stored extraHeaders - skip rather than crash
-          console.warn("Failed to parse extraHeaders from credentials, ignoring malformed value");
-        }
-      } else {
-        oauthConfig.extraHeaders = system.credentials.extraHeaders;
-      }
-    } else if (templateOAuth?.extraHeaders) oauthConfig.extraHeaders = templateOAuth.extraHeaders;
+    const templateOAuth = findTemplateForSystem(system)?.template.oauth;
+    const oauthConfig = resolveOAuthConfig(input, system.credentials, templateOAuth);
 
     if (!oauthConfig.client_id) {
       return {
@@ -1411,24 +1337,15 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       };
     }
 
-    if (sensitiveCredentials && Object.keys(sensitiveCredentials).length > 0) {
-      return {
-        confirmationState: SYSTEM_UPSERT_CONFIRMATION.PENDING,
-        systemId,
-        oauthConfig,
-        system: filterSystemFields(system),
-        requiredSensitiveFields: Object.keys(sensitiveCredentials),
-      };
-    }
+    const { client_secret: _secret, ...safeOauthConfig } = oauthConfig;
 
     return {
       success: true,
       requiresOAuth: true,
-      systemId,
-      oauthConfig,
+      systemId: input.systemId,
+      oauthConfig: safeOauthConfig,
       system: filterSystemFields(system),
       message: "OAuth authentication ready. Click the button to authenticate.",
-      note: "STOP the conversation here and wait for the user to complete OAuth authentication.",
     };
   } catch (error: any) {
     return {
@@ -1451,12 +1368,40 @@ const processAuthenticateOAuthConfirmation = async (
     return { output: JSON.stringify(output), status: "completed" };
   }
 
+  if (parsedOutput.success === false && parsedOutput.error) {
+    return { output: JSON.stringify(parsedOutput), status: "completed" };
+  }
   if (!parsedOutput.confirmationState) {
     return { output: JSON.stringify(parsedOutput), status: "completed" };
   }
 
-  if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.CONFIRMED) {
-    const confirmationData = parsedOutput.confirmationData || parsedOutput;
+  if (parsedOutput.confirmationState === "declined") {
+    return {
+      output: JSON.stringify({
+        success: false,
+        cancelled: true,
+        message: "OAuth authentication cancelled by user",
+      }),
+      status: "declined",
+    };
+  }
+
+  if (parsedOutput.confirmationState === "oauth_failure") {
+    const confirmationData = parsedOutput.confirmationData || {};
+    return {
+      output: JSON.stringify({
+        success: false,
+        error: confirmationData.error || "OAuth authentication failed",
+        systemId: confirmationData.systemId,
+      }),
+      status: "completed",
+    };
+  }
+
+  if (parsedOutput.confirmationState === "oauth_success") {
+    const confirmationData = parsedOutput.confirmationData || {};
+    const { tokens } = confirmationData;
+    const oauthConfig = parsedOutput.oauthConfig || {};
     const systemId = confirmationData.systemId || parsedOutput.systemId;
     const oauthConfig = confirmationData.oauthConfig || parsedOutput.oauthConfig;
     const userProvidedCredentials =
@@ -1467,26 +1412,42 @@ const processAuthenticateOAuthConfirmation = async (
       ...userProvidedCredentials,
     };
 
-    return {
-      output: JSON.stringify({
-        success: true,
-        requiresOAuth: true,
-        systemId,
-        oauthConfig: finalOAuthConfig,
-        message: "OAuth authentication ready. Click the button to authenticate.",
-        note: "STOP the conversation here and wait for the user to complete OAuth authentication.",
-      }),
-      status: "completed",
-    };
-  } else if (parsedOutput.confirmationState === SYSTEM_UPSERT_CONFIRMATION.DECLINED) {
-    return {
-      output: JSON.stringify({
-        success: false,
-        cancelled: true,
-        message: "OAuth authentication cancelled by user",
-      }),
-      status: "declined",
-    };
+    try {
+      const currentSystem = await ctx.superglueClient.getSystem(systemId);
+      const { extraHeaders, ...restOauthConfig } = oauthConfig;
+      const updatedCredentials = {
+        ...currentSystem?.credentials,
+        ...restOauthConfig,
+        ...(extraHeaders && {
+          extraHeaders:
+            typeof extraHeaders === "string" ? extraHeaders : JSON.stringify(extraHeaders),
+        }),
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_type: tokens.token_type,
+        expires_at: tokens.expires_at,
+      };
+
+      await ctx.superglueClient.upsertSystem(systemId, { credentials: updatedCredentials });
+
+      return {
+        output: JSON.stringify({
+          success: true,
+          systemId,
+          message: "OAuth authentication completed and credentials saved to system.",
+        }),
+        status: "completed",
+      };
+    } catch (error: any) {
+      return {
+        output: JSON.stringify({
+          success: false,
+          error: `OAuth succeeded but failed to save credentials: ${error.message}`,
+          suggestion: "Try calling authenticate_oauth again.",
+        }),
+        status: "completed",
+      };
+    }
   }
 
   return { output: JSON.stringify(parsedOutput), status: "completed" };

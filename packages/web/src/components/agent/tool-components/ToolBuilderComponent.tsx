@@ -94,6 +94,8 @@ export function ToolBuilderComponent({
   const lastAbortTimeRef = useRef<number>(0);
   const logSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
+  const displayInstruction = tool.input?.instruction || tool.input?.fixInstructions;
+
   const parsedOutput = useMemo(() => {
     if (!tool.output) return null;
     try {
@@ -487,17 +489,15 @@ export function ToolBuilderComponent({
         {/* Running/Building/Fixing indicator */}
         {isToolRunning && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div
-              className={`flex items-center gap-2 ${mode === "build" && tool.input?.instruction ? "mb-2" : ""}`}
-            >
+            <div className={`flex items-center gap-2 ${displayInstruction ? "mb-2" : ""}`}>
               <ModeIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
               <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">
                 {modeLabel}...
               </span>
             </div>
-            {mode === "build" && tool.input?.instruction && (
+            {displayInstruction && (
               <TruncatableInstruction
-                text={tool.input.instruction}
+                text={displayInstruction}
                 className="text-sm text-blue-700 dark:text-blue-300"
               />
             )}
@@ -511,6 +511,13 @@ export function ToolBuilderComponent({
               <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span className="text-sm font-medium">Review Changes</span>
             </div>
+            {displayInstruction && (
+              <TruncatableInstruction
+                text={displayInstruction}
+                className="text-[13px] text-muted-foreground leading-relaxed"
+                maxLines={1}
+              />
+            )}
             {awaitingConfirmationDiffs?.error ? (
               <div className="flex items-start gap-3 p-3 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200/60 dark:border-red-900/40">
                 <XCircle className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
