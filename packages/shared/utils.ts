@@ -342,6 +342,37 @@ export function assertValidArrowFunction(code: string | undefined | null): strin
   throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
 }
 
+const NON_SENSITIVE_CREDENTIAL_KEYS = new Set([
+  "client_id",
+  "auth_url",
+  "token_url",
+  "scopes",
+  "grant_type",
+  "redirect_uri",
+  "audience",
+  "host",
+  "port",
+  "database",
+  "username",
+  "region",
+]);
+
+export const isSensitiveCredentialKey = (key: string): boolean => {
+  return !NON_SENSITIVE_CREDENTIAL_KEYS.has(key.toLowerCase().trim());
+};
+
+export const maskSystemCredentials = (
+  credentials: Record<string, any> | undefined,
+): Record<string, any> | undefined => {
+  if (!credentials) return undefined;
+  return Object.fromEntries(
+    Object.entries(credentials).map(([key, value]) => [
+      key,
+      isSensitiveCredentialKey(key) ? `<<masked_${key}>>` : value,
+    ]),
+  );
+};
+
 export function maskCredentials(message: string, credentials?: Record<string, string>): string {
   if (!credentials) {
     return message;
