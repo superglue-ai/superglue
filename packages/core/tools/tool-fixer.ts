@@ -5,6 +5,9 @@ import {
   ToolDiff,
   ToolStepResult,
   normalizeToolSchemas,
+  isRequestConfig,
+  RequestStepConfig,
+  ToolStep,
 } from "@superglue/shared";
 import jsonpatch from "fast-json-patch";
 import z from "zod";
@@ -80,14 +83,15 @@ export class ToolFixer {
       id: tool.id,
       instruction: tool.instruction,
       inputSchema: tool.inputSchema,
-      responseSchema: tool.responseSchema,
-      finalTransform: tool.finalTransform,
-      steps: tool.steps.map((step) => this.trimStepForLLM(step)),
+      outputSchema: tool.outputSchema,
+      outputTransform: tool.outputTransform,
+      steps: tool.steps.map((step, index) => this.trimStepForLLM(step, index)),
     };
   }
 
-  private trimStepForLLM(step: any): any {
+  private trimStepForLLM(step: Partial<ToolStep>, index: number): ToolStep & { _index: number } {
     return {
+      _index: index, // Helps the LLM understand the step index in the JSON Patch path
       id: step.id,
       systemId: step.systemId,
       executionMode: step.executionMode,

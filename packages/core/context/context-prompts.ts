@@ -381,11 +381,12 @@ Each patch operation has:
 
 CRITICAL RULES FOR PATCHES:
 1. Use JSON Pointer notation for paths - starts with "/" and uses "/" as separator
-2. Array indices are numbers: "/steps/0", "/steps/1", etc.
-3. Use "/steps/-" to append to an array
-4. The "value" field contains the ACTUAL value (not JSON-escaped) - no escaping needed!
-5. Make minimal changes - only patch what needs fixing
-6. You can chain multiple operations - they apply in order
+2. Array indices are zero-based: "/steps/0" is the first step, "/steps/1" is the second step, etc.
+3. Before generating patches, verify the path exists by checking the step indices in the tool JSON
+4. Use "/steps/-" to append to an array
+5. The "value" field contains the ACTUAL value (not JSON-escaped) - no escaping needed!
+6. Make minimal changes - only patch what needs fixing and don't forget to update the instruction to reflect the changes.
+7. You can chain multiple operations - they apply in order
 
 OPERATION TYPES:
 - "replace": Change an existing value at a path

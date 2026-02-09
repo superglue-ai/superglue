@@ -1,6 +1,8 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { splitUrl } from "@/src/lib/client-utils";
-import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
+import { truncateToolResult } from "@/src/lib/general-utils";
+import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
+import { applyDiffsToConfig } from "@/src/lib/config-diff-utils";
+import { ConfirmationAction, ToolResult, UpsertMode, getToolSystemIds } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -439,9 +441,22 @@ const processEditToolConfirmation = async (
       formatDiffSummary(d),
     );
 
+    // Apply only the approved diffs to the original config to get the correct updated config
+    let updatedConfig = parsedOutput.originalConfig;
+    if (parsedOutput.originalConfig && parsedOutput.approvedDiffs?.length > 0) {
+      try {
+        updatedConfig = applyDiffsToConfig(parsedOutput.originalConfig, parsedOutput.approvedDiffs);
+      } catch (e) {
+        console.error("[edit_tool] Failed to apply approved diffs:", e);
+        // Fall back to original config if applying diffs fails
+        updatedConfig = parsedOutput.originalConfig;
+      }
+    }
+
     return {
       output: JSON.stringify({
         ...parsedOutput,
+        config: updatedConfig,
         userApproved: true,
         partialApproval: true,
         message: `User PARTIALLY approved: ${parsedOutput.approvedDiffs?.length || 0} change(s) APPLIED, ${parsedOutput.rejectedDiffs?.length || 0} REJECTED.`,

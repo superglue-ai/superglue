@@ -108,6 +108,10 @@ export function ToolBuilderComponent({
 
   // Enrich diffs for awaiting confirmation state
   const awaitingConfirmationDiffs = useMemo(() => {
+    // If the fix failed, return the error from parsedOutput
+    if (isAwaitingConfirmation && parsedOutput?.success === false && parsedOutput?.error) {
+      return { enrichedDiffs: [], error: parsedOutput.error };
+    }
     if (!isAwaitingConfirmation || !parsedOutput?.diffs || parsedOutput.diffs.length === 0) {
       return { enrichedDiffs: [], error: null };
     }
