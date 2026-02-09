@@ -74,7 +74,6 @@ export interface DataStore {
     workflow: Tool;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
   renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool>;
@@ -86,7 +85,6 @@ export interface DataStore {
     version: number;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool>;
 
   // Tenant Information Methods
@@ -184,6 +182,5 @@ export type ToolHistoryEntry = {
   version: number;
   createdAt: Date;
   createdByUserId?: string;
-  createdByEmail?: string;
   tool: Tool;
 };

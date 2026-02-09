@@ -15,8 +15,6 @@ export interface AuthenticatedFastifyRequest extends FastifyRequest {
   authInfo: {
     orgId: string;
     userId?: string;
-    userEmail?: string;
-    userName?: string;
     orgName?: string;
     orgRole?: UserRole;
     // EE: API key permission fields

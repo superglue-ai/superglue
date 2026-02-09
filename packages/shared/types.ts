@@ -69,6 +69,12 @@ export enum UserRole {
   MEMBER = "member",
 }
 
+// User info for lookup by user ID
+export interface UserInfo {
+  id: string;
+  email: string | null;
+}
+
 export enum SupportedFileType {
   JSON = "JSON",
   CSV = "CSV",

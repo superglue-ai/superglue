@@ -14,6 +14,18 @@ export const _resetAuthManager = (manager: AuthManager | null = null) => {
   _authManager = manager;
 };
 
+export async function createApiKey(
+  orgId: string,
+  userId?: string,
+  mode?: "frontend" | "backend",
+): Promise<string | null> {
+  const manager = getAuthManager();
+  if (manager.createApiKey) {
+    return manager.createApiKey(orgId, userId, mode);
+  }
+  return null;
+}
+
 export async function validateToken(token: string | undefined): Promise<AuthResult> {
   if (!token) {
     return {
