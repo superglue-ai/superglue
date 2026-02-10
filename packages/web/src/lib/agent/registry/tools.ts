@@ -5,6 +5,7 @@ import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
   filterSystemFields,
+  resolveBodyFileReferences,
   resolveDocumentationFiles,
   resolvePayloadWithFiles,
   stripLegacyToolFields,
@@ -987,6 +988,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       - Supports sftp://, ftp://, and ftps:// URLs for file transfer operations
       - Supports credential injection using placeholders: <<system_id_credential_key>>
       - When a systemId is provided, OAuth tokens are automatically refreshed if expired
+      - Use file::<key> in body values to reference uploaded files (e.g., {"data": "file::my_csv"})
     </important_notes>
 
     <http_usage>
@@ -1032,7 +1034,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       body: {
         type: "string",
         description:
-          "Request body. For HTTP: JSON string for POST/PUT/PATCH. For Postgres: JSON with query and params. For SFTP: JSON with operation and path. Can use <<system_id_credential_key>> for credential injection.",
+          "Request body. For HTTP: JSON string for POST/PUT/PATCH. For Postgres: JSON with query and params. For SFTP: JSON with operation and path. Can use <<system_id_credential_key>> for credential injection. Use file::<key> in values to reference uploaded files, they are auto parsed to JSON and replaced in the body.",
       },
     },
     required: ["url"],
@@ -1047,9 +1049,10 @@ const runCallSystem = async (
   const protocol = getProtocol(url);
 
   try {
-    // this split is not strictly necessary, but we need due to backwards compatibility with composeURL() in the tool executor
-    const { urlHost, urlPath } =
-      protocol === "http" ? splitUrl(url) : { urlHost: url, urlPath: "" };
+    const resolvedBody = resolveBodyFileReferences(body, ctx.filePayloads);
+    if (resolvedBody.success === false) {
+      return { success: false, protocol, error: resolvedBody.error };
+    }
 
     const step = {
       id: `call_system_${Date.now()}`,
@@ -1058,8 +1061,8 @@ const runCallSystem = async (
         urlPath,
         method: method || "GET",
         headers,
-        body,
-        instruction: "",
+        body: resolvedBody.body,
+        systemId,
       },
       systemId,
     };

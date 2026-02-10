@@ -259,3 +259,35 @@ export const getProtocol = (url: string): "http" | "postgres" | "sftp" => {
     return "sftp";
   return "http";
 };
+
+export const resolveBodyFileReferences = (
+  body: string | undefined,
+  filePayloads: Record<string, any> | undefined,
+): { success: true; body: string | undefined } | { success: false; error: string } => {
+  if (!body || !filePayloads || Object.keys(filePayloads).length === 0) {
+    if (body?.includes("file::")) {
+      return {
+        success: false,
+        error: `Body contains file references but no files are available: ${body}`,
+      };
+    }
+    return { success: true, body };
+  }
+
+  try {
+    const parsed = JSON.parse(body);
+    const fileResult = resolvePayloadWithFiles(parsed, filePayloads, true);
+    if (fileResult.success === false) return { success: false, error: fileResult.error };
+    return { success: true, body: JSON.stringify(fileResult.resolved) };
+  } catch {
+    const fileResult = resolvePayloadWithFiles(body, filePayloads, true);
+    if (fileResult.success === false) return { success: false, error: fileResult.error };
+    return {
+      success: true,
+      body:
+        typeof fileResult.resolved === "string"
+          ? fileResult.resolved
+          : JSON.stringify(fileResult.resolved),
+    };
+  }
+};
