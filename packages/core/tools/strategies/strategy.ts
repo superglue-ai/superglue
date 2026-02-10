@@ -59,7 +59,7 @@ export class StepExecutionStrategyRegistry {
       success: false,
       strategyExecutionData: {},
       error:
-        "Unsupported URL protocol. URL must start with a supported protocol (http://, https://, postgres://, postgresql://, ftp://, ftps://, sftp://).",
+        "Unsupported URL protocol. URL must start with a supported protocol (http://, https://, postgres://, postgresql://, ftp://, ftps://, sftp://, smb://).",
     };
   }
 }

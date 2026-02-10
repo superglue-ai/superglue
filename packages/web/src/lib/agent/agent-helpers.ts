@@ -1,4 +1,13 @@
-import { System, Tool } from "@superglue/shared";
+import { maskSystemCredentials, Message, System, Tool } from "@superglue/shared";
+
+// Re-export from shared for backwards compatibility
+export { getConnectionProtocol, type ConnectionProtocol } from "@superglue/shared";
+// Alias for backwards compatibility
+export { getConnectionProtocol as getProtocol } from "@superglue/shared";
+
+export const needsSystemMessage = (messages: Message[]): boolean => {
+  return !messages.some((m) => m.role === "system");
+};
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
   return {
@@ -253,9 +262,34 @@ export const truncateResponseBody = (result: any): any => {
   return result;
 };
 
-export const getProtocol = (url: string): "http" | "postgres" | "sftp" => {
-  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
-  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
-    return "sftp";
-  return "http";
+export const resolveBodyFileReferences = (
+  body: string | undefined,
+  filePayloads: Record<string, any> | undefined,
+): { success: true; body: string | undefined } | { success: false; error: string } => {
+  if (!body || !filePayloads || Object.keys(filePayloads).length === 0) {
+    if (body?.includes("file::")) {
+      return {
+        success: false,
+        error: `Body contains file references but no files are available: ${body}`,
+      };
+    }
+    return { success: true, body };
+  }
+
+  try {
+    const parsed = JSON.parse(body);
+    const fileResult = resolvePayloadWithFiles(parsed, filePayloads, true);
+    if (fileResult.success === false) return { success: false, error: fileResult.error };
+    return { success: true, body: JSON.stringify(fileResult.resolved) };
+  } catch {
+    const fileResult = resolvePayloadWithFiles(body, filePayloads, true);
+    if (fileResult.success === false) return { success: false, error: fileResult.error };
+    return {
+      success: true,
+      body:
+        typeof fileResult.resolved === "string"
+          ? fileResult.resolved
+          : JSON.stringify(fileResult.resolved),
+    };
+  }
 };

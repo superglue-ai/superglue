@@ -71,6 +71,11 @@ export const server_defaults = {
     DEFAULT_RETRIES: 0,
     DEFAULT_RETRY_DELAY: 1000, // 1 second
   },
+  SMB: {
+    DEFAULT_TIMEOUT: 600000, // 10 minutes
+    DEFAULT_RETRIES: 0,
+    DEFAULT_RETRY_DELAY: 1000, // 1 second
+  },
   HTTP: {
     DEFAULT_TIMEOUT: 3600000, // 60 minutes
     MAX_QUICK_RETRIES: 1,

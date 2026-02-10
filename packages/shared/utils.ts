@@ -11,6 +11,16 @@ export * from "./utils/ai-model-init.js";
 // Re-export model context length utilities
 export * from "./utils/model-context-length.js";
 
+export type ConnectionProtocol = "http" | "postgres" | "sftp" | "smb";
+
+export const getConnectionProtocol = (url: string): ConnectionProtocol => {
+  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
+  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
+    return "sftp";
+  if (url.startsWith("smb://")) return "smb";
+  return "http";
+};
+
 export const ALLOWED_FILE_EXTENSIONS = [
   ".json",
   ".csv",
@@ -515,4 +525,21 @@ export function normalizeToolDiffs<T extends { op: string; path: string; value?:
   diffs: T[],
 ): T[] {
   return diffs.map((diff) => normalizeToolDiff(diff));
+}
+
+export function composeUrl(host: string, path: string) {
+  // Handle empty/undefined inputs
+  if (!host) host = "";
+  if (!path) path = "";
+
+  // Add https:// if protocol is missing
+  if (!/^(https?|postgres(ql)?|ftp(s)?|sftp|smb|file):\/\//i.test(host)) {
+    host = `https://${host}`;
+  }
+
+  // Trim slashes in one pass
+  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+  return `${cleanHost}/${cleanPath}`;
 }
