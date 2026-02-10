@@ -8,7 +8,7 @@ import {
   resolveDocumentationFiles,
   resolvePayloadWithFiles,
   stripLegacyToolFields,
-  truncateResponseBody,
+  truncateResponseData,
   validateDraftOrToolId,
   validateRequiredFields,
   getProtocol,
@@ -1069,7 +1069,7 @@ const runCallSystem = async (
       payload: {},
     });
 
-    return {
+    return truncateResponseData({
       success: result.success,
       protocol,
       data: result.data,
