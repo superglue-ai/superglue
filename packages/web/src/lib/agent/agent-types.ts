@@ -1,6 +1,4 @@
-import { ConfirmationAction, Message } from "@superglue/shared";
-import { SuperglueClient } from "@superglue/shared";
-import { z } from "zod";
+import { ConfirmationAction, Message, ConnectionProtocol } from "@superglue/shared";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import { AgentType } from "./registry/agents";
 
@@ -157,7 +155,7 @@ export interface CallSystemArgs {
 
 export interface CallSystemResult {
   success: boolean;
-  protocol: "http" | "postgres" | "sftp";
+  protocol: ConnectionProtocol;
   status?: number;
   statusText?: string;
   headers?: Record<string, string>;

@@ -39,6 +39,7 @@
   "type": "module",
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^3.0.61",
+    "@awo00/smb2": "^1.1.1",
     "@apollo/server": "^4.11.3",
     "@aws-sdk/client-s3": "^3.947.0",
     "@aws-sdk/s3-request-presigner": "^3.947.0",

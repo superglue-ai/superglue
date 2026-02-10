@@ -9,21 +9,12 @@ import {
 } from "@/src/components/ui/select";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { UserAction, CallSystemAutoExecute } from "@/src/lib/agent/agent-types";
-import { ToolCall } from "@superglue/shared";
-import { AlertCircle, ChevronDown, Database, FolderOpen, Loader2, Terminal } from "lucide-react";
+import { ToolCall, getConnectionProtocol } from "@superglue/shared";
+import { AlertCircle, ChevronDown, FolderOpen, Loader2, Terminal } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 import { useAgentContext } from "../AgentContextProvider";
 import { Button } from "@/src/components/ui/button";
-
-type Protocol = "http" | "postgres" | "sftp";
-
-const getProtocol = (url: string): Protocol => {
-  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
-  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
-    return "sftp";
-  return "http";
-};
 
 const maskConnectionString = (url: string): string => {
   try {
@@ -72,7 +63,7 @@ export function CallSystemComponent({
   const headers = tool.input?.headers || {};
   const body = tool.input?.body;
 
-  const protocol = getProtocol(url);
+  const protocol = getConnectionProtocol(url);
 
   let parsedBody: any = null;
   try {
@@ -98,10 +89,6 @@ export function CallSystemComponent({
   const isCompleted = tool.status === "completed";
   const isDeclined = tool.status === "declined";
   const hasError = output?.success === false && output?.error && !isDeclined;
-  const isDestructive =
-    protocol === "http"
-      ? ["POST", "PUT", "DELETE", "PATCH"].includes(method)
-      : protocol === "postgres" || protocol === "sftp";
 
   useEffect(() => {
     if (isCompleted || isDeclined) {
@@ -239,6 +226,35 @@ export function CallSystemComponent({
     );
   };
 
+  const renderSmbHeader = () => {
+    const operation = parsedBody?.operation || "unknown";
+    const path = parsedBody?.path || "";
+    return (
+      <div className="flex items-start gap-3">
+        <button
+          onClick={() => setDetailsExpanded(!detailsExpanded)}
+          className="flex-shrink-0 mt-1 hover:bg-muted rounded p-1 -m-1 transition-colors"
+          title={detailsExpanded ? "Hide details" : "Show details"}
+        >
+          {detailsExpanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <FolderOpen className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              SMB
+            </span>
+            <span className="text-xs font-medium text-muted-foreground uppercase">{operation}</span>
+          </div>
+          {path && <pre className="text-sm font-mono text-foreground truncate">{path}</pre>}
+        </div>
+      </div>
+    );
+  };
+
   const renderHttpDetails = () => (
     <div className="bg-muted/50 p-3 rounded-md space-y-2">
       <div className="flex items-center justify-between">
@@ -263,6 +279,41 @@ export function CallSystemComponent({
       <div className="bg-muted/50 p-3 rounded-md space-y-2">
         <div className="flex items-center justify-between">
           <div className="text-sm font-medium">SFTP Operation</div>
+          <CopyButton getData={() => JSON.stringify(parsedBody, null, 2)} />
+        </div>
+        <div className="text-xs space-y-1">
+          <div>
+            <span className="text-muted-foreground">Operation:</span>{" "}
+            <span className="font-mono font-medium uppercase">{operation}</span>
+          </div>
+          {path && (
+            <div>
+              <span className="text-muted-foreground">Path:</span>{" "}
+              <span className="font-mono">{path}</span>
+            </div>
+          )}
+          {content && (
+            <div>
+              <span className="text-muted-foreground">Content:</span>
+              <pre className="text-xs font-mono overflow-x-auto whitespace-pre bg-background p-2 rounded border border-border mt-1 max-h-32">
+                {typeof content === "string" ? content : JSON.stringify(content, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground">Connection: {maskConnectionString(url)}</div>
+      </div>
+    );
+  };
+
+  const renderSmbDetails = () => {
+    const operation = parsedBody?.operation || "unknown";
+    const path = parsedBody?.path || "";
+    const content = parsedBody?.content;
+    return (
+      <div className="bg-muted/50 p-3 rounded-md space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">SMB Operation</div>
           <CopyButton getData={() => JSON.stringify(parsedBody, null, 2)} />
         </div>
         <div className="text-xs space-y-1">
@@ -341,19 +392,14 @@ export function CallSystemComponent({
         {protocol === "http" && renderHttpHeader()}
         {protocol === "postgres" && renderPostgresHeader()}
         {protocol === "sftp" && renderSftpHeader()}
+        {protocol === "smb" && renderSmbHeader()}
 
         {detailsExpanded && protocol === "http" && renderHttpDetails()}
         {detailsExpanded && protocol === "sftp" && renderSftpDetails()}
+        {detailsExpanded && protocol === "smb" && renderSmbDetails()}
 
         {isAwaitingConfirmation && (
           <div className="space-y-3">
-            {isDestructive && (
-              <div className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300 text-xs bg-amber-500/10 px-2 py-1.5 rounded border border-amber-500/20">
-                <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                <span>{getWarningMessage()}</span>
-              </div>
-            )}
-
             <div className="flex items-center gap-2">
               <Button size="sm" variant="success" onClick={handleConfirm} disabled={isExecuting}>
                 {isExecuting ? (

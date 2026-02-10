@@ -339,6 +339,16 @@ BATCH OPERATIONS:
 - Response: single result for single operation, array of results for multiple operations
 - Use batch operations to perform multiple file operations efficiently in one API call
 </FTP_SFTP>
+
+<SMB>
+Correct SMB/Samba configuration:
+- url: "smb://<<username>>:<<password>>@<<hostname>>/<<sharename>>/"
+- For domain auth: "smb://<<domain>>\\<<username>>:<<password>>@<<hostname>>/<<sharename>>/"
+- body: Can be either a single operation object or an array of operation objects for batch operations.
+- Paths use forward slashes (/) - the library handles Windows path conversion internally.
+
+SUPPORTED OPERATIONS: same as FTP/SFTP, including batch operations.
+</SMB>
 `;
 
 export const GENERATE_INSTRUCTIONS_SYSTEM_PROMPT = `You are helping users discover what they can build with their connected data sources and APIs. Your job is to generate creative, practical example workflows or API calls they could implement.
@@ -529,6 +539,14 @@ FTP/SFTP configuration:
 Operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 Body format: {"operation": "get", "path": "/file.txt"}
 </FTP_SFTP>
+
+<SMB>
+Correct SMB/Samba configuration:
+- url: "smb://<<username>>:<<password>>@<<hostname>>/<<sharename>>/"
+- For domain auth: "smb://<<domain>>\\<<username>>:<<password>>@<<hostname>>/<<sharename>>/"
+- Paths use forward slashes (/) - the library handles Windows path conversion internally.
+- Operations and body format are the same as FTP/SFTP, including batch operations.
+</SMB>
 
 <PATCH_EXAMPLES>
 Example 1 - Change API endpoint:

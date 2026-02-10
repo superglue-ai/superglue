@@ -22,6 +22,7 @@ import { applyResponseFilters, FilterMatchError } from "./response-filters.js";
 import { FTPStepExecutionStrategy } from "./strategies/ftp/ftp.js";
 import { AbortError, ApiCallError, HttpStepExecutionStrategy } from "./strategies/http/http.js";
 import { PostgresStepExecutionStrategy } from "./strategies/postgres/postgres.js";
+import { SMBStepExecutionStrategy } from "./strategies/smb/smb.js";
 import { StepExecutionStrategyRegistry } from "./strategies/strategy.js";
 import { executeAndEvaluateFinalTransform } from "./tool-transform.js";
 
@@ -79,6 +80,7 @@ export class ToolExecutor implements Tool {
     this.strategyRegistry.register(new HttpStepExecutionStrategy());
     this.strategyRegistry.register(new PostgresStepExecutionStrategy());
     this.strategyRegistry.register(new FTPStepExecutionStrategy());
+    this.strategyRegistry.register(new SMBStepExecutionStrategy());
   }
 
   public async execute({

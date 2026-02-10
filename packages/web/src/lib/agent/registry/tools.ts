@@ -1,6 +1,14 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { splitUrl } from "@/src/lib/client-utils";
-import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
+import { truncateToolResult } from "@/src/lib/general-utils";
+import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
+import { applyDiffsToConfig } from "@/src/lib/config-diff-utils";
+import {
+  ConfirmationAction,
+  ToolResult,
+  UpsertMode,
+  getToolSystemIds,
+  getConnectionProtocol,
+} from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -11,7 +19,6 @@ import {
   truncateResponseBody,
   validateDraftOrToolId,
   validateRequiredFields,
-  getProtocol,
 } from "../agent-helpers";
 import {
   EDIT_TOOL_CONFIRMATION,
@@ -985,6 +992,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       - Supports HTTP/HTTPS URLs for REST APIs
       - Supports postgres:// and postgresql:// URLs for PostgreSQL databases
       - Supports sftp://, ftp://, and ftps:// URLs for file transfer operations
+      - Supports smb:// URLs for Windows/Samba file share operations
       - Supports credential injection using placeholders: <<system_id_credential_key>>
       - When a systemId is provided, OAuth tokens are automatically refreshed if expired
     </important_notes>
@@ -1003,8 +1011,17 @@ const callSystemDefinition = (): ToolDefinition => ({
     <sftp_usage>
       - URL format: sftp://user:password@host:port
       - Body should contain JSON with operation: {"operation": "list", "path": "/data"}
+      - Batch operations: body can be an array of operations: [{"operation": "list", "path": "/"}, {"operation": "get", "path": "/file.txt"}]
       - Supported operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
     </sftp_usage>
+
+    <smb_usage>
+      - URL format: smb://user:password@host/sharename or smb://domain\\user:password@host/sharename
+      - Body should contain JSON with operation: {"operation": "list", "path": "/data"}
+      - Batch operations: body can be an array of operations: [{"operation": "list", "path": "/"}, {"operation": "get", "path": "/file.txt"}]
+      - Supported operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
+      - Paths use forward slashes (/) - converted internally
+    </smb_usage>
     `,
   inputSchema: {
     type: "object",
@@ -1017,7 +1034,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       url: {
         type: "string",
         description:
-          "Full URL including protocol. Supports http(s)://, postgres://, postgresql://, sftp://, ftp://, ftps://. Can use <<system_id_credential_key>> for credential injection.",
+          "Full URL including protocol. Supports http(s)://, postgres://, postgresql://, sftp://, ftp://, ftps://, smb://. Can use <<system_id_credential_key>> for credential injection.",
       },
       method: {
         type: "string",
@@ -1032,7 +1049,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       body: {
         type: "string",
         description:
-          "Request body. For HTTP: JSON string for POST/PUT/PATCH. For Postgres: JSON with query and params. For SFTP: JSON with operation and path. Can use <<system_id_credential_key>> for credential injection.",
+          "Request body. For HTTP: JSON string for POST/PUT/PATCH. For Postgres: JSON with query and params. For SFTP/SMB: JSON with operation and path, or array of operations for batch. Can use <<system_id_credential_key>> for credential injection. Use file::<key> in values to reference uploaded files, they are auto parsed to JSON and replaced in the body.",
       },
     },
     required: ["url"],
@@ -1044,7 +1061,7 @@ const runCallSystem = async (
   ctx: ToolExecutionContext,
 ): Promise<CallSystemResult> => {
   const { systemId, url, method, headers, body } = request;
-  const protocol = getProtocol(url);
+  const protocol = getConnectionProtocol(url);
 
   try {
     // this split is not strictly necessary, but we need due to backwards compatibility with composeURL() in the tool executor
@@ -1107,7 +1124,7 @@ const processCallSystemConfirmation = async (
     } catch (error: any) {
       const errorResult = {
         success: false,
-        protocol: getProtocol(input.url),
+        protocol: getConnectionProtocol(input.url),
         error: error.message || "Request failed",
       };
       return { output: JSON.stringify(errorResult), status: "completed" };
