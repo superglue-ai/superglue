@@ -229,24 +229,24 @@ export function resolveDocumentationFiles(
   }
 }
 
-const MAX_RESPONSE_BODY_LENGTH = 25_000;
+const MAX_RESPONSE_DATA_LENGTH = 25_000;
 
-export const truncateResponseBody = (result: any): any => {
-  if (!result.body) return result;
+export const truncateResponseData = (result: any): any => {
+  if (!result.data) return result;
 
-  if (typeof result.body === "object") {
-    const bodyStr = JSON.stringify(result.body);
-    if (bodyStr.length > MAX_RESPONSE_BODY_LENGTH) {
-      result.body = {
-        _note: `Response body truncated for LLM context (original size: ${bodyStr.length} chars)`,
+  if (typeof result.data === "object") {
+    const dataStr = JSON.stringify(result.data);
+    if (dataStr.length > MAX_RESPONSE_DATA_LENGTH) {
+      result.data = {
+        _note: `Response data truncated for LLM context (original size: ${dataStr.length} chars)`,
         _truncated: true,
-        preview: bodyStr.substring(0, MAX_RESPONSE_BODY_LENGTH),
+        preview: dataStr.substring(0, MAX_RESPONSE_DATA_LENGTH),
       };
     }
-  } else if (typeof result.body === "string" && result.body.length > MAX_RESPONSE_BODY_LENGTH) {
-    const originalLength = result.body.length;
-    result.body =
-      result.body.substring(0, MAX_RESPONSE_BODY_LENGTH) +
+  } else if (typeof result.data === "string" && result.data.length > MAX_RESPONSE_DATA_LENGTH) {
+    const originalLength = result.data.length;
+    result.data =
+      result.data.substring(0, MAX_RESPONSE_DATA_LENGTH) +
       `\n\n[Truncated from ${originalLength} chars]`;
   }
 
