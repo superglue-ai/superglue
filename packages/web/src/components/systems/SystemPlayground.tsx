@@ -233,7 +233,7 @@ export function SystemPlayground() {
           )}
 
           <Button
-            variant="default"
+            variant="glass-primary"
             size="sm"
             onClick={handleSave}
             disabled={!canSave || isSaving}

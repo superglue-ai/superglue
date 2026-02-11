@@ -18,6 +18,8 @@ const buttonVariants = cva(
         success: "btn-success",
         glass:
           "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm border border-border/50 dark:border-border/70 shadow-sm hover:shadow hover:border-border/60 dark:hover:border-border/90 hover:from-muted/60 hover:to-muted/40 dark:hover:from-muted/60 dark:hover:to-muted/40 active:scale-[0.99] text-foreground/90 dark:text-foreground/95 hover:text-foreground transition-all duration-200",
+        "glass-primary":
+          "!bg-foreground !text-background backdrop-blur-sm border border-foreground shadow-sm hover:!bg-foreground hover:!opacity-90 active:scale-[0.99] transition-all duration-200",
       },
       size: {
         default: "h-9 px-4 py-2",
