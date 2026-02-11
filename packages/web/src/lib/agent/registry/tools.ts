@@ -1,7 +1,7 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { truncateToolResult } from "@/src/lib/general-utils";
 import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
-import { ConfirmationAction, ToolResult, UpsertMode, getToolSystemIds } from "@superglue/shared";
+import { splitUrl } from "@/src/lib/client-utils";
+import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -1075,7 +1075,7 @@ const runCallSystem = async (
       protocol,
       data: result.data,
       error: result.error,
-    };
+    });
   } catch (error) {
     return {
       success: false,
@@ -1104,7 +1104,7 @@ const processCallSystemConfirmation = async (
   if (parsedOutput.confirmationState === CALL_SYSTEM_CONFIRMATION.CONFIRMED) {
     try {
       const realResult = await runCallSystem(input, ctx);
-      return { output: JSON.stringify(truncateResponseBody(realResult)), status: "completed" };
+      return { output: JSON.stringify(truncateResponseData(realResult)), status: "completed" };
     } catch (error: any) {
       const errorResult = {
         success: false,
@@ -1401,7 +1401,6 @@ const processAuthenticateOAuthConfirmation = async (
   if (parsedOutput.confirmationState === "oauth_success") {
     const confirmationData = parsedOutput.confirmationData || {};
     const { tokens } = confirmationData;
-    const oauthConfig = parsedOutput.oauthConfig || {};
     const systemId = confirmationData.systemId || parsedOutput.systemId;
     const oauthConfig = confirmationData.oauthConfig || parsedOutput.oauthConfig;
     const userProvidedCredentials =
@@ -1879,7 +1878,7 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
 
       if (shouldAutoExecute) {
         const result = await runCallSystem(input, ctx);
-        return truncateResponseBody(result);
+        return truncateResponseData(result);
       }
 
       return {

@@ -289,69 +289,90 @@ function PlaygroundAgentContent({
                       return message.isStreaming && !hasContent ? <ThinkingIndicator /> : null;
                     })()}
                     {message.role === "user" && !isLoading && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleEditMessage(message.id, message.content)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 px-2 flex items-center justify-center rounded hover:bg-muted"
                         title="Edit message"
                       >
-                        Save & Restart
+                        <Edit2 className="w-3 h-3" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleCancelEdit}
-                        disabled={isLoading}
-                      >
-                        <X className="w-3 h-3 mr-1" />
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {message.parts && message.parts.length > 0 ? (
-                      groupMessageParts(message.parts).map((grouped, idx) => {
-                        if (grouped.type === "content") {
-                          return (
-                            <div
-                              key={grouped.part.id}
-                              className={cn(
-                                "prose prose-sm max-w-none dark:prose-invert text-sm",
-                                message.isStreaming && "streaming-message",
-                              )}
-                            >
-                              <Streamdown>{grouped.part.content || ""}</Streamdown>
-                            </div>
-                          );
-                        } else if (grouped.type === "background_tools") {
-                          return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
-                        } else if (grouped.type === "tool" && grouped.part.tool) {
-                          return (
-                            <ToolCallComponent
-                              key={grouped.part.tool.id}
-                              tool={grouped.part.tool}
-                              onInputChange={handleToolInputChange}
-                              onToolUpdate={handleToolUpdate}
-                              sendAgentRequest={sendAgentRequest}
-                              bufferAction={bufferAction}
-                              onAbortStream={stopStreaming}
-                              onApplyChanges={onApplyChanges}
-                              onApplyPayload={onApplyPayload}
-                              currentPayload={currentPayload}
-                              isPlayground={mode === "tool"}
-                            />
-                          );
-                        }
-                        return null;
-                      })
-                    ) : (
-                      <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
-                        <Streamdown>{message.content}</Streamdown>
-                      </div>
                     )}
                   </div>
-                )}
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        className="min-h-[60px] text-sm"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveEdit(message.id)}
+                          disabled={isLoading}
+                        >
+                          Save & Restart
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleCancelEdit}
+                          disabled={isLoading}
+                        >
+                          <X className="w-3 h-3 mr-1" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {message.parts && message.parts.length > 0 ? (
+                        groupMessageParts(message.parts).map((grouped, idx) => {
+                          if (grouped.type === "content") {
+                            return (
+                              <div
+                                key={grouped.part.id}
+                                className={cn(
+                                  "prose prose-sm max-w-none dark:prose-invert text-sm",
+                                  message.isStreaming && "streaming-message",
+                                )}
+                              >
+                                <Streamdown>{grouped.part.content || ""}</Streamdown>
+                              </div>
+                            );
+                          } else if (grouped.type === "background_tools") {
+                            return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
+                          } else if (grouped.type === "tool" && grouped.part.tool) {
+                            return (
+                              <ToolCallComponent
+                                key={grouped.part.tool.id}
+                                tool={grouped.part.tool}
+                                onInputChange={handleToolInputChange}
+                                onToolUpdate={handleToolUpdate}
+                                sendAgentRequest={sendAgentRequest}
+                                bufferAction={bufferAction}
+                                onAbortStream={stopStreaming}
+                                onApplyChanges={onApplyChanges}
+                                onApplyPayload={onApplyPayload}
+                                currentPayload={currentPayload}
+                                isPlayground={mode === "tool"}
+                              />
+                            );
+                          }
+                          return null;
+                        })
+                      ) : (
+                        <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
+                          <Streamdown>{message.content}</Streamdown>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
         </div>
