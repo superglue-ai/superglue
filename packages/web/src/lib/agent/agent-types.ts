@@ -23,6 +23,15 @@ export const SYSTEM_UPSERT_CONFIRMATION = {
   DECLINED: "CREDENTIALS_DECLINED",
 } as const;
 
+export type ExecutionMode = "auto" | "confirm_before_execution" | "confirm_after_execution";
+
+export interface ToolPolicy {
+  defaultMode: ExecutionMode;
+  userModeOptions?: ExecutionMode[];
+  computeModeFromInput?: (input: any, policies?: Record<string, any>) => ExecutionMode | null;
+  buildPendingOutput?: (input: any) => any;
+}
+
 export type ToolExecutionPolicies = Record<string, Record<string, any>>;
 
 export type CallSystemAutoExecute = "ask_every_time" | "run_gets_only" | "run_everything";

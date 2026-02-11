@@ -327,7 +327,11 @@ export class AgentClient {
             const generatedId = queue?.shift();
 
             const toolEntry = toolRegistry[part.toolName];
-            const policyResult = processToolPolicy(part.toolName, part.input, ctx);
+            const policyResult = processToolPolicy(
+              part.toolName,
+              part.input,
+              ctx.toolExecutionPolicies,
+            );
             const confirmationMetadata: ToolConfirmationMetadata | undefined =
               toolEntry?.confirmation
                 ? {

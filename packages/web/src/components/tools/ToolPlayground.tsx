@@ -507,26 +507,26 @@ function ToolPlaygroundInner({
             <div className="w-full h-full">
               <div className="h-full">
                 <div className={embedded ? "h-full" : "h-full"}>
-                    <ToolStepGallery
-                      onStepEdit={handleStepEdit}
-                      onExecuteStep={handleExecuteStep}
-                      onExecuteStepWithLimit={handleExecuteStepWithLimit}
-                      onExecuteTransform={handleExecuteTransform}
-                      onAbort={currentRunId ? handleStopExecution : undefined}
-                      onFilesUpload={handleFilesUpload}
-                      onFileRemove={handleFileRemove}
-                      toolActionButtons={toolActionButtons}
-                      headerActions={
-                        headerActions !== undefined ? headerActions : defaultHeaderActions
-                      }
-                      navigateToFinalSignal={navigateToFinalSignal}
-                      showStepOutputSignal={showStepOutputSignal}
-                      focusStepId={focusStepId}
-                      isProcessingFiles={isProcessingFiles}
-                      totalFileSize={totalFileSize}
-                      isPayloadValid={isPayloadValid}
-                      embedded={embedded}
-                    />
+                  <ToolStepGallery
+                    onStepEdit={handleStepEdit}
+                    onExecuteStep={handleExecuteStep}
+                    onExecuteStepWithLimit={handleExecuteStepWithLimit}
+                    onExecuteTransform={handleExecuteTransform}
+                    onAbort={currentRunId ? handleStopExecution : undefined}
+                    onFilesUpload={handleFilesUpload}
+                    onFileRemove={handleFileRemove}
+                    toolActionButtons={toolActionButtons}
+                    headerActions={
+                      headerActions !== undefined ? headerActions : defaultHeaderActions
+                    }
+                    navigateToFinalSignal={navigateToFinalSignal}
+                    showStepOutputSignal={showStepOutputSignal}
+                    focusStepId={focusStepId}
+                    isProcessingFiles={isProcessingFiles}
+                    totalFileSize={totalFileSize}
+                    isPayloadValid={isPayloadValid}
+                    embedded={embedded}
+                  />
                 </div>
               </div>
             </div>
