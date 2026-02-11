@@ -14,6 +14,7 @@ import { BotMessageSquare, Edit2, MessagesSquare, Send, Square, User, Plus, X } 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextProvider";
+import { AgentCapabilities } from "../../agent/AgentCapabilities";
 import { ConversationHistory } from "../../agent/ConversationHistory";
 import type { AgentConfig, PlaygroundToolContext } from "../../agent/hooks/types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
@@ -80,6 +81,7 @@ interface PlaygroundAgentContentProps {
   hideHeader?: boolean;
   initialError?: string;
   mode: PlaygroundMode;
+  agentType: AgentType;
   cacheKeyPrefix: string;
   onApplyChanges?: (newConfig: Tool, diffs?: ToolDiff[]) => void;
   onApplyPayload?: (newPayload: string) => void;
@@ -92,6 +94,7 @@ function PlaygroundAgentContent({
   hideHeader = false,
   initialError,
   mode,
+  agentType,
   cacheKeyPrefix,
   onApplyChanges,
   onApplyPayload,
@@ -216,6 +219,7 @@ function PlaygroundAgentContent({
           </div>
         )}
         <div className={cn("flex items-center gap-1 relative", hideHeader && "ml-auto")}>
+          <AgentCapabilities agentType={agentType} compact triggerClassName="h-7 w-7" />
           <ConversationHistory
             messages={messages}
             currentConversationId={currentConversationId}
@@ -553,6 +557,7 @@ function ToolPlaygroundAgentSidebar({
           hideHeader={hideHeader}
           initialError={initialError}
           mode="tool"
+          agentType={AgentType.PLAYGROUND}
           cacheKeyPrefix={`superglue-playground-${toolId}`}
           onApplyChanges={handleApplyChanges}
           onApplyPayload={handleApplyPayload}
@@ -596,6 +601,7 @@ function SystemPlaygroundAgentSidebar({
           hideHeader={hideHeader}
           initialError={initialError}
           mode="system"
+          agentType={AgentType.SYSTEM_PLAYGROUND}
           cacheKeyPrefix={`superglue-system-${systemConfig.systemId || "new"}`}
         />
       </AgentContextProvider>

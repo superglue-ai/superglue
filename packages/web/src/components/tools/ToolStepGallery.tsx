@@ -728,11 +728,11 @@ export function ToolStepGallery({
                                       e.stopPropagation();
                                       handleAddStep(getInsertIndex());
                                     }}
-                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/15 hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/15 hover:border-muted-foreground/25 hover:bg-muted/40 transition-colors"
                                     title="Add step here"
                                   >
                                     <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:opacity-0 transition-opacity" />
-                                    <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Plus className="h-4 w-4 text-muted-foreground absolute opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </button>
                                 ) : null}
                               </div>

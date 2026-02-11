@@ -205,8 +205,9 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
 
       return {
         id: system?.id,
-        urlHost: system?.urlHost,
-        credentials: credentialStatus,
+        name: system?.displayName || system?.id,
+        credentialKeys: credentialKeys.length > 0 ? credentialKeys : undefined,
+        systemSpecificInstructions: system?.specificInstructions,
       };
     });
 
@@ -255,8 +256,9 @@ export async function initializeToolPlaygroundAgentContext(
   return `
     [PRELOADED CONTEXT - The user's available superglue systems and tools are listed below]${SUPERGLUE_INFORMATION_PROMPT}
 
-    AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-    ${JSON.stringify(systemsResult.systems || [])}
+[PRELOADED CONTEXT]${SUPERGLUE_INFORMATION_PROMPT}
+
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
 
     AVAILABLE SUPERGLUE TOOLS:
     ${JSON.stringify(toolsResult.tools || [])}
