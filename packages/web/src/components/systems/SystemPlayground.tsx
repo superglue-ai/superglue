@@ -209,14 +209,24 @@ export function SystemPlayground() {
 
         <div className="flex items-center gap-2">
           {system.id && (
-            <Button variant="outline" size="sm" onClick={handleTestSystem} className="gap-1.5">
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={handleTestSystem}
+              className="gap-1.5 rounded-xl"
+            >
               <FlaskConical className="h-4 w-4" />
               Test System
             </Button>
           )}
 
           {!isNewSystem && system.id && (
-            <Button variant="outline" size="sm" onClick={handleBuildTool} className="gap-1.5">
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={handleBuildTool}
+              className="gap-1.5 rounded-xl"
+            >
               <Hammer className="h-4 w-4" />
               Build Tool
             </Button>

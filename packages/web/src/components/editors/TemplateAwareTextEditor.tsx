@@ -126,6 +126,7 @@ export function TemplateAwareTextEditor({
           "[&_.tiptap>p]:inline [&_.tiptap>p]:!whitespace-nowrap [&_.tiptap>p]:m-0",
           "[&_.react-renderer]:!whitespace-nowrap [&_.react-renderer]:inline",
           "[&_[data-node-view-wrapper]]:!inline [&_[data-node-view-wrapper]]:!whitespace-nowrap",
+          "[&_.ProseMirror-separator]:!hidden [&_br.ProseMirror-trailingBreak]:!hidden",
         )}
       />
       {!value?.trim() && placeholder && (
