@@ -1,4 +1,8 @@
-import { System, Tool } from "@superglue/shared";
+import { maskSystemCredentials, Message, System, Tool } from "@superglue/shared";
+
+export const needsSystemMessage = (messages: Message[]): boolean => {
+  return !messages.some((m) => m.role === "system");
+};
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
   return {
@@ -12,12 +16,7 @@ export const stripLegacyToolFields = (tool: Tool): Tool => {
 
 export const filterSystemFields = (system: System) => {
   const { openApiSchema, documentation, credentials, ...filtered } = system;
-
-  const maskedCredentials = credentials
-    ? Object.fromEntries(Object.keys(credentials).map((key) => [key, `<<masked_${key}>>`]))
-    : undefined;
-
-  return { ...filtered, credentials: maskedCredentials };
+  return { ...filtered, credentials: maskSystemCredentials(credentials) };
 };
 
 export function resolveFileReferences(

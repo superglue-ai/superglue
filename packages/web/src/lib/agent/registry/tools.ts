@@ -1824,18 +1824,9 @@ const runFindSystem = async (
     return { success: false, error: "Provide either id or query" };
   }
 
-  const maskCredentialsInSystem = (sys: any) => {
-    if (!sys?.credentials || Object.keys(sys.credentials).length === 0) return sys;
-    const maskedCredentials: Record<string, string> = {};
-    for (const key of Object.keys(sys.credentials)) {
-      maskedCredentials[key] = `<<masked_${key}>>`;
-    }
-    return { ...sys, credentials: maskedCredentials };
-  };
-
   if (input.id) {
     const system = await ctx.superglueClient.getSystem(input.id);
-    return { success: true, system: maskCredentialsInSystem(system) };
+    return { success: true, system: filterSystemFields(system) };
   }
   const { items } = await ctx.superglueClient.listSystems(100);
   const query = input.query!.toLowerCase();
@@ -1844,7 +1835,7 @@ const runFindSystem = async (
     const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
     return keywords.some((kw) => text.includes(kw));
   });
-  return { success: true, systems: filtered.map(maskCredentialsInSystem) };
+  return { success: true, systems: filtered.map(filterSystemFields) };
 };
 
 export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
