@@ -31,8 +31,7 @@ describe("Rate Limit Integration Test with real server", () => {
 
     const config: ApiConfig = {
       id: "test-rate-limit-integration",
-      urlHost: mockServer.getBaseUrl(),
-      urlPath: "api/test-rate-limit",
+      url: `${mockServer.getBaseUrl()}/api/test-rate-limit`,
       method: HttpMethod.GET,
       instruction: "Test rate limit integration",
       // maxRateLimitWaitSec: 5,
@@ -55,8 +54,7 @@ describe("Rate Limit Integration Test with real server", () => {
     // Modify the server to return a retry time that exceeds the hardcoded 60s limit
     const config: ApiConfig = {
       id: "test-always-rate-limited",
-      urlHost: mockServer.getBaseUrl(),
-      urlPath: "api/always-rate-limited",
+      url: `${mockServer.getBaseUrl()}/api/always-rate-limited`,
       method: HttpMethod.GET,
       instruction: "Test always rate limited",
       createdAt: new Date(),

@@ -38,12 +38,12 @@ export class StepExecutionStrategyRegistry {
   }
 
   async routeAndExecute(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
-    // Resolve urlHost template variables once for strategy selection
+    // Resolve URL template variables once for strategy selection
     const allVars = { ...input.stepInputData, ...input.credentials };
-    const resolvedUrlHost = await replaceVariables(input.stepConfig.urlHost || "", allVars);
+    const resolvedUrl = await replaceVariables(input.stepConfig.url || "", allVars);
 
     for (const strategy of this.strategies) {
-      if (strategy.shouldExecute(resolvedUrlHost)) {
+      if (strategy.shouldExecute(resolvedUrl)) {
         try {
           return await strategy.executeStep(input);
         } catch (error) {

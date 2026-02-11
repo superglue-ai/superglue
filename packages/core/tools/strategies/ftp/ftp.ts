@@ -11,7 +11,7 @@ import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
-import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
+import { replaceVariables } from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
 import {
   StepExecutionInput,
@@ -402,9 +402,7 @@ export async function callFTP({
 }): Promise<any> {
   const allVars = { ...stepInputData, ...credentials };
 
-  const resolvedUrlHost = await replaceVariables(endpoint.urlHost, allVars);
-  const resolvedUrlPath = await replaceVariables(endpoint.urlPath, allVars);
-  let connectionString = composeUrl(resolvedUrlHost, resolvedUrlPath);
+  const connectionString = await replaceVariables(endpoint.url || "", allVars);
   const connectionInfo = parseConnectionUrl(connectionString);
 
   let operations: FTPOperation[] = [];

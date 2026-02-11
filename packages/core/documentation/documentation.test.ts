@@ -93,7 +93,7 @@ describe("Documentation Class", () => {
 
       const docUrl = "https://api.example.com/docs";
       const doc = new DocumentationFetcher(
-        { documentationUrl: docUrl, urlHost: "https://api.example.com" },
+        { documentationUrl: docUrl, url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -125,7 +125,7 @@ describe("Documentation Class", () => {
       mockedAxios.get.mockRejectedValue(new Error("404"));
 
       const doc = new DocumentationFetcher(
-        { documentationUrl: "https://api.example.com/raw", urlHost: "https://api.example.com" },
+        { documentationUrl: "https://api.example.com/raw", url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -147,8 +147,7 @@ describe("Documentation Class", () => {
       const doc = new DocumentationFetcher(
         {
           documentationUrl: docUrl,
-          urlHost: "https://api.example.com",
-          urlPath: "/graphql",
+          url: "https://api.example.com/graphql",
           headers,
           queryParams: params,
         },
@@ -177,7 +176,7 @@ describe("Documentation Class", () => {
 
       const docUrl = "https://api.example.com/graphql"; // Looks like GraphQL
       const doc = new DocumentationFetcher(
-        { documentationUrl: docUrl, urlHost: "https://api.example.com" },
+        { documentationUrl: docUrl, url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -203,7 +202,7 @@ describe("Documentation Class", () => {
 
       const docUrl = "https://api.example.com/graphql"; // Looks like GraphQL
       const doc = new DocumentationFetcher(
-        { documentationUrl: docUrl, urlHost: "https://api.example.com" },
+        { documentationUrl: docUrl, url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -226,7 +225,7 @@ describe("Documentation Class", () => {
       mockedAxios.get.mockResolvedValue({ data: openApiJson });
 
       const doc = new DocumentationFetcher(
-        { documentationUrl: baseUrl, urlHost: "https://api.example.com" },
+        { documentationUrl: baseUrl, url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -250,7 +249,7 @@ describe("Documentation Class", () => {
 
       const docUrl = "https://api.example.com/openapi.json";
       const doc = new DocumentationFetcher(
-        { documentationUrl: docUrl, urlHost: "https://api.example.com" },
+        { documentationUrl: docUrl, url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -274,7 +273,7 @@ describe("Documentation Class", () => {
 
       const docUrl = "https://api.example.com/openapi.yaml";
       const doc = new DocumentationFetcher(
-        { documentationUrl: docUrl, urlHost: "https://api.example.com" },
+        { documentationUrl: docUrl, url: "https://api.example.com" },
         {},
         metadata,
       );
@@ -295,7 +294,7 @@ describe("Documentation Class", () => {
       const headers = { Auth: "key" };
       const docUrl = "https://api.example.com/docs";
       const doc = new DocumentationFetcher(
-        { documentationUrl: docUrl, urlHost: "https://api.example.com", headers },
+        { documentationUrl: docUrl, url: "https://api.example.com", headers },
         {},
         metadata,
       );
@@ -312,7 +311,7 @@ describe("Documentation Class", () => {
         new Error("Browser launch failed"),
       );
       const doc = new DocumentationFetcher(
-        { documentationUrl: "https://api.example.com/docs", urlHost: "https://api.example.com" },
+        { documentationUrl: "https://api.example.com/docs", url: "https://api.example.com" },
         {},
         metadata,
       );

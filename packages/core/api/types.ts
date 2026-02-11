@@ -114,7 +114,7 @@ export interface CreateRunRequestBody {
 
 export interface CreateSystemBody {
   name: string;
-  urlHost: string;
+  url: string;
   credentials?: Record<string, any>;
   specificInstructions?: string;
   templateName?: string;
@@ -125,7 +125,7 @@ export interface CreateSystemBody {
 
 export interface UpdateSystemBody {
   name: string;
-  urlHost: string;
+  url: string;
   specificInstructions?: string;
   icon?: string;
   credentials?: Record<string, any>;

@@ -1,7 +1,7 @@
 import { System } from "@superglue/shared";
 import { server_defaults } from "../default.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { composeUrl, sanitizeUnpairedSurrogates } from "../utils/helpers.js";
+import { sanitizeUnpairedSurrogates } from "../utils/helpers.js";
 import { logMessage } from "../utils/logs.js";
 import {
   buildFullObjectSection,
@@ -150,7 +150,7 @@ function buildSystemContext(system: System, opts: SystemContextOptions): string 
   );
 
   const xml_opening_tag = `<${system.id}>`;
-  const urlSection = "<base_url>: " + composeUrl(system.urlHost, system.urlPath) + "</base_url>";
+  const urlSection = "<base_url>: " + (system.url || "") + "</base_url>";
   const specificInstructionsSection =
     "<system_specific_instructions>: " +
     (system.specificInstructions?.length > 0

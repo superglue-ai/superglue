@@ -1,4 +1,10 @@
-import { assertValidArrowFunction, findTemplateForSystem } from "@superglue/shared";
+import {
+  assertValidArrowFunction,
+  findTemplateForSystem,
+  sampleResultObject,
+  safeStringify,
+  System,
+} from "@superglue/shared";
 import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
@@ -324,12 +330,7 @@ export type ResolvedIcon =
  * - Legacy format: "salesforce" (assumes simpleicons)
  * - Fallback to template matching by system id/urlHost
  */
-export function resolveSystemIcon(system: {
-  id?: string;
-  urlHost?: string;
-  icon?: string | null;
-  templateName?: string;
-}): ResolvedIcon {
+export function resolveSystemIcon(system: Partial<System>): ResolvedIcon {
   // First, try the system's own icon field
   if (system.icon) {
     const colonIndex = system.icon.indexOf(":");

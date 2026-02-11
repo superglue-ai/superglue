@@ -75,8 +75,7 @@ const createCallProperties = (
     case "call":
       const call = responseBody?.singleResult?.data?.call;
       if (!call) break;
-      properties.endpointHost = call?.config?.urlHost;
-      properties.endpointPath = call?.config?.urlPath;
+      properties.endpointUrl = call?.config?.url;
       properties.apiConfigId = call?.config?.id;
       properties.callMethod = call?.config?.method;
       properties.documentationUrl = call?.config?.documentationUrl;

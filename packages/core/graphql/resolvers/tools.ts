@@ -12,6 +12,7 @@ import {
 } from "@superglue/shared";
 import type { GraphQLResolveInfo } from "graphql";
 import { JSONSchema } from "openai/lib/jsonschema.mjs";
+import { normalizeApiConfig } from "../../datastore/migrations/migration.js";
 import { parseJSON } from "../../files/index.js";
 import { RunLifecycleManager } from "../../runs/index.js";
 import { SystemManager } from "../../systems/system-manager.js";
@@ -97,7 +98,13 @@ export const executeWorkflowResolver = async (
         throw new Error("Workflow not found");
       }
     } else if (args.input.workflow) {
-      workflow = args.input.workflow;
+      workflow = {
+        ...args.input.workflow,
+        steps: (args.input.workflow.steps || []).map((step: any) => ({
+          ...step,
+          apiConfig: normalizeApiConfig(step.apiConfig),
+        })),
+      };
       // Validate required workflow fields
       if (!workflow.id) throw new Error("Workflow must have an ID");
       if (!workflow.steps || !Array.isArray(workflow.steps))
@@ -321,7 +328,10 @@ export const upsertWorkflowResolver = async (
 
     const workflow = {
       id,
-      steps: resolveField(input.steps, oldWorkflow?.steps, []),
+      steps: resolveField(input.steps, oldWorkflow?.steps, []).map((step: any) => ({
+        ...step,
+        apiConfig: normalizeApiConfig(step.apiConfig),
+      })),
       systemIds: resolveField(input.systemIds, oldWorkflow?.systemIds, []),
       inputSchema: resolveField(input.inputSchema, oldWorkflow?.inputSchema),
       finalTransform: resolveField(input.finalTransform, oldWorkflow?.finalTransform, "$"),
@@ -364,7 +374,7 @@ export const getWorkflowResolver = async (_: unknown, { id }: { id: string }, co
     if (!workflow) {
       throw new Error("Workflow not found");
     }
-    // for each step, make sure that the apiConfig has an id. if not, set it to the step id
+    // Ensure apiConfig has id (set to step id if missing)
     workflow.steps.forEach((step: any) => {
       if (!step.apiConfig.id) {
         step.apiConfig.id = step.id;

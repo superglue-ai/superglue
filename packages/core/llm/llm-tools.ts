@@ -147,8 +147,7 @@ export const generateInstructionsToolImplementation: LLMToolImplementation<
 
     return {
       id: system.id,
-      urlHost: system.urlHost,
-      urlPath: system.urlPath,
+      url: system.url,
       documentation: truncatedDocs.slice(0, 1000) + (truncatedDocs.length > 1000 ? "..." : ""),
       documentationUrl: system.documentationUrl,
     };

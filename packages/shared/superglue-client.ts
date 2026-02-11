@@ -3,7 +3,6 @@ import {
   BuildToolArgs,
   CredentialMode,
   ExtractArgs,
-  ExtractInputRequest,
   ExtractResult,
   FixToolArgs,
   FixToolResult,
@@ -42,8 +41,7 @@ export class SuperglueClient {
           modify
           apiConfig {
             id
-            urlHost
-            urlPath
+            url
             instruction
             method
             queryParams
@@ -88,8 +86,7 @@ export class SuperglueClient {
         version
         createdAt
         updatedAt
-        urlHost
-        urlPath
+        url
         instruction
         method
         queryParams
@@ -253,9 +250,8 @@ export class SuperglueClient {
         steps: tool.steps.map((step) => {
           const apiConfigInput = {
             id: step.apiConfig.id,
-            urlHost: step.apiConfig.urlHost,
+            url: step.apiConfig.url,
             instruction: step.apiConfig.instruction,
-            urlPath: step.apiConfig.urlPath,
             method: step.apiConfig.method,
             queryParams: step.apiConfig.queryParams,
             headers: step.apiConfig.headers,
@@ -618,9 +614,8 @@ export class SuperglueClient {
       steps: tool.steps?.map((step) => {
         const apiConfigInput = {
           id: step.apiConfig.id,
-          urlHost: step.apiConfig.urlHost,
+          url: step.apiConfig.url,
           instruction: step.apiConfig.instruction,
-          urlPath: step.apiConfig.urlPath,
           method: step.apiConfig.method,
           queryParams: step.apiConfig.queryParams,
           headers: step.apiConfig.headers,
@@ -697,91 +692,47 @@ export class SuperglueClient {
     }
   }
 
-  async extract<T = any>({
-    id,
-    endpoint,
-    file,
-    payload,
-    credentials,
-    options,
-  }: ExtractArgs): Promise<ExtractResult & { data: T }> {
+  async extract<T = any>({ file }: ExtractArgs): Promise<ExtractResult & { data: T }> {
+    if (!file) {
+      throw new Error("File must be provided for extract.");
+    }
+
     const mutation = `
-        mutation Extract($input: ExtractInputRequest!, $payload: JSON, $credentials: JSON, $options: RequestOptions) {
-          extract(input: $input, payload: $payload, credentials: $credentials, options: $options) {
+        mutation Extract($input: ExtractInputRequest!) {
+          extract(input: $input) {
             id
             success
             data
             error
             startedAt
             completedAt
-            ${SuperglueClient.configQL}
           }
         }
       `;
 
-    if (file) {
-      const operations = {
-        query: mutation,
-        variables: {
-          input: { file: null },
-          payload,
-          credentials,
-          options,
-        },
-      };
+    const operations = {
+      query: mutation,
+      variables: {
+        input: { file: null },
+      },
+    };
 
-      const formData = new FormData();
-      formData.append("operations", JSON.stringify(operations));
-      formData.append("map", JSON.stringify({ "0": ["variables.input.file"] }));
-      formData.append("0", file);
+    const formData = new FormData();
+    formData.append("operations", JSON.stringify(operations));
+    formData.append("map", JSON.stringify({ "0": ["variables.input.file"] }));
+    formData.append("0", file);
 
-      const response = await axios.post(this.endpoint, formData, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-      });
+    const response = await axios.post(this.endpoint, formData, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+    });
 
-      if (response.data.errors) {
-        throw new Error(response.data.errors[0].message);
-      }
-
-      return response.data.data.extract;
+    if (response.data.errors) {
+      throw new Error(response.data.errors[0].message);
     }
 
-    let gqlInput: Partial<ExtractInputRequest> = {};
-    if (id) {
-      gqlInput = { id };
-    } else if (endpoint) {
-      const extractInput = {
-        id: endpoint.id,
-        urlHost: endpoint.urlHost,
-        instruction: endpoint.instruction,
-        urlPath: endpoint.urlPath,
-        queryParams: endpoint.queryParams,
-        method: endpoint.method,
-        headers: endpoint.headers,
-        body: endpoint.body,
-        documentationUrl: endpoint.documentationUrl,
-        decompressionMethod: endpoint.decompressionMethod,
-        fileType: endpoint.fileType,
-        authentication: endpoint.authentication,
-        dataPath: endpoint.dataPath,
-        version: endpoint.version,
-      };
-      Object.keys(extractInput).forEach(
-        (key) => (extractInput as any)[key] === undefined && delete (extractInput as any)[key],
-      );
-      gqlInput = { endpoint: extractInput };
-    } else {
-      throw new Error("Either id, endpoint, or file must be provided for extract.");
-    }
-
-    return this.request<{ extract: ExtractResult & { data: T } }>(mutation, {
-      input: gqlInput,
-      payload,
-      credentials,
-      options,
-    }).then((data) => data.extract);
+    return response.data.data.extract;
   }
 
   private mapOpenAPIRunToRun(openAPIRun: any): Run {
@@ -969,8 +920,7 @@ export class SuperglueClient {
             id
             name
             type
-            urlHost
-            urlPath
+            url
             credentials
             documentationUrl
             documentation

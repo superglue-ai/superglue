@@ -27,8 +27,6 @@ import {
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { splitUrl } from "@/src/lib/client-utils";
-import { composeUrl } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
 import { ExecutionStep } from "@superglue/shared";
 import {
@@ -601,15 +599,11 @@ export const SpotlightStepCard = React.memo(
                             </Select>
                           </div>
                           <TemplateAwareTextEditor
-                            value={composeUrl(
-                              step.apiConfig.urlHost || "",
-                              step.apiConfig.urlPath || "",
-                            )}
+                            value={step.apiConfig.url || ""}
                             onChange={(newValue) => {
-                              const { urlHost, urlPath } = splitUrl(newValue);
                               handleImmediateEdit((s) => ({
                                 ...s,
-                                apiConfig: { ...s.apiConfig, urlHost, urlPath },
+                                apiConfig: { ...s.apiConfig, url: newValue },
                               }));
                             }}
                             stepId={step.id}

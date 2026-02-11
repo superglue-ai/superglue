@@ -1,24 +1,17 @@
-import { ExtractInputRequest, RequestOptions } from "@superglue/shared";
+import { ExtractInputRequest } from "@superglue/shared";
 import { SupportedFileType } from "@superglue/shared";
 import { GraphQLResolveInfo } from "graphql";
 import { parseFile } from "../../files/index.js";
 import { logMessage } from "../../utils/logs.js";
 import { telemetryClient } from "../../utils/telemetry.js";
-import { maskCredentials } from "@superglue/shared";
-import { GraphQLRequestContext, ServiceMetadata } from "../types.js";
+import { GraphQLRequestContext } from "../types.js";
 
 export const extractResolver = async (
   _: any,
   {
     input,
-    payload,
-    credentials,
-    options,
   }: {
     input: ExtractInputRequest;
-    payload: any;
-    credentials: Record<string, string>;
-    options: RequestOptions;
   },
   context: GraphQLRequestContext,
   info: GraphQLResolveInfo,
@@ -28,17 +21,6 @@ export const extractResolver = async (
   const metadata = context.toMetadata();
 
   try {
-    if (!input.file) {
-      logMessage("error", "Extract call failed. No file provided", metadata);
-      return {
-        id: callId,
-        success: false,
-        error: "No file provided",
-        startedAt,
-        completedAt: new Date(),
-      };
-    }
-
     const { createReadStream, filename } = (await input.file) as any;
     const stream = createReadStream();
     const chunks: Buffer[] = [];
@@ -57,13 +39,12 @@ export const extractResolver = async (
       completedAt: new Date(),
     };
   } catch (error: any) {
-    const maskedError = maskCredentials(error.message, credentials);
-    telemetryClient?.captureException(maskedError, context.orgId);
+    telemetryClient?.captureException(error.message, context.orgId);
 
     return {
       id: callId,
       success: false,
-      error: maskedError,
+      error: error.message,
       startedAt,
       completedAt: new Date(),
     };

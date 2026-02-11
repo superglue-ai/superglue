@@ -118,8 +118,8 @@ export function SystemPlayground() {
   }, [setContextSystemConfig, systemConfigForAgent]);
 
   const canSave = useMemo(() => {
-    return Boolean(system.id?.trim() && system.urlHost?.trim());
-  }, [system.id, system.urlHost]);
+    return Boolean(system.id?.trim() && system.url?.trim());
+  }, [system.id, system.url]);
 
   const handleSave = useCallback(async () => {
     const success = await saveSystem();

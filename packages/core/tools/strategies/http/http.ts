@@ -13,7 +13,6 @@ import { JSONPath } from "jsonpath-plus";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
 import {
-  composeUrl,
   convertBasicAuthToBase64,
   replaceVariables,
   smartMergeResponses,
@@ -464,9 +463,7 @@ export async function callHttp({
 
     const processedBody = config.body ? await replaceVariables(config.body, requestVars) : "";
 
-    const processedUrlHost = await replaceVariables(config.urlHost, requestVars);
-    const processedUrlPath = await replaceVariables(config.urlPath, requestVars);
-    const processedUrl = composeUrl(processedUrlHost, processedUrlPath);
+    const processedUrl = await replaceVariables(config.url || "", requestVars);
 
     const axiosConfig: AxiosRequestConfig = {
       method: config.method,

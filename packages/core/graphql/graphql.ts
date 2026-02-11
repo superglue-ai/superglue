@@ -29,6 +29,25 @@ import {
 
 export const typeDefs = fs.readFileSync("../../api.graphql", "utf8");
 
+// Helper functions to derive urlHost/urlPath from url for backward compatibility
+function deriveUrlHost(parent: any): string {
+  if (parent.urlHost !== undefined) return parent.urlHost;
+  if (!parent.url) return "";
+  const protocolEnd = parent.url.indexOf("://");
+  const firstSlashAfterProtocol = parent.url.indexOf("/", protocolEnd + 3);
+  return firstSlashAfterProtocol === -1
+    ? parent.url
+    : parent.url.substring(0, firstSlashAfterProtocol);
+}
+
+function deriveUrlPath(parent: any): string {
+  if (parent.urlPath !== undefined) return parent.urlPath;
+  if (!parent.url) return "";
+  const protocolEnd = parent.url.indexOf("://");
+  const firstSlashAfterProtocol = parent.url.indexOf("/", protocolEnd + 3);
+  return firstSlashAfterProtocol === -1 ? "" : parent.url.substring(firstSlashAfterProtocol);
+}
+
 export const resolvers = {
   Query: {
     getTenantInfo: getTenantInfoResolver,
@@ -62,16 +81,15 @@ export const resolvers = {
   JSONSchema: JSONSchemaResolver,
   JSONata: JSONataResolver,
   Upload: GraphQLUpload,
-  ExtractConfig: {
-    // Ensure ExtractConfig.id is always non-null at runtime, even though schema allows nullable
-    // for union type compatibility with ApiConfig
-    id: (parent: any) => {
-      // If id is null/undefined, generate one (shouldn't happen, but safety check)
-      if (!parent.id) {
-        throw new Error("Workflow.id is missing");
-      }
-      return parent.id;
-    },
+  System: {
+    // Backward compatibility: derive urlHost/urlPath from url when queried
+    urlHost: deriveUrlHost,
+    urlPath: deriveUrlPath,
+  },
+  ApiConfig: {
+    // Backward compatibility: derive urlHost/urlPath from url when queried
+    urlHost: deriveUrlHost,
+    urlPath: deriveUrlPath,
   },
   Workflow: {
     // Ensure Workflow.id is always non-null at runtime, even though schema allows nullable

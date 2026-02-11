@@ -7,8 +7,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should stop execution on first failure in loop", async () => {
       const mockApiConfig: ApiConfig = {
         id: "test-api",
-        urlHost: "https://api.example.com",
-        urlPath: "/test",
+        url: "https://api.example.com/test",
         method: HttpMethod.GET,
         instruction: "Test endpoint that fails on second iteration",
       };
@@ -61,8 +60,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should continue execution through all iterations despite failures", async () => {
       const mockApiConfig: ApiConfig = {
         id: "test-api",
-        urlHost: "https://api.example.com",
-        urlPath: "/test",
+        url: "https://api.example.com/test",
         method: HttpMethod.GET,
         instruction: "Test endpoint that fails on some iterations",
       };
@@ -145,8 +143,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should include currentItem in both successful and failed iterations", async () => {
       const mockApiConfig: ApiConfig = {
         id: "test-api",
-        urlHost: "https://api.example.com",
-        urlPath: "/test",
+        url: "https://api.example.com/test",
         method: HttpMethod.GET,
         instruction: "Test endpoint",
       };
@@ -209,8 +206,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should mark step as successful even when execution fails", async () => {
       const mockApiConfig: ApiConfig = {
         id: "test-api",
-        urlHost: "https://api.example.com",
-        urlPath: "/test",
+        url: "https://api.example.com/test",
         method: HttpMethod.GET,
         instruction: "Test endpoint that will fail",
       };
@@ -265,16 +261,14 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should continue workflow when first step has CONTINUE behavior and fails", async () => {
       const mockApiConfig1: ApiConfig = {
         id: "test-api-1",
-        urlHost: "https://api.example.com",
-        urlPath: "/test1",
+        url: "https://api.example.com/test1",
         method: HttpMethod.GET,
         instruction: "First step that may fail",
       };
 
       const mockApiConfig2: ApiConfig = {
         id: "test-api-2",
-        urlHost: "https://api.example.com",
-        urlPath: "/test2",
+        url: "https://api.example.com/test2",
         method: HttpMethod.GET,
         instruction: "Second step",
       };
@@ -342,16 +336,14 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should stop workflow when step with FAIL behavior fails", async () => {
       const mockApiConfig1: ApiConfig = {
         id: "test-api-1",
-        urlHost: "https://api.example.com",
-        urlPath: "/test1",
+        url: "https://api.example.com/test1",
         method: HttpMethod.GET,
         instruction: "First step",
       };
 
       const mockApiConfig2: ApiConfig = {
         id: "test-api-2",
-        urlHost: "https://api.example.com",
-        urlPath: "/test2",
+        url: "https://api.example.com/test2",
         method: HttpMethod.GET,
         instruction: "Second step that will fail",
       };
@@ -414,8 +406,7 @@ describe("ToolExecutor - Failure Behavior", () => {
     it("should handle empty loop arrays gracefully", async () => {
       const mockApiConfig: ApiConfig = {
         id: "test-api",
-        urlHost: "https://api.example.com",
-        urlPath: "/test",
+        url: "https://api.example.com/test",
         method: HttpMethod.GET,
         instruction: "Test endpoint",
       };
