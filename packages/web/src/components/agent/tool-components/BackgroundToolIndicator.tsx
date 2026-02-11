@@ -60,6 +60,7 @@ export const BACKGROUND_TOOL_NAMES = new Set(Object.keys(BACKGROUND_TOOL_CONFIG)
 export type GroupedPart =
   | { type: "content"; part: MessagePart }
   | { type: "tool"; part: MessagePart }
+  | { type: "error"; part: MessagePart }
   | { type: "background_tools"; tools: ToolCall[] };
 
 export function groupMessageParts(parts: MessagePart[]): GroupedPart[] {
@@ -82,6 +83,8 @@ export function groupMessageParts(parts: MessagePart[]): GroupedPart[] {
         grouped.push({ type: "content", part });
       } else if (part.type === "tool") {
         grouped.push({ type: "tool", part });
+      } else if (part.type === "error") {
+        grouped.push({ type: "error", part });
       }
     }
   }

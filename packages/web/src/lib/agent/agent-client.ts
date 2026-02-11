@@ -1,6 +1,6 @@
-import { Message, SuperglueClient } from "@superglue/shared";
-import { initializeAIModel } from "@superglue/shared/utils";
-import { LanguageModel, stepCountIs, streamText } from "ai";
+import { Message } from "@superglue/shared";
+import { getConfiguredModelContextLength, initializeAIModel } from "@superglue/shared/utils";
+import { LanguageModel, stepCountIs, streamText, TextStreamPart, ToolSet } from "ai";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import {
   AgentRequest,
@@ -18,6 +18,56 @@ import { TOOL_REGISTRY } from "./registry/tools";
 import { processToolPolicy } from "./registry/tool-policies";
 import type { ToolConfirmationMetadata } from "@/src/components/agent/hooks/types";
 
+// Helper to extract error message from unknown error type
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as Record<string, unknown>).message);
+  }
+  return String(err);
+}
+
+// Type helpers for AI SDK stream parts - Extract specific part types from the union
+type StreamPart = TextStreamPart<ToolSet>;
+type TextDeltaPart = Extract<StreamPart, { type: "text-delta" }>;
+type ToolCallPart = Extract<StreamPart, { type: "tool-call" }>;
+type ToolInputStartPart = Extract<StreamPart, { type: "tool-input-start" }>;
+type ToolResultPart = Extract<StreamPart, { type: "tool-result" }>;
+type ToolErrorPart = Extract<StreamPart, { type: "tool-error" }>;
+type ErrorPart = Extract<StreamPart, { type: "error" }>;
+
+// Token estimation constants
+const CHARS_PER_TOKEN = 3.5; // Conservative estimate (~4 chars/token for English, less for code/JSON)
+const CONTEXT_SAFETY_MARGIN = 0.95; // Leave 5% headroom for output tokens and safety
+
+function estimateTokenCount(messages: any[]): number {
+  // Use a simple length check on stringified messages
+  let totalChars = 0;
+  for (const msg of messages) {
+    if (typeof msg.content === "string") {
+      totalChars += msg.content.length;
+    } else if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.text) totalChars += part.text.length;
+        if (part.input) totalChars += JSON.stringify(part.input).length;
+        if (part.output) {
+          const outputStr =
+            typeof part.output === "string" ? part.output : JSON.stringify(part.output);
+          totalChars += outputStr.length;
+        }
+      }
+    }
+  }
+  return Math.ceil(totalChars / CHARS_PER_TOKEN);
+}
+
+function wouldExceedContextLimit(messages: any[], contextLimit: number): boolean {
+  const estimatedTokens = estimateTokenCount(messages);
+  const effectiveLimit = contextLimit * CONTEXT_SAFETY_MARGIN;
+  return estimatedTokens > effectiveLimit;
+}
+
 export interface StreamChunk {
   type:
     | "content"
@@ -25,8 +75,15 @@ export interface StreamChunk {
     | "tool_call_complete"
     | "tool_call_error"
     | "tool_call_update"
-    | "done";
+    | "done"
+    | "paused"
+    | "error";
   content?: string;
+  errorDetails?: string; // Technical error details for collapsible display
+  systemMessage?: {
+    id: string;
+    content: string;
+  };
   toolCall?: {
     id: string;
     name: string;
@@ -57,7 +114,8 @@ export class AgentClient {
   private config: AgentClientConfig;
   private model: LanguageModel;
   private subscriptionClient: GraphQLSubscriptionClient | null = null;
-  private superglueClient: SuperglueClient;
+  private superglueClient: EESuperglueClient;
+  private contextLimit: number;
 
   constructor(config: AgentClientConfig) {
     this.config = config;
@@ -67,7 +125,9 @@ export class AgentClient {
       defaultModel: "claude-sonnet-4-5",
     });
 
-    this.superglueClient = new SuperglueClient({
+    this.contextLimit = getConfiguredModelContextLength();
+
+    this.superglueClient = new EESuperglueClient({
       endpoint: config.graphqlEndpoint,
       apiKey: config.token,
       apiEndpoint: config.apiEndpoint,
@@ -169,6 +229,15 @@ export class AgentClient {
               aiMessages.push({
                 role: "assistant",
                 content: [{ type: "text", text: part.content }],
+              });
+            } else if (part.type === "error") {
+              // Include error messages in the conversation so the LLM knows what happened
+              const errorText = part.errorDetails
+                ? `[Error: ${part.content}]\nDetails: ${part.errorDetails}`
+                : `[Error: ${part.content}]`;
+              aiMessages.push({
+                role: "assistant",
+                content: [{ type: "text", text: errorText }],
               });
             } else if (part.type === "tool") {
               if (part.tool?.status === "awaiting_confirmation") {
@@ -306,6 +375,16 @@ export class AgentClient {
 
       const aiMessages = this.convertToAIMessages(messages);
 
+      // Pre-flight context limit check
+      if (wouldExceedContextLimit(aiMessages, this.contextLimit)) {
+        yield {
+          type: "content",
+          content: `**Conversation limit reached**\n\nThis conversation has become too long for me to process. Please start a new chat to continue working together.`,
+        };
+        yield { type: "done" };
+        return;
+      }
+
       const result = streamText({
         model: this.model,
         messages: aiMessages,
@@ -318,89 +397,188 @@ export class AgentClient {
 
         switch (part.type) {
           case "text-delta": {
-            yield { type: "content", content: part.text };
+            const p = part as TextDeltaPart;
+            yield { type: "content", content: p.text };
             break;
           }
 
           case "tool-call": {
-            const queue = toolInputQueues.get(part.toolName);
+            const p = part as ToolCallPart;
+            const queue = toolInputQueues.get(p.toolName);
             const generatedId = queue?.shift();
 
-            const toolEntry = toolRegistry[part.toolName];
-            const policyResult = processToolPolicy(
-              part.toolName,
-              part.input,
-              ctx.toolExecutionPolicies,
-            );
-            const confirmationMetadata: ToolConfirmationMetadata | undefined =
-              toolEntry?.confirmation
-                ? {
-                    timing: toolEntry.confirmation.timing,
-                    validActions: toolEntry.confirmation.validActions,
-                    shouldAutoExecute: policyResult.shouldAutoExecute,
-                  }
-                : undefined;
+            const effectiveMode = getEffectiveMode(p.toolName, ctx.toolExecutionPolicies, p.input);
 
-            if (generatedId) {
-              toolCallIdMap.set(part.toolCallId, generatedId);
+            const toolId = generatedId || p.toolCallId;
+            toolCallIdMap.set(p.toolCallId, toolId);
+            toolInputMap.set(p.toolCallId, p.input);
+
+            yield {
+              type: "tool_call_start",
+              toolCall: { id: toolId, name: p.toolName, input: p.input },
+              executionMode: effectiveMode,
+            };
+
+            const hasExecuteFunction = !!tools[p.toolName]?.execute;
+            if (effectiveMode === "confirm_before_execution" && !hasExecuteFunction) {
+              const pendingOutput = getPendingOutput(p.toolName, p.input);
               yield {
-                type: "tool_call_start",
-                toolCall: { id: generatedId, name: part.toolName, input: part.input },
-                confirmation: confirmationMetadata,
-              };
-            } else {
-              toolCallIdMap.set(part.toolCallId, part.toolCallId);
-              yield {
-                type: "tool_call_start",
-                toolCall: { id: part.toolCallId, name: part.toolName, input: part.input },
-                confirmation: confirmationMetadata,
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  input: p.input,
+                  output: pendingOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
               };
             }
             break;
           }
 
           case "tool-input-start": {
+            const p = part as ToolInputStartPart;
             const generatedId = crypto.randomUUID();
             yield {
               type: "tool_call_start",
-              toolCall: { id: generatedId, name: part.toolName, input: undefined },
+              toolCall: { id: generatedId, name: p.toolName, input: undefined },
             };
 
-            const queue = toolInputQueues.get(part.toolName) || [];
+            const queue = toolInputQueues.get(p.toolName) || [];
             queue.push(generatedId);
-            toolInputQueues.set(part.toolName, queue);
+            toolInputQueues.set(p.toolName, queue);
             break;
           }
 
           case "tool-result": {
-            const toolId = toolCallIdMap.get(part.toolCallId) || part.toolCallId;
+            const p = part as ToolResultPart;
+            const toolId = toolCallIdMap.get(p.toolCallId) || p.toolCallId;
+            const toolInput = toolInputMap.get(p.toolCallId);
+            const outputObj = p.output as any;
 
-            if (part.toolName === "web_search") {
+            if (p.toolName === "web_search") {
               yield {
                 type: "tool_call_complete",
                 toolCall: {
                   id: toolId,
-                  name: part.toolName,
+                  name: p.toolName,
                   output: { message: "Web search completed" },
                 },
               };
               break;
             }
 
+            const effectiveMode = getEffectiveMode(
+              p.toolName,
+              ctx.toolExecutionPolicies,
+              toolInput,
+            );
+            const shouldAwaitConfirmation = effectiveMode === "confirm_after_execution";
+
+            if (effectiveMode === "confirm_before_execution" && p.output === undefined) {
+              const pendingOutput = getPendingOutput(p.toolName, toolInput);
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  input: toolInput,
+                  output: pendingOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
+              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
+            }
+
+            if (outputObj?.type === "tool_call_update") {
+              yield {
+                type: "tool_call_update",
+                toolCall: { id: toolId, name: p.toolName, logs: outputObj.toolCall?.logs },
+              };
+              break;
+            }
+
+            if (outputObj?.type === "tool_call_complete") {
+              // Don't await confirmation if the tool execution failed
+              const toolOutput = outputObj.toolCall?.output;
+              let executionFailed = false;
+              try {
+                const parsedToolOutput =
+                  typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
+                executionFailed = parsedToolOutput?.success === false;
+              } catch {
+                // If parsing fails, assume it's not a failure
+              }
+              const shouldPause = shouldAwaitConfirmation && !executionFailed;
+
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  input: outputObj.toolCall?.input,
+                  output: outputObj.toolCall?.output,
+                  ...(shouldPause && { status: "awaiting_confirmation" as const }),
+                },
+                ...(shouldPause && { awaitingConfirmation: true }),
+              };
+              if (shouldPause) {
+                yield { type: "paused", pauseReason: "awaiting_confirmation" };
+                return;
+              }
+              break;
+            }
+
+            const finalOutput = outputObj?.toolCall?.output ?? p.output;
+
+            // Don't await confirmation if the tool execution failed
+            let executionFailed = false;
+            try {
+              const parsedFinalOutput =
+                typeof finalOutput === "string" ? JSON.parse(finalOutput) : finalOutput;
+              executionFailed = parsedFinalOutput?.success === false;
+            } catch {
+              // If parsing fails, assume it's not a failure
+            }
+            const shouldPause = shouldAwaitConfirmation && !executionFailed;
+
+            if (shouldPause) {
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  output: finalOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
+              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
+            }
+
             yield {
-              ...(part.output as any),
-              toolCall: { ...((part.output as any).toolCall ?? {}), id: toolId },
+              type: "tool_call_complete",
+              toolCall: { id: toolId, name: p.toolName, output: finalOutput },
             };
             break;
           }
 
           case "tool-error": {
-            console.warn("[Vercel AI] Tool error:", part.error);
-            const toolId = toolCallIdMap.get(part.toolCallId) || part.toolCallId;
+            const p = part as ToolErrorPart;
+            console.warn("[Vercel AI] Tool error:", p.error);
+            const toolId = toolCallIdMap.get(p.toolCallId) || p.toolCallId;
 
             yield {
-              type: "tool_call_error",
-              toolCall: { id: toolId, name: part.toolName, error: String(part.error) },
+              type: "tool_call_complete",
+              toolCall: {
+                id: toolId,
+                name: p.toolName,
+                output: JSON.stringify({ success: false, error: String(p.error) }),
+              },
             };
             break;
           }
@@ -411,19 +589,25 @@ export class AgentClient {
           }
 
           case "error": {
-            console.error("[Vercel AI] Stream error:", part.error);
-            const errorMessage =
-              part.error instanceof Error ? part.error.message : String(part.error);
+            const p = part as ErrorPart;
+            console.error("[Vercel AI] Stream error:", p.error);
+            const errorMessage = getErrorMessage(p.error);
             const isPromptTooLong =
-              errorMessage.includes("prompt is too long") || errorMessage.includes("tokens > ");
+              errorMessage.includes("prompt is too long") ||
+              errorMessage.includes("tokens > ") ||
+              errorMessage.includes("Input is too long");
 
             if (isPromptTooLong) {
               yield {
                 type: "content",
-                content: `🔄 **Your conversation has gotten too long!**\n\nThe conversation history has exceeded the model's maximum context length. Please start a new chat to continue.\n\nYou can create a new chat by clicking the **"New"** button.`,
+                content: `**Conversation limit reached**\n\nThis conversation has become too long for me to process. Please start a new chat to continue working together.`,
               };
             } else {
-              yield { type: "content", content: `Error: ${part.error}` };
+              yield {
+                type: "error",
+                content: "Something went wrong while processing your request. Please try again.",
+                errorDetails: errorMessage,
+              };
             }
             yield { type: "done" };
             return;
@@ -434,9 +618,11 @@ export class AgentClient {
       yield { type: "done" };
     } catch (error) {
       console.error("Vercel AI SDK streaming error:", error);
+      const errorMessage = getErrorMessage(error);
       yield {
-        type: "content",
-        content: "Sorry, I encountered an error. Please try again.",
+        type: "error",
+        content: "Something went wrong while processing your request. Please try again.",
+        errorDetails: errorMessage,
       };
       yield { type: "done" };
     }

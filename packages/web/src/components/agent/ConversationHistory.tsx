@@ -3,29 +3,15 @@
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
 import { cn } from "@/src/lib/general-utils";
-import { loadFromCache, saveToCache } from "@/src/lib/cache-utils";
-import { History, Plus, Trash2, X } from "lucide-react";
+import { loadFromCacheAsync, saveToCache } from "@/src/lib/cache-utils";
+import { Message, MessagePart } from "@superglue/shared";
+import { MessagesSquare, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const MAX_CONVERSATIONS = 20;
 const DEFAULT_CACHE_PREFIX = "superglue-conversations";
 
-export interface MessagePart {
-  type: "content" | "tool";
-  content?: string;
-  tool?: any;
-  id: string;
-}
-
-export interface Message {
-  id: string;
-  content: string;
-  role: "user" | "assistant" | "system";
-  timestamp: Date;
-  tools?: any[];
-  parts?: MessagePart[];
-  isStreaming?: boolean;
-}
+export type { Message, MessagePart };
 
 export interface Conversation {
   id: string;
@@ -39,11 +25,13 @@ const getMessageContent = (message: Message): string => {
     return message.content.trim();
   }
   if (message.parts) {
-    return message.parts
-      .filter((part) => part.type === "content")
+    // Include both content and error parts as meaningful content
+    const contentParts = message.parts
+      .filter((part) => part.type === "content" || part.type === "error")
       .map((part) => part.content || "")
       .join("")
       .trim();
+    if (contentParts) return contentParts;
   }
   return "";
 };

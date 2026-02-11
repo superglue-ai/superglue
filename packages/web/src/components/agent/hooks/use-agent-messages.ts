@@ -291,8 +291,19 @@ export function useAgentMessages(
           };
         }
 
-        case "error":
-          return { ...msg, content: msg.content + "\n\n❌ " + data.content, isStreaming: false };
+        case "error": {
+          const errorPart = {
+            type: "error" as const,
+            content: data.content,
+            errorDetails: data.errorDetails,
+            id: `error-${Date.now()}`,
+          };
+          return {
+            ...msg,
+            parts: [...(msg.parts || []), errorPart],
+            isStreaming: false,
+          };
+        }
 
         default:
           return msg;
