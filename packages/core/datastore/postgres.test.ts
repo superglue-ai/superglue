@@ -426,7 +426,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
           workflow: testWorkflow,
           orgId: testOrgId,
           userId: "user-1",
-          userEmail: "user1@test.com",
         });
 
         // Second save with changes
@@ -436,7 +435,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
           workflow: updatedWorkflow,
           orgId: testOrgId,
           userId: "user-2",
-          userEmail: "user2@test.com",
         });
 
         // Check history
@@ -449,7 +447,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         expect(history[0].version).toBe(1);
         expect(history[0].tool.instruction).toBe("Test workflow v1");
         expect(history[0].createdByUserId).toBe("user-2");
-        expect(history[0].createdByEmail).toBe("user2@test.com");
       });
 
       it("should return empty history for new tool", async () => {
@@ -502,7 +499,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
           version: 1,
           orgId: testOrgId,
           userId: "restorer",
-          userEmail: "restorer@test.com",
         });
 
         expect(restored.instruction).toBe("Original");

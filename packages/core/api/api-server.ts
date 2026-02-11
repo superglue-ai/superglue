@@ -125,8 +125,6 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
     authenticatedRequest.authInfo = {
       orgId: authResult.orgId,
       userId: authResult.userId,
-      userEmail: authResult.userEmail,
-      userName: authResult.userName,
       orgName: authResult.orgName,
       orgRole: authResult.orgRole,
       isRestricted: authResult.isRestricted,

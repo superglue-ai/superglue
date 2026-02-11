@@ -12,7 +12,6 @@ export type GraphQLRequestContext = {
   traceId?: string;
   orgId: string;
   userId?: string;
-  userEmail?: string;
   orgName?: string;
   orgRole?: UserRole;
   requestSource?: RequestSource;

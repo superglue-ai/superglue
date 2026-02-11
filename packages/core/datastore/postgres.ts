@@ -343,7 +343,6 @@ export class PostgresService implements DataStore {
                     data JSONB NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     created_by_user_id VARCHAR(255),
-                    created_by_email VARCHAR(255),
                     UNIQUE(tool_id, org_id, version)
                 )
             `);
@@ -823,9 +822,8 @@ export class PostgresService implements DataStore {
     workflow: Tool;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool> {
-    const { id, workflow, orgId = "", userId, userEmail } = params;
+    const { id, workflow, orgId = "", userId } = params;
     if (!id || !workflow) return null;
 
     const client = await this.pool.connect();
@@ -855,16 +853,9 @@ export class PostgresService implements DataStore {
 
           // Archive the existing version (normalized to ensure consistent format)
           await client.query(
-            `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id, created_by_email)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-              id,
-              orgId,
-              nextVersion,
-              JSON.stringify(normalizeTool(existingTool)),
-              userId || null,
-              userEmail || null,
-            ],
+            `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [id, orgId, nextVersion, JSON.stringify(normalizeTool(existingTool)), userId || null],
           );
         }
       }
@@ -984,7 +975,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `SELECT version, data, created_at, created_by_user_id, created_by_email
+        `SELECT version, data, created_at, created_by_user_id
          FROM tool_history
          WHERE tool_id = $1 AND org_id = $2
          ORDER BY version DESC`,
@@ -995,8 +986,7 @@ export class PostgresService implements DataStore {
         version: row.version,
         createdAt: row.created_at,
         createdByUserId: row.created_by_user_id || undefined,
-        createdByEmail: row.created_by_email || undefined,
-        tool: row.data as Tool,
+        tool: normalizeTool(row.data as Tool),
       }));
     } finally {
       client.release();
@@ -1008,9 +998,8 @@ export class PostgresService implements DataStore {
     version: number;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool> {
-    const { toolId, version, orgId = "", userId, userEmail } = params;
+    const { toolId, version, orgId = "", userId } = params;
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -1045,16 +1034,9 @@ export class PostgresService implements DataStore {
         const nextVersion = versionResult.rows[0].next_version;
 
         await client.query(
-          `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id, created_by_email)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            toolId,
-            orgId,
-            nextVersion,
-            JSON.stringify(currentTool),
-            userId || null,
-            userEmail || null,
-          ],
+          `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [toolId, orgId, nextVersion, JSON.stringify(currentTool), userId || null],
         );
       }
 

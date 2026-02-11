@@ -45,7 +45,6 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
       traceId: req.traceId,
       orgId: req.orgId || "",
       userId: req.authInfo?.userId,
-      userEmail: req.authInfo?.userEmail,
       orgName: req.authInfo?.orgName,
       orgRole: req.authInfo?.orgRole,
       toMetadata: function () {
@@ -107,7 +106,6 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
           traceId,
           orgId: authResult.orgId,
           userId: authResult.userId,
-          userEmail: authResult.userEmail,
           orgName: authResult.orgName,
           orgRole: authResult.orgRole,
           toMetadata: function () {

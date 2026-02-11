@@ -336,7 +336,6 @@ export class MemoryStore implements DataStore {
     version: number;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool> {
     throw new Error("Tool history not supported in MemoryStore");
   }
