@@ -534,13 +534,13 @@ const createSystemDefinition = (): ToolDefinition => ({
   name: "create_system",
   description: `
     <use_case>
-      Creates and immediately saves a new system. Systems are building blocks for tools and contain the credentials for accessing the API.
+      Creates and saves a new system.
     </use_case>
 
     <important_notes>
-      - Use templateId when creating systems for known services (slack, github, stripe, etc.) - this auto-populates urlHost, urlPath, documentationUrl, and OAuth config.
-      - When using templateId, you only need to provide: id, templateId, and credentials (if required by the auth type).
-      - For OAuth auth: create the system first, then call authenticate_oauth to trigger the OAuth flow.
+      - For systems that require OAuth (like Slack, GitHub, etc.) but do not support pre-configured OAuth, you MUST set sensitiveCredentials: { client_secret: true } (and optionally { client_id: true }) when calling create_system.
+      - slack, salesforce, asana, notion, airtable, jira, confluence are the only templates that support pre-configured oauth
+      - Use templateId when creating systems for knowns services auto-populates url, documentationUrl, and OAuth settings and URLs. For the list above, this also contains pre-configured client_id and secrets, but ONLY for pre-configured oauth templates.
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions'.
