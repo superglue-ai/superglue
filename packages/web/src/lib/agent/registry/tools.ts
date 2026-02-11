@@ -1,7 +1,7 @@
 import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
-import { truncateToolResult } from "@/src/lib/general-utils";
 import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
-import { ConfirmationAction, ToolResult, UpsertMode, getToolSystemIds } from "@superglue/shared";
+import { splitUrl } from "@/src/lib/client-utils";
+import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
@@ -545,15 +545,7 @@ const createSystemDefinition = (): ToolDefinition => ({
       - Providing a documentationUrl will trigger asynchronous API documentation processing.
       - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions'.
-    </important_notes>
-    
-    <credential_handling>
-      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
-      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
-      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
-      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
-      - Example: For API key auth, use sensitiveCredentials: { api_key: true }
-    </credential_handling>`,
+    </important_notes>`,
   inputSchema: {
     type: "object",
     properties: {
@@ -597,13 +589,7 @@ const createSystemDefinition = (): ToolDefinition => ({
       },
       credentials: {
         type: "object",
-        description:
-          "Non-sensitive credentials only: client_id, auth_url, token_url, scopes, grant_type, redirect_uri. Do NOT include secrets here.",
-      },
-      sensitiveCredentials: {
-        type: "object",
-        description:
-          "Sensitive credentials requiring secure user input. Set field to true to request it. Example: { api_key: true, client_secret: true }. A secure UI will appear for users to enter values.",
+        description: "Credentials for the system including API keys, OAuth config, etc.",
       },
       metadata: {
         type: "object",
@@ -616,7 +602,7 @@ const createSystemDefinition = (): ToolDefinition => ({
 });
 
 const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
-  let { templateId, sensitiveCredentials, ...systemInput } = input;
+  let { templateId, ...systemInput } = input;
 
   if (templateId) {
     const template = systems[templateId];
@@ -679,14 +665,6 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
   }
   if (docResult.documentationUrl) {
     systemInput.documentationUrl = docResult.documentationUrl;
-  }
-
-  if (sensitiveCredentials && Object.keys(sensitiveCredentials).length > 0) {
-    return {
-      confirmationState: SYSTEM_UPSERT_CONFIRMATION.PENDING,
-      systemConfig: systemInput,
-      requiredSensitiveFields: Object.keys(sensitiveCredentials),
-    };
   }
 
   try {
@@ -798,16 +776,7 @@ const editSystemDefinition = (): ToolDefinition => ({
       - Files persist for the entire conversation session (until page refresh or new conversation)
       - When providing files as system documentation input, the files you use will overwrite the current documentation content. Ensure to include ALL required files always, even if the user only asks you to add one.
       - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
-    </important_notes>
-
-    <credential_handling>
-      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
-      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
-      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
-      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
-      - Sensitive credential values you see (like <<masked_api_key>>) are placeholders, not real values
-    </credential_handling>
-    `,
+    </important_notes>`,
   inputSchema: {
     type: "object",
     properties: {
@@ -832,13 +801,7 @@ const editSystemDefinition = (): ToolDefinition => ({
       },
       credentials: {
         type: "object",
-        description:
-          "Non-sensitive credentials only: client_id, auth_url, token_url, scopes, grant_type, redirect_uri. Do NOT include secrets here.",
-      },
-      sensitiveCredentials: {
-        type: "object",
-        description:
-          "Sensitive credentials requiring secure user input. Set field to true to request it. Example: { api_key: true }. A secure UI will appear for users to enter values.",
+        description: "Credentials for the system including API keys, OAuth config, etc.",
       },
     },
     required: ["id"],
@@ -846,7 +809,7 @@ const editSystemDefinition = (): ToolDefinition => ({
 });
 
 const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
-  let { sensitiveCredentials, ...systemInput } = input;
+  const systemInput = { ...input };
 
   const docResult = resolveDocumentationFiles(
     systemInput.documentation,
@@ -866,14 +829,6 @@ const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
   }
   if (docResult.documentationUrl) {
     systemInput.documentationUrl = docResult.documentationUrl;
-  }
-
-  if (sensitiveCredentials && Object.keys(sensitiveCredentials).length > 0) {
-    return {
-      confirmationState: SYSTEM_UPSERT_CONFIRMATION.PENDING,
-      systemConfig: systemInput,
-      requiredSensitiveFields: Object.keys(sensitiveCredentials),
-    };
   }
 
   try {
@@ -992,7 +947,11 @@ const callSystemDefinition = (): ToolDefinition => ({
 
     <http_usage>
       - Supports all HTTP methods: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
-      - Example header with credentials: { "Authorization": "Bearer <<stripe_api_api_key>>" }
+      - CRITICAL: For authenticated APIs, you MUST include the Authorization header with credential placeholders
+      - Example: headers: { "Authorization": "Bearer <<systemId_access_token>>" }
+      - OAuth systems typically use: headers: { "Authorization": "Bearer <<systemId_access_token>>" }
+      - API key systems typically use: headers: { "Authorization": "Bearer <<systemId_api_key>>" } or headers: { "X-API-Key": "<<systemId_api_key>>" }
+      - Credentials are NOT auto-injected into headers - you MUST explicitly include them
     </http_usage>
 
     <postgres_usage>
@@ -1028,7 +987,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       headers: {
         type: "object",
         description:
-          "HTTP headers (only used for HTTP/HTTPS URLs). Ensure to include system credentials via <<system_id_credential_key>> if this url requires authentication.",
+          'REQUIRED for authenticated HTTP APIs. Must include Authorization header with credential placeholders like { "Authorization": "Bearer <<systemId_access_token>>" }. Credentials are NOT auto-injected - you must explicitly include them here.',
       },
       body: {
         type: "string",
@@ -1075,7 +1034,7 @@ const runCallSystem = async (
       protocol,
       data: result.data,
       error: result.error,
-    };
+    });
   } catch (error) {
     return {
       success: false,
@@ -1104,7 +1063,7 @@ const processCallSystemConfirmation = async (
   if (parsedOutput.confirmationState === CALL_SYSTEM_CONFIRMATION.CONFIRMED) {
     try {
       const realResult = await runCallSystem(input, ctx);
-      return { output: JSON.stringify(truncateResponseBody(realResult)), status: "completed" };
+      return { output: JSON.stringify(truncateResponseData(realResult)), status: "completed" };
     } catch (error: any) {
       const errorResult = {
         success: false,
@@ -1210,7 +1169,7 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
 
     <credential_resolution>
       OAuth credentials are resolved in this priority order:
-      1. Values passed to this tool (client_id, auth_url, token_url) or via sensitiveCredentials (client_secret)
+      1. Values passed to this tool (client_id, client_secret, auth_url, token_url)
       2. Values already stored in the system's credentials
       3. Values from templates (slack, salesforce, asana, notion, airtable, jira, confluence)
       
@@ -1229,19 +1188,6 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       - confluence: auth_url=https://auth.atlassian.com/authorize, token_url=https://auth.atlassian.com/oauth/token
     </templates_with_preconfigured_oauth>
 
-    <first_time_setup>
-      For FIRST-TIME setup on Google, Microsoft, GitHub, etc. (when credentials are NOT already stored):
-      1. Provide client_id directly (non-sensitive)
-      2. Use sensitiveCredentials: { client_secret: true } to request the secret via secure UI
-      3. Provide the correct auth_url and token_url and other configuration options
-    </first_time_setup>
-
-    <credential_handling>
-      - client_id, auth_url, token_url, scopes, grant_type are NON-SENSITIVE - pass directly
-      - client_secret is SENSITIVE - use sensitiveCredentials: { client_secret: true }
-      - NEVER ask users to paste client_secret in chat - use sensitiveCredentials instead
-    </credential_handling>
-
     <important>
       - STOP the conversation after calling - user must complete OAuth in UI
       - client_credentials flow only requires client_id, client_secret, scopes and token_url
@@ -1259,7 +1205,12 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       client_id: {
         type: "string",
         description:
-          "OAuth client ID (non-sensitive) - only needed if not already stored in system credentials or template",
+          "OAuth client ID - only needed if not already stored in system credentials or template",
+      },
+      client_secret: {
+        type: "string",
+        description:
+          "OAuth client secret - only needed if not already stored in system credentials or template",
       },
       auth_url: {
         type: "string",
@@ -1296,11 +1247,6 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
         type: "object",
         description:
           "Additional headers for token requests, e.g., {'Notion-Version': '2022-06-28'}",
-      },
-      sensitiveCredentials: {
-        type: "object",
-        description:
-          "Sensitive OAuth credentials requiring secure user input. Set { client_secret: true } if user needs to provide it. A secure UI will appear for users to enter the value.",
       },
     },
     required: ["systemId", "scopes"],
@@ -1401,7 +1347,6 @@ const processAuthenticateOAuthConfirmation = async (
   if (parsedOutput.confirmationState === "oauth_success") {
     const confirmationData = parsedOutput.confirmationData || {};
     const { tokens } = confirmationData;
-    const oauthConfig = parsedOutput.oauthConfig || {};
     const systemId = confirmationData.systemId || parsedOutput.systemId;
     const oauthConfig = confirmationData.oauthConfig || parsedOutput.oauthConfig;
     const userProvidedCredentials =
@@ -1875,11 +1820,15 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
     name: "call_system",
     definition: callSystemDefinition,
     execute: async (input: any, ctx: ToolExecutionContext) => {
-      const { shouldAutoExecute } = processToolPolicy("call_system", input, ctx);
+      const { shouldAutoExecute } = processToolPolicy(
+        "call_system",
+        input,
+        ctx.toolExecutionPolicies,
+      );
 
       if (shouldAutoExecute) {
         const result = await runCallSystem(input, ctx);
-        return truncateResponseBody(result);
+        return truncateResponseData(result);
       }
 
       return {

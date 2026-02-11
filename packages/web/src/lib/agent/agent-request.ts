@@ -13,7 +13,7 @@ import {
   ToolExecutionFeedback,
   FileUploadAction,
 } from "./agent-types";
-import { TOOL_POLICY_PROCESSORS, processToolPolicy } from "./registry/tool-policies";
+import { TOOL_POLICIES, getEffectiveMode } from "./registry/tool-policies";
 
 function validateUserActions(actions: any[]): void {
   for (const action of actions) {
@@ -641,9 +641,10 @@ export function buildToolsForAISDK(
       inputSchema: jsonSchema(schema),
     };
 
-    const hasPolicyProcessor = TOOL_POLICY_PROCESSORS[entry.name] !== undefined;
+    const policy = TOOL_POLICIES[entry.name];
+    const hasPolicy = policy !== undefined;
     const shouldAutoExecute =
-      entry.execute && (entry.confirmation?.timing !== "before" || hasPolicyProcessor);
+      entry.execute && (entry.confirmation?.timing !== "before" || hasPolicy);
 
     if (shouldAutoExecute) {
       toolDef.execute = async function* (input: any) {

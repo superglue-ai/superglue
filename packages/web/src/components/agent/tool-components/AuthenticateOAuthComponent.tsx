@@ -7,7 +7,7 @@ import { UserAction } from "@/src/lib/agent/agent-types";
 import { triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { findTemplateForSystem, SuperglueClient, ToolCall } from "@superglue/shared";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Key, Loader2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 

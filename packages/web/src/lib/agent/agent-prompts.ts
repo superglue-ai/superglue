@@ -127,13 +127,14 @@ find_system:
 
 create_system:
 - If you have NO information about the system and how to set it up, use the find_system_templates tool to get information about the system.
-- CREDENTIAL HANDLING:
-  * Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type
-  * Use 'sensitiveCredentials' for SECRETS: { api_key: true, client_secret: true }
-  * When sensitiveCredentials is set, a secure UI appears for users to enter values
-  * NEVER ask users to paste secrets in chat - always use sensitiveCredentials
+- CREDENTIALS: Pass credentials directly in the 'credentials' object. Example: { "credentials": { "api_key": "user_provided_key" } }
 - For OAuth auth: create system first, then call authenticate_oauth with the scopes from the response.
 - If call_system fails (any error, 4xx/5xx status, auth errors, etc.), use search_documentation with the systemId and relevant keywords, then web_search.
+
+edit_system:
+- Use to update any system field including credentials
+- CREDENTIALS: Pass credentials directly in the 'credentials' object. Example: { "id": "system-id", "credentials": { "api_key": "user_provided_key" } }
+- Credentials are stored securely and masked in responses
 
 authenticate_oauth:
 - REQUIRES: client_id, auth_url, token_url, scopes
@@ -154,7 +155,9 @@ call_system - CRITICAL RULES:
 - Supports HTTP/HTTPS URLs for REST APIs, postgres:// for PostgreSQL databases, and sftp:// for file transfers.
 - ALWAYS only call ONE AT A TIME - NEVER multiple in same turn.
 - CREDENTIALS: Use EXACTLY the placeholders from availableCredentials in your context. Do NOT guess.
-- OAuth tokens auto-refresh.
+- CRITICAL: For HTTP APIs, you MUST include the headers parameter with Authorization. Example: headers: { "Authorization": "Bearer <<systemId_access_token>>" }
+- Credentials are NOT auto-injected into headers - you must explicitly include them.
+- OAuth tokens auto-refresh when systemId is provided.
 - If call_system fails (any error, 4xx/5xx status, auth errors, etc.), use search_documentation with the systemId and relevant keywords, then web_search.
 
 BUILD_TOOL PRE-REQUISITES (MANDATORY):
@@ -444,35 +447,29 @@ AVAILABLE TOOLS:
 create_system:
 - Use ONLY if the user explicitly wants to create a new system
 - Normally you should use edit_system since the user is editing an existing system
-- CREDENTIAL HANDLING:
-  * Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type
-  * Use 'sensitiveCredentials' for SECRETS: { api_key: true, client_secret: true }
-  * NEVER ask users to paste secrets in chat - use sensitiveCredentials
+- CREDENTIALS: Pass credentials directly in the 'credentials' object
 
 edit_system:
 - Use to update system configuration (credentials, URLs, documentation, instructions)
 - Provide the system ID and only the fields that need to change
-- CREDENTIAL HANDLING:
-  * Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type
-  * Use 'sensitiveCredentials' for SECRETS: { api_key: true, client_secret: true }
-  * When sensitiveCredentials is set, a secure UI appears for users to enter values
-  * NEVER ask users to paste secrets in chat - use sensitiveCredentials
-- After user confirms and enters credentials, test with call_system to verify
+- CREDENTIALS: Pass credentials directly in the 'credentials' object. Example: { "id": "system-id", "credentials": { "api_key": "user_provided_key" } }
+- After updating credentials, test with call_system to verify they work
 
 call_system:
 - Your PRIMARY tool for testing and debugging
 - Use to verify credentials work, explore API endpoints, databases, and file servers, debug issues
 - CREDENTIALS: Use the exact placeholder format from your context: <<systemId_credentialKey>>
-- OAuth tokens auto-refresh
+- CRITICAL: For HTTP APIs, you MUST include the headers parameter with Authorization. Example: headers: { "Authorization": "Bearer <<systemId_access_token>>" }
+- Credentials are NOT auto-injected - you must explicitly include them in headers
+- OAuth tokens auto-refresh when systemId is provided
 - Requires user confirmation before execution
 
 authenticate_oauth:
 - Use to initiate or re-authenticate OAuth flows
 - REQUIRES: systemId, scopes
-- client_id, auth_url, token_url can be passed directly (non-sensitive)
-- For client_secret: use sensitiveCredentials: { client_secret: true } - a secure UI will appear
+- client_id, auth_url, token_url can be passed directly
 - Pre-configured OAuth available for: slack, salesforce, asana, jira, confluence, notion, airtable
-- For other OAuth providers, provide client_id directly and use sensitiveCredentials for client_secret
+- For other OAuth providers, ask user for client_id and client_secret
 - CALLBACK URL: https://app.superglue.cloud/api/auth/callback
 
 find_system:
@@ -498,10 +495,9 @@ DOCUMENTATION URL WARNING:
 - Always warn the user before modifying documentation if they have uploaded files
 
 CREDENTIAL TESTING WORKFLOW:
-1. Use edit_system with sensitiveCredentials to request credentials
-2. User enters credentials in the secure UI that appears
-3. After confirmation, test with call_system to verify they work
-4. If test fails, help debug
+1. When user provides credentials (API key, etc.), use edit_system to store them: { "id": "system-id", "credentials": { "api_key": "the_key_value" } }
+2. Test with call_system to verify they work
+3. If test fails, help debug
 
 DEBUGGING WORKFLOW:
 1. Use get_runs to see recent execution history
