@@ -316,9 +316,9 @@ Always use parameterized queries:
 
 <FTP_SFTP>
 Correct FTP/SFTP configuration:
-- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
-- FTPS: urlHost: "ftps://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"  
-- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+- FTP: url: "ftp://<<username>>:<<password>>@<<hostname>>:<<port>>/"
+- FTPS: url: "ftps://<<username>>:<<password>>@<<hostname>>:<<port>>/"
+- SFTP: url: "sftp://<<username>>:<<password>>@<<hostname>>:<<port>>/"
 - body: Can be either a single operation object or an array of operation objects for batch operations.
 - If possible, use batch operations for efficiency.
 
@@ -523,8 +523,8 @@ Always use parameterized queries with $1, $2, etc. placeholders.
 
 <FTP_SFTP>
 FTP/SFTP configuration:
-- FTP: urlHost: "ftp://<<username>>:<<password>>@<<hostname>>:21", urlPath: "/"
-- SFTP: urlHost: "sftp://<<username>>:<<password>>@<<hostname>>:22", urlPath: "/"
+- FTP: url: "ftp://<<username>>:<<password>>@<<hostname>>:<<port>>/"
+- SFTP: url: "sftp://<<username>>:<<password>>@<<hostname>>:<<port>>/"
 
 Operations: list, get, put, delete, rename, mkdir, rmdir, exists, stat
 Body format: {"operation": "get", "path": "/file.txt"}
