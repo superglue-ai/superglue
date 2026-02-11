@@ -507,32 +507,6 @@ function ToolPlaygroundInner({
             <div className="w-full h-full">
               <div className="h-full">
                 <div className={embedded ? "h-full" : "h-full"}>
-                  {notFound ? (
-                    <div className="flex items-center justify-center py-20">
-                      <div className="flex flex-col items-center gap-4 text-center">
-                        <FileQuestion className="h-16 w-16 text-muted-foreground" />
-                        <div>
-                          <h2 className="text-xl font-semibold mb-2">Tool Not Found</h2>
-                          <p className="text-muted-foreground mb-4">
-                            The tool &quot;{id}&quot; doesn&apos;t exist or has been deleted.
-                          </p>
-                          <Button
-                            variant="glass"
-                            className="rounded-xl"
-                            onClick={() => router.push("/tools")}
-                          >
-                            Back to Tools
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : isRestoringRun ? (
-                    <div className="flex items-center justify-center py-20">
-                      <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
-                      </div>
-                    </div>
-                  ) : (
                     <ToolStepGallery
                       onStepEdit={handleStepEdit}
                       onExecuteStep={handleExecuteStep}
@@ -553,7 +527,6 @@ function ToolPlaygroundInner({
                       isPayloadValid={isPayloadValid}
                       embedded={embedded}
                     />
-                  )}
                 </div>
               </div>
             </div>
