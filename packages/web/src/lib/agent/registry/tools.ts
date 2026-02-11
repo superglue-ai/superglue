@@ -987,7 +987,7 @@ const callSystemDefinition = (): ToolDefinition => ({
       headers: {
         type: "object",
         description:
-          "REQUIRED for authenticated HTTP APIs. Must include Authorization header with credential placeholders like { \"Authorization\": \"Bearer <<systemId_access_token>>\" }. Credentials are NOT auto-injected - you must explicitly include them here.",
+          'REQUIRED for authenticated HTTP APIs. Must include Authorization header with credential placeholders like { "Authorization": "Bearer <<systemId_access_token>>" }. Credentials are NOT auto-injected - you must explicitly include them here.',
       },
       body: {
         type: "string",
