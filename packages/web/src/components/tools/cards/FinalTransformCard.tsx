@@ -273,16 +273,20 @@ export const FinalTransformMiniStepCard = ({
                     }
                   >
                     {isRunningTransform && onAbort ? (
-                      <Button variant="outline" onClick={onAbort} className="h-8 px-3 gap-2">
+                      <Button
+                        variant="glass"
+                        onClick={onAbort}
+                        className="h-8 px-3 gap-2 rounded-xl"
+                      >
                         <Square className="h-3 w-3" />
                         <span className="font-medium text-[13px]">Stop</span>
                       </Button>
                     ) : (
                       <Button
-                        variant="outline"
+                        variant="glass"
                         onClick={handleExecuteTransform}
                         disabled={!canExecute || isRunningTransform || isFixingTransform}
-                        className="h-8 px-3 gap-2"
+                        className="h-8 px-3 gap-2 rounded-xl"
                       >
                         <Play className="h-3 w-3" />
                         <span className="font-medium text-[13px]">Run Transform</span>

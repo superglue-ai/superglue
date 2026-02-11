@@ -426,7 +426,7 @@ function ToolPlaygroundInner({
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
       {isArchived ? (
-        <Button variant="outline" onClick={handleUnarchive} className="h-9 px-4">
+        <Button variant="glass" onClick={handleUnarchive} className="h-9 px-4 rounded-xl">
           <ArchiveRestore className="h-4 w-4" />
           Unarchive
         </Button>
@@ -434,22 +434,22 @@ function ToolPlaygroundInner({
         <>
           {loading ? (
             <Button
-              variant="outline"
+              variant="glass"
               onClick={handleStopExecution}
               disabled={saving}
-              className="h-9 px-4"
+              className="h-9 px-4 rounded-xl"
             >
               <Square className="h-4 w-4" />
               Stop Execution
             </Button>
           ) : (
             <Button
-              variant="outline"
+              variant="glass"
               onClick={handleRunAllSteps}
               disabled={
                 loading || saving || isExecutingStep != null || isExecutingTransform || isArchived
               }
-              className="h-9 px-4"
+              className="h-9 px-4 rounded-xl"
             >
               <Play className="h-4 w-4" />
               Run All Steps
@@ -507,7 +507,26 @@ function ToolPlaygroundInner({
             <div className="w-full h-full">
               <div className="h-full">
                 <div className={embedded ? "h-full" : "h-full"}>
-                  {loading && steps.length === 0 && !instructions ? (
+                  {notFound ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex flex-col items-center gap-4 text-center">
+                        <FileQuestion className="h-16 w-16 text-muted-foreground" />
+                        <div>
+                          <h2 className="text-xl font-semibold mb-2">Tool Not Found</h2>
+                          <p className="text-muted-foreground mb-4">
+                            The tool &quot;{id}&quot; doesn&apos;t exist or has been deleted.
+                          </p>
+                          <Button
+                            variant="glass"
+                            className="rounded-xl"
+                            onClick={() => router.push("/tools")}
+                          >
+                            Back to Tools
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isRestoringRun ? (
                     <div className="flex items-center justify-center py-20">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 className="h-8 w-8 animate-spin text-foreground" />
