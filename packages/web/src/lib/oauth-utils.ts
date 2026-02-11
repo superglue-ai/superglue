@@ -65,6 +65,59 @@ const shouldUsePKCE = (templateId?: string): boolean => {
   return template?.oauth?.usePKCE === true;
 };
 
+const parseExtraHeaders = (inputVal: any, credVal: any, templateVal: any) => {
+  if (inputVal) return inputVal;
+  if (credVal) {
+    if (typeof credVal === "string") {
+      try {
+        return JSON.parse(credVal);
+      } catch {
+        return undefined;
+      }
+    }
+    return credVal;
+  }
+  return templateVal;
+};
+
+export const resolveOAuthConfig = (
+  input: Record<string, any>,
+  credentials: Record<string, any> | undefined,
+  templateOAuth: Record<string, any> | undefined,
+): Record<string, any> => {
+  const first = (agentVal: any, credVal: any, templateVal: any) =>
+    agentVal ?? credVal ?? templateVal;
+
+  const config: Record<string, any> = {
+    grant_type:
+      first(input.grant_type, credentials?.grant_type, templateOAuth?.grant_type) ||
+      "authorization_code",
+    scopes: first(input.scopes, credentials?.scopes, templateOAuth?.scopes),
+    client_id: credentials?.client_id ?? templateOAuth?.client_id,
+    client_secret: credentials?.client_secret,
+    auth_url: first(input.auth_url, credentials?.auth_url, templateOAuth?.authUrl),
+    token_url: first(input.token_url, credentials?.token_url, templateOAuth?.tokenUrl),
+    tokenAuthMethod: first(
+      input.tokenAuthMethod,
+      credentials?.tokenAuthMethod,
+      templateOAuth?.tokenAuthMethod,
+    ),
+    tokenContentType: first(
+      input.tokenContentType,
+      credentials?.tokenContentType,
+      templateOAuth?.tokenContentType,
+    ),
+    usePKCE: first(input.usePKCE, credentials?.usePKCE, templateOAuth?.usePKCE),
+    extraHeaders: parseExtraHeaders(
+      input.extraHeaders,
+      credentials?.extraHeaders,
+      templateOAuth?.extraHeaders,
+    ),
+  };
+
+  return Object.fromEntries(Object.entries(config).filter(([_, v]) => v != null));
+};
+
 export const buildOAuthFieldsFromSystem = (system: System) => {
   const hasRefreshToken = !!system.credentials?.refresh_token;
   const derivedGrantType =

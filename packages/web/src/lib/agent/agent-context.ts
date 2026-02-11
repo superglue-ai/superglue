@@ -171,9 +171,7 @@ async function getToolsForContext(ctx: ToolExecutionContext) {
 
     const toolsWithTruncatedInstructions = result.map(({ reason, ...tool }: any) => ({
       id: tool.id,
-      instruction: tool.instruction?.substring(0, 300) || tool.instruction,
-      systemIds: tool.systemIds,
-      inputSchema: tool.inputSchema,
+      instruction: tool.instruction?.substring(0, 100) || "",
     }));
 
     return {

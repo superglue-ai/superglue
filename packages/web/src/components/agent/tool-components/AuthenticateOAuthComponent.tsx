@@ -6,14 +6,9 @@ import { Button } from "@/src/components/ui/button";
 import { UserAction } from "@/src/lib/agent/agent-types";
 import { triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import {
-  SuperglueClient,
-  systems as templateSystems,
-  findTemplateForSystem,
-  ToolCall,
-} from "@superglue/shared";
-import { CheckCircle, Key, Loader2, XCircle } from "lucide-react";
-import { useCallback, useState } from "react";
+import { findTemplateForSystem, SuperglueClient, ToolCall } from "@superglue/shared";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 
 interface AuthenticateOAuthComponentProps {
@@ -64,22 +59,20 @@ export function AuthenticateOAuthComponent({
     setErrorMessage(null);
 
     try {
-      // Determine if we should use template OAuth or user-provided/stored credentials
-      // Priority: user input > stored system credentials > template
-      // If oauthConfig has client_secret, it means either:
-      //   1. User provided it in tool input, OR
-      //   2. System has it stored in credentials
-      // In both cases, we should cache and use those credentials, not template
-      const hasClientSecret = !!oauthConfig.client_secret;
-
       let templateInfo: { templateId?: string; clientId?: string } | undefined;
+      let resolvedClientSecret: string | undefined;
 
-      // Only use template OAuth if we don't have client_secret (neither from user input nor stored)
-      if (!hasClientSecret) {
-        // Check if system matches a template with OAuth configured
-        const templateMatch = system ? findTemplateForSystem(system) : null;
-        const template = templateMatch?.template || templateSystems[systemId];
-        const templateOAuth = template?.oauth;
+      const client = new SuperglueClient({
+        endpoint: config.superglueEndpoint,
+        apiKey: tokenRegistry.getToken(),
+        apiEndpoint: config.apiEndpoint,
+      });
+      const freshSystem = await client.getSystem(systemId);
+      resolvedClientSecret = freshSystem?.credentials?.client_secret;
+
+      if (!resolvedClientSecret) {
+        const templateMatch = findTemplateForSystem(system || { id: systemId });
+        const templateOAuth = templateMatch?.template?.oauth;
         const hasTemplateClientId = !!(
           templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0
         );
@@ -178,7 +171,7 @@ export function AuthenticateOAuthComponent({
         systemId,
         {
           client_id: oauthConfig.client_id,
-          client_secret: oauthConfig.client_secret, // Will be undefined if user didn't provide it
+          client_secret: resolvedClientSecret,
           auth_url: oauthConfig.auth_url,
           token_url: oauthConfig.token_url,
           scopes: oauthConfig.scopes,

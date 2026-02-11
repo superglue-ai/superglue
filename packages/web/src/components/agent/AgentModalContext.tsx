@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  ReactNode,
+} from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
@@ -18,6 +26,7 @@ interface AgentModalContextValue {
   closeAgentModal: () => void;
   isAgentModalOpen: boolean;
   modalPrompt: AgentModalPrompt | null;
+  registerOnClose: (cb: () => void) => () => void;
 }
 
 const AgentModalContext = createContext<AgentModalContextValue | null>(null);
@@ -36,11 +45,21 @@ interface AgentModalProviderProps {
 
 export function AgentModalProvider({ children }: AgentModalProviderProps) {
   const [modalPrompt, setModalPrompt] = useState<AgentModalPrompt | null>(null);
+  const onCloseCallbacksRef = useRef<Set<() => void>>(new Set());
   const pathname = usePathname();
 
   useEffect(() => {
-    setModalPrompt(null);
+    if (modalPrompt !== null) {
+      closeAgentModal();
+    }
   }, [pathname]);
+
+  const registerOnClose = useCallback((cb: () => void) => {
+    onCloseCallbacksRef.current.add(cb);
+    return () => {
+      onCloseCallbacksRef.current.delete(cb);
+    };
+  }, []);
 
   const openAgentModal = useCallback((prompt: AgentModalPrompt) => {
     setModalPrompt(prompt);
@@ -48,13 +67,14 @@ export function AgentModalProvider({ children }: AgentModalProviderProps) {
 
   const closeAgentModal = useCallback(() => {
     setModalPrompt(null);
+    onCloseCallbacksRef.current.forEach((cb) => cb());
   }, []);
 
   const isAgentModalOpen = modalPrompt !== null;
 
   return (
     <AgentModalContext.Provider
-      value={{ openAgentModal, closeAgentModal, isAgentModalOpen, modalPrompt }}
+      value={{ openAgentModal, closeAgentModal, isAgentModalOpen, modalPrompt, registerOnClose }}
     >
       {children}
     </AgentModalContext.Provider>

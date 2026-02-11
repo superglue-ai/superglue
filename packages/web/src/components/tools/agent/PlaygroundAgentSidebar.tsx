@@ -253,55 +253,47 @@ function PlaygroundAgentContent({
           {messages
             .filter((m) => !(m as any).isHidden)
             .map((message) => (
-              <div key={message.id} className="space-y-1 group">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {message.role === "user" ? <User size={14} /> : <BotMessageSquare size={14} />}
-                  </div>
-                  <span className="text-sm font-medium">
-                    {message.role === "user" ? "You" : "superglue"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatTimestamp(message.timestamp)}
-                  </span>
-                  {(() => {
-                    const hasContent =
-                      message.content?.trim() ||
-                      message.parts?.some((p) => p.type === "content" && p.content?.trim());
-                    return message.isStreaming && !hasContent ? <ThinkingIndicator /> : null;
-                  })()}
-                  {message.role === "user" && !isLoading && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 p-3"
-                      onClick={() => handleEditMessage(message.id, message.content)}
+              <div key={message.id} className="p-2 pt-3 rounded-xl group min-h-12">
+                <div className="space-y-2 min-w-0 overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center",
+                        message.role === "user"
+                          ? "bg-neutral-100 dark:bg-neutral-900"
+                          : "bg-white dark:bg-black",
+                      )}
                     >
-                      <Edit2 className="w-0.5 h-0.5" />
-                    </Button>
-                  )}
-                </div>
-
-                {editingMessageId === message.id ? (
-                  <div className="space-y-2">
-                    <Textarea
-                      value={editingContent}
-                      onChange={(e) => setEditingContent(e.target.value)}
-                      className="min-h-[48px] max-h-[120px] resize-none text-sm focus-visible:ring-0 focus-visible:border-ring"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleSaveEdit(message.id)}
-                        disabled={!editingContent.trim() || isLoading}
+                      {message.role === "user" ? (
+                        <span className="text-[9px] font-semibold text-neutral-900 dark:text-neutral-100">
+                          Y
+                        </span>
+                      ) : (
+                        <img
+                          src="/favicon.png"
+                          alt="superglue"
+                          className="w-3 h-3 object-contain dark:invert"
+                        />
+                      )}
+                    </div>
+                    <span className="font-medium text-sm">
+                      {message.role === "user" ? "You" : "superglue"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatTimestamp(message.timestamp)}
+                    </span>
+                    {(() => {
+                      const hasContent =
+                        message.content?.trim() ||
+                        message.parts?.some((p) => p.type === "content" && p.content?.trim());
+                      return message.isStreaming && !hasContent ? <ThinkingIndicator /> : null;
+                    })()}
+                    {message.role === "user" && !isLoading && (
+                      <button
+                        type="button"
+                        onClick={() => handleEditMessage(message.id, message.content)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                        title="Edit message"
                       >
                         Save & Restart
                       </Button>

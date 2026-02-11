@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { SystemTemplatePicker } from "@/src/components/systems/SystemTemplatePicker";
+import { useAgentModal } from "@/src/components/agent/AgentModalContext";
 
 interface SystemPickerModalContextValue {
   openSystemPicker: () => void;
@@ -28,18 +29,23 @@ interface SystemPickerModalProviderProps {
 
 export function SystemPickerModalProvider({ children }: SystemPickerModalProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { registerOnClose } = useAgentModal();
   const pathname = usePathname();
 
   useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
 
-  const openSystemPicker = useCallback(() => {
-    setIsOpen(true);
-  }, []);
-
   const closeSystemPicker = useCallback(() => {
     setIsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    return registerOnClose(closeSystemPicker);
+  }, [registerOnClose, closeSystemPicker]);
+
+  const openSystemPicker = useCallback(() => {
+    setIsOpen(true);
   }, []);
 
   return (

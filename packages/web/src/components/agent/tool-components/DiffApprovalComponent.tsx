@@ -151,9 +151,8 @@ function DiffApprovalItem({
   const firstChangeIndex = lines.findIndex((l) => l.type !== "context");
   const startLineNum = Math.max(1, firstChangeIndex > 0 ? firstChangeIndex : 1);
 
-  // Show first 6 lines by default
-  const previewLines = lines.slice(0, 6);
-  const remainingLines = lines.slice(6);
+  const previewLines = lines.slice(0, 2);
+  const remainingLines = lines.slice(2);
   const hasMore = remainingLines.length > 0;
 
   const stateStyles = {
@@ -234,7 +233,7 @@ function DiffApprovalItem({
             {/* Expanded lines */}
             {isExpanded &&
               remainingLines.map((line, i) => (
-                <DiffLineDisplay key={i + 6} line={line} lineNumber={startLineNum + 6 + i} />
+                <DiffLineDisplay key={i + 2} line={line} lineNumber={startLineNum + 2 + i} />
               ))}
           </div>
         </div>
