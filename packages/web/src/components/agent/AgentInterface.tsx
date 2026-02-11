@@ -11,15 +11,13 @@ import { UserAction } from "@/src/lib/agent/agent-types";
 import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
 import {
   AlertTriangle,
-  BotMessageSquare,
+  ChevronDown,
   ChevronUp,
-  Edit2,
-  Loader2,
   Paperclip,
+  Pencil,
   Plus,
   Send,
   Square,
-  User,
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,6 +35,41 @@ import { BackgroundToolGroup, groupMessageParts } from "./tool-components";
 import { AgentWelcome } from "./welcome/AgentWelcome";
 
 const MAX_MESSAGE_LENGTH = 50000;
+
+function ErrorMessagePart({ content, errorDetails }: { content: string; errorDetails?: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg border border-zinc-200/50 dark:border-zinc-700/50 bg-zinc-50/50 dark:bg-zinc-800/20 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-zinc-500 dark:text-zinc-400 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-zinc-800 dark:text-zinc-200">{content}</p>
+          {errorDetails && (
+            <div className="mt-2">
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center gap-1 text-xs text-zinc-600/70 dark:text-zinc-400/70 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+                {isExpanded ? "Hide details" : "Show details"}
+              </button>
+              {isExpanded && (
+                <pre className="mt-2 p-2 text-xs font-mono bg-zinc-100/50 dark:bg-zinc-900/30 rounded border border-zinc-200/30 dark:border-zinc-700/30 overflow-x-auto whitespace-pre-wrap break-all text-zinc-700 dark:text-zinc-300">
+                  {errorDetails}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const MemoMessage = React.memo(
   ({
@@ -175,6 +208,14 @@ const MemoMessage = React.memo(
                       >
                         <Streamdown>{grouped.part.content || ""}</Streamdown>
                       </div>
+                    );
+                  } else if (grouped.type === "error") {
+                    return (
+                      <ErrorMessagePart
+                        key={grouped.part.id}
+                        content={grouped.part.content || "An error occurred"}
+                        errorDetails={grouped.part.errorDetails}
+                      />
                     );
                   } else if (grouped.type === "background_tools") {
                     return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;

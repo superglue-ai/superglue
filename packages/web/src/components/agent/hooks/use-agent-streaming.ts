@@ -156,6 +156,27 @@ export function useAgentStreaming({
                   continue;
                 }
 
+                if (data.type === "error") {
+                  // Add error as a special content part with error details
+                  setMessages((prev) =>
+                    prev.map((m) => {
+                      if (m.id !== msg.id) return m;
+                      const errorPart = {
+                        type: "error" as const,
+                        content: data.content,
+                        errorDetails: data.errorDetails,
+                        id: `error-${Date.now()}`,
+                      };
+                      return {
+                        ...m,
+                        parts: [...(m.parts || []), errorPart],
+                        isStreaming: false,
+                      };
+                    }),
+                  );
+                  continue;
+                }
+
                 while (streamDripBufferRef.current) {
                   await new Promise((resolve) => setTimeout(resolve, 10));
                 }

@@ -13,8 +13,9 @@ export interface Log {
 }
 
 export interface MessagePart {
-  type: "content" | "tool";
+  type: "content" | "tool" | "error";
   content?: string;
+  errorDetails?: string;
   tool?: ToolCall;
   id: string;
 }
