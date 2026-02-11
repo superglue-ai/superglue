@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import { AgentCapabilities } from "./AgentCapabilities";
+import { AgentType } from "@/src/lib/agent/registry/agents";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
 import { ConversationHistory } from "./ConversationHistory";
 import {
@@ -479,6 +481,8 @@ function AgentInterfaceContent({
             New
           </Button>
         )}
+
+        <AgentCapabilities agentType={AgentType.MAIN} />
 
         {chatTitle && (
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-xl border border-border/50">
