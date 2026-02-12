@@ -11,6 +11,19 @@ export * from "./utils/ai-model-init.js";
 // Re-export model context length utilities
 export * from "./utils/model-context-length.js";
 
+// Re-export token counting utilities
+export * from "./utils/token-count.js";
+
+export type ConnectionProtocol = "http" | "postgres" | "sftp" | "smb";
+
+export const getConnectionProtocol = (url: string): ConnectionProtocol => {
+  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
+  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
+    return "sftp";
+  if (url.startsWith("smb://")) return "smb";
+  return "http";
+};
+
 export const ALLOWED_FILE_EXTENSIONS = [
   ".json",
   ".csv",

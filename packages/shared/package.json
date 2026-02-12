@@ -33,6 +33,7 @@
     "cron-parser": "^5.3.1",
     "graphql-ws": "^6.0.4",
     "cron-validate": "^1.5.2",
+    "js-tiktoken": "^1.0.14",
     "json-schema": "^0.4.0",
     "lodash.keys": "^4.2.0",
     "lodash.merge": "^4.6.2",
