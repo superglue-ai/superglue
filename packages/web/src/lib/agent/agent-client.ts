@@ -1,6 +1,10 @@
-import { Message, SuperglueClient } from "@superglue/shared";
-import { initializeAIModel } from "@superglue/shared/utils";
-import { LanguageModel, stepCountIs, streamText } from "ai";
+import { Message } from "@superglue/shared";
+import {
+  estimateTokenCount,
+  getConfiguredModelContextLength,
+  initializeAIModel,
+} from "@superglue/shared/utils";
+import { LanguageModel, stepCountIs, streamText, TextStreamPart, ToolSet } from "ai";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import {
   AgentRequest,
@@ -14,9 +18,28 @@ import {
   prepareMessages,
   buildToolsForAISDK,
 } from "./agent-request";
-import { TOOL_REGISTRY } from "./registry/tools";
-import { processToolPolicy } from "./registry/tool-policies";
-import type { ToolConfirmationMetadata } from "@/src/components/agent/hooks/types";
+import { TOOL_REGISTRY } from "./registry/tool-definitions";
+import { getEffectiveMode, getPendingOutput } from "./registry/tool-policies";
+import { EESuperglueClient } from "../ee-superglue-client";
+
+// Helper to extract error message from unknown error type
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as Record<string, unknown>).message);
+  }
+  return String(err);
+}
+
+// Type helpers for AI SDK stream parts - Extract specific part types from the union
+type StreamPart = TextStreamPart<ToolSet>;
+type TextDeltaPart = Extract<StreamPart, { type: "text-delta" }>;
+type ToolCallPart = Extract<StreamPart, { type: "tool-call" }>;
+type ToolInputStartPart = Extract<StreamPart, { type: "tool-input-start" }>;
+type ToolResultPart = Extract<StreamPart, { type: "tool-result" }>;
+type ToolErrorPart = Extract<StreamPart, { type: "tool-error" }>;
+type ErrorPart = Extract<StreamPart, { type: "error" }>;
 
 export interface StreamChunk {
   type:
@@ -280,7 +303,18 @@ export class AgentClient {
 
     const tools = buildToolsForAISDK(validated.agent.toolSet, TOOL_REGISTRY, executionContext);
 
-    yield* this.streamLLMResponse(preparedMessages, tools, TOOL_REGISTRY, executionContext);
+    const messageText = JSON.stringify(preparedMessages);
+    const tokenCount = await estimateTokenCount(messageText);
+    if (tokenCount > this.contextLimit * 0.9) {
+      yield {
+        type: "content",
+        content: `**Conversation limit reached**\n\nThis conversation has become too long for me to process. Please start a new chat to continue working together.`,
+      };
+      yield { type: "done" };
+      return;
+    }
+
+    yield* this.streamLLMResponse(preparedMessages, tools, executionContext);
   }
 
   private async *streamLLMResponse(
@@ -303,8 +337,6 @@ export class AgentClient {
       }
 
       yield* this.preprocessConfirmations(messages, toolRegistry, ctx);
-
-      const aiMessages = this.convertToAIMessages(messages);
 
       const result = streamText({
         model: this.model,
