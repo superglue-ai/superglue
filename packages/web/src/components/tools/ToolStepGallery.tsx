@@ -674,12 +674,12 @@ export function ToolStepGallery({
                                       <Blocks className="h-4 w-4 text-muted-foreground" />
                                     )}
                                   </div>
-                                  {step.systemId && (
+                                  {(linkedSystem?.name || stepSystemId) && (
                                     <span
                                       className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
-                                      title={step.systemId}
+                                      title={linkedSystem?.name || stepSystemId}
                                     >
-                                      {step.systemId}
+                                      {linkedSystem?.name || stepSystemId}
                                     </span>
                                   )}
                                   <span

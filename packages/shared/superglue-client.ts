@@ -1,10 +1,10 @@
 import axios from "axios";
 import {
   BuildToolArgs,
-  CredentialMode,
   ExtractArgs,
   ExtractInputRequest,
   ExtractResult,
+  FileReference,
   FixToolArgs,
   FixToolResult,
   Log,
@@ -17,8 +17,6 @@ import {
   ToolDiff,
   ToolInputRequest,
   ToolResult,
-  ToolStepResult,
-  UpsertMode,
 } from "./types.js";
 import {
   LogSubscriptionOptions,
@@ -907,15 +905,11 @@ export class SuperglueClient {
   async listSystems(
     limit: number = 10,
     page: number = 1,
-    options?: { includeDocs?: boolean },
   ): Promise<{ items: System[]; total: number }> {
     const params = new URLSearchParams({
       limit: String(limit),
       page: String(page),
     });
-    if (options?.includeDocs) {
-      params.set("includeDocs", "true");
-    }
     const response = await this.restRequest<{
       success: boolean;
       data: System[];
@@ -948,111 +942,231 @@ export class SuperglueClient {
     return response.findRelevantTools;
   }
 
-  async getSystem(id: string, options?: { includeDocs?: boolean }): Promise<System> {
-    const params = options?.includeDocs ? "?includeDocs=true" : "";
+  async getSystem(id: string): Promise<System> {
     const response = await this.restRequest<{ success: boolean; data: System }>(
       "GET",
-      `/v1/systems/${encodeURIComponent(id)}${params}`,
+      `/v1/systems/${encodeURIComponent(id)}`,
     );
     return response.data;
   }
 
-  async upsertSystem(
-    id: string,
-    input: Partial<System>,
-    mode: UpsertMode = UpsertMode.UPSERT,
-    credentialMode?: CredentialMode,
-  ): Promise<System> {
-    const mutation = `
-        mutation UpsertSystem($input: SystemInput!, $mode: UpsertMode, $credentialMode: CredentialMode) {
-          upsertSystem(input: $input, mode: $mode, credentialMode: $credentialMode) {
-            id
-            name
-            type
-            urlHost
-            urlPath
-            credentials
-            documentationUrl
-            documentation
-            documentationPending
-            openApiSchema
-            openApiUrl
-            specificInstructions
-            documentationKeywords
-            icon
-            metadata
-            templateName
-            version
-            createdAt
-            updatedAt
-          }
-        }
-      `;
-    const systemInput = { id, ...input };
-    const response = await this.request<{ upsertSystem: System }>(mutation, {
-      input: systemInput,
-      mode,
-      credentialMode,
-    });
-    return response.upsertSystem;
+  async createSystem(input: {
+    id?: string;
+    name: string;
+    url: string;
+    credentials?: Record<string, any>;
+    specificInstructions?: string;
+    icon?: string;
+    templateName?: string;
+    documentationFiles?: Record<string, string[]>;
+    metadata?: Record<string, any>;
+  }): Promise<System> {
+    const response = await this.restRequest<{ success: boolean; data: System }>(
+      "POST",
+      "/v1/systems",
+      input,
+    );
+    return response.data;
+  }
+
+  async updateSystem(id: string, input: Partial<System>): Promise<System> {
+    const response = await this.restRequest<{ success: boolean; data: System }>(
+      "PATCH",
+      `/v1/systems/${encodeURIComponent(id)}`,
+      input,
+    );
+    return response.data;
   }
 
   async deleteSystem(id: string): Promise<boolean> {
-    const mutation = `
-        mutation DeleteSystem($id: ID!) {
-          deleteSystem(id: $id)
-        }
-      `;
-    const response = await this.request<{ deleteSystem: boolean }>(mutation, { id });
-    return response.deleteSystem;
+    await this.restRequest<{ success: boolean }>("DELETE", `/v1/systems/${encodeURIComponent(id)}`);
+    return true;
   }
 
-  async cacheOauthClientCredentials(args: {
-    clientCredentialsUid: string;
+  async cacheOAuthSecret(args: {
+    uid: string;
     clientId: string;
     clientSecret: string;
   }): Promise<boolean> {
-    const data = await this.graphQL<{ cacheOauthClientCredentials: boolean }>(
-      `
-            mutation CacheOauthClientCredentials($clientCredentialsUid: String!, $clientId: String!, $clientSecret: String!) {
-                cacheOauthClientCredentials(clientCredentialsUid: $clientCredentialsUid, clientId: $clientId, clientSecret: $clientSecret)
-            }
-        `,
-      args,
-    );
-    return Boolean(data?.cacheOauthClientCredentials);
+    await this.restRequest<{ success: boolean }>("POST", "/v1/oauth/secrets", args);
+    return true;
   }
 
-  async getOAuthClientCredentials(args: {
-    templateId?: string;
-    clientCredentialsUid?: string;
-  }): Promise<{ client_id: string; client_secret: string }> {
-    const data = await this.graphQL<{
-      getOAuthClientCredentials: { client_id: string; client_secret: string };
-    }>(
-      `
-            mutation GetOAuthClientCredentials($templateId: ID, $clientCredentialsUid: String) {
-                getOAuthClientCredentials(templateId: $templateId, clientCredentialsUid: $clientCredentialsUid) {
-                    client_id
-                    client_secret
-                }
-            }
-        `,
-      args,
-    );
-    return data.getOAuthClientCredentials;
+  async getOAuthSecret(uid: string): Promise<{ client_id: string; client_secret: string }> {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: { client_id: string; client_secret: string };
+    }>("GET", `/v1/oauth/secrets/${encodeURIComponent(uid)}`);
+    return response.data;
+  }
+
+  async getTemplateOAuthCredentials(
+    templateId: string,
+  ): Promise<{ client_id: string; client_secret: string }> {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: { client_id: string; client_secret: string };
+    }>("GET", `/v1/oauth/templates/${encodeURIComponent(templateId)}/credentials`);
+    return response.data;
   }
 
   async searchSystemDocumentation(systemId: string, keywords: string): Promise<string> {
-    const data = await this.graphQL<{ searchSystemDocumentation: string }>(
-      `
-            query SearchSystemDocumentation($systemId: ID!, $keywords: String!) {
-                searchSystemDocumentation(systemId: $systemId, keywords: $keywords)
-            }
-        `,
-      { systemId, keywords },
+    const response = await this.restRequest<{ success: boolean; data: string }>(
+      "POST",
+      `/v1/systems/${encodeURIComponent(systemId)}/documentation/search`,
+      { keywords },
     );
-    return data.searchSystemDocumentation;
+    return response.data;
+  }
+
+  async cacheOauthClientCredentials(params: {
+    clientCredentialsUid: string;
+    clientId: string;
+    clientSecret: string;
+  }): Promise<{ success: boolean }> {
+    return this.restRequest<{ success: boolean }>("POST", "/v1/oauth/secrets", {
+      uid: params.clientCredentialsUid,
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+    });
+  }
+
+  async getOAuthClientCredentials(params: {
+    templateId?: string;
+    clientCredentialsUid?: string;
+  }): Promise<{ client_id: string; client_secret: string }> {
+    if (params.clientCredentialsUid) {
+      const response = await this.restRequest<{
+        success: boolean;
+        data: { client_id: string; client_secret: string };
+      }>("GET", `/v1/oauth/secrets/${encodeURIComponent(params.clientCredentialsUid)}`);
+      return response.data;
+    }
+    if (!params.templateId) {
+      throw new Error("No valid credentials source provided");
+    }
+    const response = await this.restRequest<{
+      success: boolean;
+      data: { client_id: string; client_secret: string };
+    }>("GET", `/v1/oauth/templates/${encodeURIComponent(params.templateId)}/credentials`);
+    return response.data;
+  }
+
+  async triggerSystemDocumentationScrapeJob(
+    systemId: string,
+    options?: { url?: string; keywords?: string[] },
+  ): Promise<{ fileReferenceId: string; status: string }> {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: { fileReferenceId: string; status: string };
+    }>("POST", `/v1/systems/${encodeURIComponent(systemId)}/documentation/scrape`, options);
+    return response.data;
+  }
+
+  async fetchOpenApiSpec(
+    systemId: string,
+    url: string,
+  ): Promise<{ fileReferenceId: string; title?: string; version?: string }> {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: { fileReferenceId: string; title?: string; version?: string };
+    }>("POST", `/v1/systems/${encodeURIComponent(systemId)}/documentation/openapi`, { url });
+    return response.data;
+  }
+
+  async createSystemFileUploadUrls(
+    systemId: string,
+    files: Array<{ fileName: string; contentType?: string; contentLength?: number }>,
+  ): Promise<
+    Array<{ id: string; originalFileName: string; uploadUrl: string; expiresIn: number }>
+  > {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: {
+        files: Array<{
+          id: string;
+          originalFileName: string;
+          uploadUrl: string;
+          expiresIn: number;
+        }>;
+      };
+    }>("POST", `/v1/systems/${encodeURIComponent(systemId)}/file-references`, {
+      files: files.map((f) => ({
+        fileName: f.fileName,
+        metadata: { contentType: f.contentType, contentLength: f.contentLength },
+      })),
+    });
+    return response.data.files;
+  }
+
+  async uploadSystemFileReferences(
+    systemId: string,
+    files: Array<{ fileName: string; content: string; contentType?: string }>,
+  ): Promise<Array<{ id: string; fileName: string }>> {
+    const uploadUrls = await this.createSystemFileUploadUrls(
+      systemId,
+      files.map((f) => ({ fileName: f.fileName, contentType: f.contentType })),
+    );
+    await Promise.all(
+      uploadUrls.map(async (fileInfo, i) => {
+        const uploadResponse = await fetch(fileInfo.uploadUrl, {
+          method: "PUT",
+          body: files[i].content,
+          headers: files[i].contentType ? { "Content-Type": files[i].contentType } : undefined,
+        });
+        if (!uploadResponse.ok) {
+          throw new Error(
+            `Upload failed for ${files[i].fileName}: ${uploadResponse.status} ${uploadResponse.statusText}`,
+          );
+        }
+      }),
+    );
+    return uploadUrls.map((f, i) => ({ id: f.id, fileName: files[i].fileName }));
+  }
+
+  async listSystemFileReferences(systemId: string): Promise<{
+    files: Array<{
+      id: string;
+      source: "upload" | "scrape" | "openapi";
+      status: string;
+      fileName: string;
+      sourceUrl?: string;
+      error?: string;
+      createdAt?: string;
+      contentLength?: number;
+    }>;
+  }> {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: {
+        files: Array<{
+          id: string;
+          source: "upload" | "scrape" | "openapi";
+          status: string;
+          fileName: string;
+          sourceUrl?: string;
+          error?: string;
+          createdAt?: string;
+          contentLength?: number;
+        }>;
+      };
+    }>("GET", `/v1/systems/${encodeURIComponent(systemId)}/file-references`);
+    return response.data;
+  }
+
+  async deleteSystemFileReference(systemId: string, fileId: string): Promise<void> {
+    await this.restRequest(
+      "DELETE",
+      `/v1/systems/${encodeURIComponent(systemId)}/file-references/${encodeURIComponent(fileId)}`,
+    );
+  }
+
+  async getFileReferenceContent(fileId: string): Promise<string | null> {
+    const response = await this.restRequest<{
+      success: boolean;
+      data: FileReference & { content?: string };
+    }>("GET", `/v1/file-references/${encodeURIComponent(fileId)}?includeContent=true`);
+    return response.data.content ?? null;
   }
 
   async generateInstructions(systems: any[]): Promise<string[]> {

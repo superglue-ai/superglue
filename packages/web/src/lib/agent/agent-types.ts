@@ -3,25 +3,17 @@ import { SuperglueClient } from "@superglue/shared";
 import { z } from "zod";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import { AgentType } from "./registry/agents";
+import { EESuperglueClient } from "../ee-superglue-client";
+import { TextStreamPart, ToolSet } from "ai";
 
-export const CALL_SYSTEM_CONFIRMATION = {
-  PENDING: "PENDING_USER_CONFIRMATION",
-  CONFIRMED: "USER_CONFIRMED",
-  DECLINED: "USER_CANCELLED",
-} as const;
-
-export const EDIT_TOOL_CONFIRMATION = {
-  PENDING: "PENDING_DIFF_APPROVAL",
-  CONFIRMED: "DIFFS_APPROVED",
-  DECLINED: "DIFFS_REJECTED",
-  PARTIAL: "DIFFS_PARTIALLY_APPROVED",
-} as const;
-
-export const SYSTEM_UPSERT_CONFIRMATION = {
-  PENDING: "PENDING_CREDENTIALS",
-  CONFIRMED: "CREDENTIALS_PROVIDED",
-  DECLINED: "CREDENTIALS_DECLINED",
-} as const;
+// Type helpers for AI SDK stream parts - Extract specific part types from the union
+export type StreamPart = TextStreamPart<ToolSet>;
+export type TextDeltaPart = Extract<StreamPart, { type: "text-delta" }>;
+export type ToolCallPart = Extract<StreamPart, { type: "tool-call" }>;
+export type ToolInputStartPart = Extract<StreamPart, { type: "tool-input-start" }>;
+export type ToolResultPart = Extract<StreamPart, { type: "tool-result" }>;
+export type ToolErrorPart = Extract<StreamPart, { type: "tool-error" }>;
+export type ErrorPart = Extract<StreamPart, { type: "error" }>;
 
 export type ExecutionMode = "auto" | "confirm_before_execution" | "confirm_after_execution";
 

@@ -3,9 +3,9 @@
 import { useConfig } from "@/src/app/config-context";
 import { useSystems } from "@/src/app/systems-context";
 import { useToast } from "@/src/hooks/use-toast";
-import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
+import { createSuperglueClient } from "@/src/lib/client-utils";
 import type { System } from "@superglue/shared";
-import { CredentialMode, UpsertMode, systems as systemTemplates } from "@superglue/shared";
+import { systems as systemTemplates, findTemplateForSystem } from "@superglue/shared";
 import {
   createContext,
   ReactNode,
@@ -137,7 +137,7 @@ export function SystemConfigProvider({
 }: SystemConfigProviderProps) {
   const config = useConfig();
   const { toast } = useToast();
-  const { systems, refreshSystems, setPendingDocIds, pendingDocIds } = useSystems();
+  const { systems, refreshSystems } = useSystems();
 
   const initialRef = useRef(initialSystem);
 
@@ -169,21 +169,27 @@ export function SystemConfigProvider({
   );
   const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(false);
 
-  const [documentationUrl, setDocumentationUrl] = useState(initialSystem?.documentationUrl || "");
-  const [documentation, setDocumentation] = useState(initialSystem?.documentation || "");
   const [specificInstructions, setSpecificInstructions] = useState(
     initialSystem?.specificInstructions || "",
   );
-  const [hasUploadedFile, setHasUploadedFile] = useState(
-    initialSystem?.documentationUrl?.startsWith("file://") || false,
-  );
-
+  const [docFileCount, setDocFileCount] = useState(0);
   const [activeSection, setActiveSection] = useState<SystemSection>("configuration");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [isOnboardingActive, setIsOnboardingActive] = useState(isOnboarding);
+
+  useEffect(() => {
+    if (!initialSystem?.id) return;
+    const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
+    client
+      .listSystemFileReferences(initialSystem.id)
+      .then((result) => {
+        setDocFileCount(result.files.length);
+      })
+      .catch(() => {});
+  }, [initialSystem?.id, config.superglueEndpoint, config.apiEndpoint]);
 
   useEffect(() => {
     if (!systemId || isNew) return;
@@ -199,14 +205,11 @@ export function SystemConfigProvider({
       : 0;
 
     if (currentUpdatedAt > initialUpdatedAt) {
-      setUrlHost(updatedSystem.urlHost || "");
-      setUrlPath(updatedSystem.urlPath || "");
+      setSystemName(updatedSystem.name || "");
+      setUrl(updatedSystem.url || "");
       setTemplateName(updatedSystem.templateName || "");
       setIcon(updatedSystem.icon || "");
-      setDocumentationUrl(updatedSystem.documentationUrl || "");
-      setDocumentation(updatedSystem.documentation || "");
       setSpecificInstructions(updatedSystem.specificInstructions || "");
-      setHasUploadedFile(updatedSystem.documentationUrl?.startsWith("file://") || false);
 
       const newAuthType = detectAuthType(updatedSystem.credentials || {});
       setAuthType(newAuthType);
@@ -229,23 +232,12 @@ export function SystemConfigProvider({
     const hasChanges =
       systemId !== (initialSystem.id || "") ||
       systemName !== (initialSystem.name || "") ||
-      urlHost !== (initialSystem.urlHost || "") ||
-      urlPath !== (initialSystem.urlPath || "") ||
-      documentationUrl !== (initialSystem.documentationUrl || "") ||
+      url !== (initialSystem.url || "") ||
       specificInstructions !== (initialSystem.specificInstructions || "") ||
       authType !== detectAuthType(initialSystem.credentials || {});
 
     setHasUnsavedChanges(hasChanges);
-  }, [
-    systemId,
-    systemName,
-    urlHost,
-    urlPath,
-    documentationUrl,
-    specificInstructions,
-    authType,
-    initialSystem,
-  ]);
+  }, [systemId, systemName, url, specificInstructions, authType, initialSystem]);
 
   useEffect(() => {
     if (isNew) {
@@ -294,60 +286,12 @@ export function SystemConfigProvider({
     [authType, credentials, oauthFields, apiKeyCredentials, isOAuthConfigured, useSuperglueOAuth],
   );
 
-  const isDocumentationPending = useMemo(() => {
-    return systemId ? pendingDocIds.has(systemId) : false;
-  }, [systemId, pendingDocIds]);
-
-  useEffect(() => {
-    if (!isDocumentationPending || !systemId) return;
-
-    const pollSystem = async () => {
-      try {
-        const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
-        const fetchedSystem = await client.getSystem(systemId, { includeDocs: true });
-
-        if (fetchedSystem && !fetchedSystem.documentationPending) {
-          setDocumentation(fetchedSystem.documentation || "");
-          setDocumentationUrl(fetchedSystem.documentationUrl || "");
-          setPendingDocIds((prev) => {
-            const next = new Set(prev);
-            next.delete(systemId);
-            return next;
-          });
-          initialRef.current = fetchedSystem;
-        }
-      } catch (error) {
-        console.error("Error polling system documentation:", error);
-      }
-    };
-
-    const pollInterval = setInterval(pollSystem, 3000);
-    pollSystem();
-
-    return () => clearInterval(pollInterval);
-  }, [
-    isDocumentationPending,
-    systemId,
-    config.superglueEndpoint,
-    config.apiEndpoint,
-    setPendingDocIds,
-  ]);
-
   const context = useMemo<ContextState>(
     () => ({
-      documentationUrl,
-      documentation,
       specificInstructions,
-      hasUploadedFile,
-      isDocumentationPending,
+      docFileCount,
     }),
-    [
-      documentationUrl,
-      documentation,
-      specificInstructions,
-      hasUploadedFile,
-      isDocumentationPending,
-    ],
+    [specificInstructions, docFileCount],
   );
 
   const getSectionStatus = useCallback(
@@ -358,8 +302,8 @@ export function SystemConfigProvider({
           const hasUrl = urlHost.trim().length > 0;
           return {
             isComplete: hasId && hasUrl,
-            hasErrors: !hasId,
-            label: hasId && hasUrl ? "Configured" : hasId ? "Needs endpoint" : "Needs ID",
+            hasErrors: false,
+            label: hasId && hasUrl ? "Configured" : "Needs endpoint",
           };
         case "authentication":
           if (authType === "none") {
@@ -369,7 +313,7 @@ export function SystemConfigProvider({
             return {
               isComplete: isOAuthConfigured,
               hasErrors: false,
-              label: isOAuthConfigured ? "OAuth configured" : "OAuth incomplete",
+              label: "OAuth",
             };
           }
           try {
@@ -378,18 +322,17 @@ export function SystemConfigProvider({
             return {
               isComplete: hasKeys,
               hasErrors: false,
-              label: hasKeys ? "API Key set" : "No credentials",
+              label: "API Key",
             };
           } catch {
-            return { isComplete: false, hasErrors: true, label: "Invalid JSON" };
+            return { isComplete: false, hasErrors: false, label: "API Key" };
           }
         case "context":
-          const hasDocs = documentationUrl.trim().length > 0 || documentation.trim().length > 0;
           const hasInstructions = specificInstructions.trim().length > 0;
           return {
-            isComplete: hasDocs || hasInstructions,
+            isComplete: docFileCount > 0 || hasInstructions,
             hasErrors: false,
-            label: hasDocs ? "Docs added" : hasInstructions ? "Instructions added" : "Optional",
+            label: `${docFileCount} source${docFileCount !== 1 ? "s" : ""}`,
           };
         default:
           return { isComplete: false, hasErrors: false, label: "Unknown" };
@@ -401,9 +344,8 @@ export function SystemConfigProvider({
       authType,
       isOAuthConfigured,
       apiKeyCredentials,
-      documentationUrl,
-      documentation,
       specificInstructions,
+      docFileCount,
     ],
   );
 
@@ -433,9 +375,6 @@ export function SystemConfigProvider({
       templateName: templateName || undefined,
       authType,
       credentialKeys,
-      hasDocumentation: Boolean(documentationUrl || documentation),
-      hasUploadedFile,
-      documentationUrl,
       specificInstructions,
       sectionStatuses: {
         configuration: getSectionStatus("configuration"),
@@ -451,9 +390,6 @@ export function SystemConfigProvider({
     authType,
     oauthFields,
     apiKeyCredentials,
-    documentationUrl,
-    documentation,
-    hasUploadedFile,
     specificInstructions,
     getSectionStatus,
   ]);
@@ -524,32 +460,19 @@ export function SystemConfigProvider({
         }
 
         const systemData = {
-          id: systemId.trim(),
           name: systemName.trim() || undefined,
-          urlHost: urlHost.trim(),
-          urlPath: urlPath.trim(),
-          documentationUrl: documentationUrl.trim(),
-          documentation: documentation.trim(),
+          url: url.trim(),
           specificInstructions: specificInstructions.trim(),
           credentials: finalCredentials,
           templateName: templateName || undefined,
         };
 
         const existingSystem = systems.find((s) => s.id === systemId);
-        const mode = existingSystem ? UpsertMode.UPDATE : UpsertMode.CREATE;
 
-        const client = createSuperglueClient(config.superglueEndpoint);
-        const savedSystem = await client.upsertSystem(
-          systemId,
-          systemData,
-          mode,
-          CredentialMode.REPLACE,
-        );
-
-        const willTriggerDocFetch = needsUIToTriggerDocFetch(savedSystem, existingSystem);
-        if (willTriggerDocFetch) {
-          setPendingDocIds((prev) => new Set([...prev, savedSystem.id]));
-        }
+        const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
+        const savedSystem = existingSystem
+          ? await client.updateSystem(systemId, systemData)
+          : await client.createSystem({ ...systemData, name: systemData.name || systemId });
 
         await refreshSystems();
         setHasUnsavedChanges(false);
@@ -576,10 +499,7 @@ export function SystemConfigProvider({
     [
       systemId,
       systemName,
-      urlHost,
-      urlPath,
-      documentationUrl,
-      documentation,
+      url,
       specificInstructions,
       authType,
       oauthFields,
@@ -587,8 +507,8 @@ export function SystemConfigProvider({
       templateName,
       systems,
       config.superglueEndpoint,
+      config.apiEndpoint,
       refreshSystems,
-      setPendingDocIds,
       toast,
     ],
   );
@@ -610,10 +530,7 @@ export function SystemConfigProvider({
           ? extractNonOAuthCredentials(initial.credentials || {})
           : JSON.stringify(initial.credentials || {}, null, 2),
       );
-      setDocumentationUrl(initial.documentationUrl || "");
-      setDocumentation(initial.documentation || "");
       setSpecificInstructions(initial.specificInstructions || "");
-      setHasUploadedFile(initial.documentationUrl?.startsWith("file://") || false);
     } else {
       setSystemId("");
       setSystemName("");
@@ -625,10 +542,7 @@ export function SystemConfigProvider({
       setCredentials({});
       setOauthFieldsState(DEFAULT_OAUTH_FIELDS);
       setApiKeyCredentials("{}");
-      setDocumentationUrl("");
-      setDocumentation("");
       setSpecificInstructions("");
-      setHasUploadedFile(false);
     }
     setHasUnsavedChanges(false);
   }, []);
@@ -654,9 +568,7 @@ export function SystemConfigProvider({
       }
     }
 
-    const contextComplete = Boolean(
-      specificInstructions.trim() || documentationUrl.trim() || hasUploadedFile,
-    );
+    const contextComplete = Boolean(specificInstructions.trim());
 
     return {
       configuration: configComplete,
@@ -672,8 +584,6 @@ export function SystemConfigProvider({
     oauthFields.grant_type,
     apiKeyCredentials,
     specificInstructions,
-    documentationUrl,
-    hasUploadedFile,
   ]);
 
   const exitOnboarding = useCallback(() => {
@@ -746,22 +656,12 @@ export function SystemConfigProvider({
         setHasUnsavedChanges(true);
       },
 
-      setDocumentationUrl: (url) => {
-        setDocumentationUrl(url);
-        setHasUnsavedChanges(true);
-      },
-      setDocumentation: (doc) => {
-        setDocumentation(doc);
-        setHasUnsavedChanges(true);
-      },
       setSpecificInstructions: (instructions) => {
         setSpecificInstructions(instructions);
         setHasUnsavedChanges(true);
       },
-      setHasUploadedFile: (has) => {
-        setHasUploadedFile(has);
-        setHasUnsavedChanges(true);
-      },
+
+      setDocFileCount,
 
       setActiveSection,
 

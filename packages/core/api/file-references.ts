@@ -34,11 +34,30 @@ const getFileReference: RouteHandler = async (request, reply) => {
   try {
     const authReq = request as AuthenticatedFastifyRequest;
     const { id } = request.params as { id: string };
+    const query = request.query as { includeContent?: string };
 
     const file = await authReq.datastore.getFileReference({ id, orgId: authReq.authInfo.orgId });
 
     if (!file) {
       return reply.code(404).send({ success: false, error: "File reference not found" });
+    }
+
+    if (query.includeContent === "true") {
+      const storageUri = file.processedStorageUri || file.storageUri;
+      if (storageUri) {
+        try {
+          const buf = await getFileService().downloadFile(storageUri, authReq.toMetadata());
+          return reply
+            .code(200)
+            .send({ success: true, data: { ...file, content: buf.toString("utf8") } });
+        } catch (downloadError) {
+          logMessage(
+            "warn",
+            `Failed to download content for file ${id}: ${String(downloadError)}`,
+            authReq.toMetadata(),
+          );
+        }
+      }
     }
 
     return reply.code(200).send({ success: true, data: file });
@@ -281,6 +300,9 @@ const batchCreateFileReferences: RouteHandler = async (request, reply) => {
   }
 };
 
+// This handler is triggered exclusively by S3 EventBridge/webhook notifications when a file is uploaded to the raw storage prefix.
+// Do NOT call this endpoint or fileService.processFile() directly from application code.
+// The correct pattern is: upload to raw URI only -> S3 event fires -> this handler processes the file automatically.
 const processFileReference: RouteHandler = async (request, reply) => {
   try {
     const authReq = request as AuthenticatedFastifyRequest;
@@ -426,6 +448,134 @@ const processFileReference: RouteHandler = async (request, reply) => {
     return reply.code(500).send({ success: false, error: String(error) });
   }
 };
+
+async function processFileByKey(
+  authReq: AuthenticatedFastifyRequest,
+  reply: any,
+  bucket: string,
+  key: string,
+  fileSize: number,
+) {
+  const serviceMetadata = authReq.toMetadata();
+  const storageUri = `s3://${bucket}/${key}`;
+
+  const filename = key.split("/").pop() || key;
+  const fileId = filename.split(".")[0];
+  const orgIdFromKey = key.split("/")[0];
+
+  // Allow the EventBridge/S3 webhook org to process files for any org
+  const eventBridgeOrgId = process.env.EVENTBRIDGE_ORG_ID;
+  if (
+    authReq.authInfo.orgId &&
+    authReq.authInfo.orgId !== orgIdFromKey &&
+    authReq.authInfo.orgId !== eventBridgeOrgId
+  ) {
+    logMessage(
+      "warn",
+      `processFileByKey: Org mismatch - auth=${authReq.authInfo.orgId} key=${orgIdFromKey} eventBridgeOrgId=${eventBridgeOrgId}`,
+      serviceMetadata,
+    );
+    return reply.code(403).send({
+      success: false,
+      error: "Not authorized to process files for this organization",
+    });
+  }
+
+  if (!fileId) {
+    return reply.code(400).send({
+      success: false,
+      error: "Could not extract file ID from key",
+    });
+  }
+
+  const fileRef = await authReq.datastore.getFileReference({
+    id: fileId,
+    orgId: orgIdFromKey,
+  });
+
+  if (!fileRef) {
+    logMessage("error", `processFileByKey: File reference not found: ${fileId}`, serviceMetadata);
+    return reply.code(404).send({
+      success: false,
+      error: `File reference not found: ${fileId}`,
+    });
+  }
+
+  const maxFileSize = server_defaults.FILE_PROCESSING.MAX_FILE_SIZE_BYTES;
+  if (fileSize !== undefined && fileSize > maxFileSize) {
+    await authReq.datastore.updateFileReference({
+      id: fileId,
+      updates: {
+        status: FileStatus.FAILED,
+        error: `File size ${fileSize} exceeds maximum allowed size ${maxFileSize}`,
+      },
+      orgId: orgIdFromKey,
+    });
+    return reply.code(400).send({
+      success: false,
+      error: `File size exceeds maximum allowed size`,
+    });
+  }
+
+  await authReq.datastore.updateFileReference({
+    id: fileId,
+    updates: { status: FileStatus.PROCESSING },
+    orgId: orgIdFromKey,
+  });
+
+  try {
+    const { processedStorageUri } = await getFileService().processFile(storageUri, serviceMetadata);
+
+    await authReq.datastore.updateFileReference({
+      id: fileId,
+      updates: {
+        status: FileStatus.COMPLETED,
+        processedStorageUri,
+        metadata: {
+          ...fileRef.metadata,
+          completedAt: new Date().toISOString(),
+        },
+      },
+      orgId: orgIdFromKey,
+    });
+
+    logMessage(
+      "info",
+      `processFileByKey: COMPLETED fileId=${fileId} processedUri=${processedStorageUri}`,
+      serviceMetadata,
+    );
+
+    return reply.code(200).send({
+      success: true,
+      message: "File processed successfully",
+      fileId,
+      processedStorageUri,
+    });
+  } catch (processingError: any) {
+    await authReq.datastore.updateFileReference({
+      id: fileId,
+      updates: {
+        status: FileStatus.FAILED,
+        error: String(processingError),
+        metadata: {
+          ...fileRef.metadata,
+          failedAt: new Date().toISOString(),
+        },
+      },
+      orgId: orgIdFromKey,
+    });
+    logMessage(
+      "error",
+      `processFileByKey: FAILED fileId=${fileId} err=${processingError}`,
+      serviceMetadata,
+    );
+
+    return reply.code(500).send({
+      success: false,
+      error: String(processingError),
+    });
+  }
+}
 
 registerApiModule({
   name: "file-references",

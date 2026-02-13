@@ -113,6 +113,7 @@ export interface CreateRunRequestBody {
 }
 
 export interface CreateSystemBody {
+  id?: string;
   name: string;
   urlHost: string;
   credentials?: Record<string, any>;
@@ -123,15 +124,26 @@ export interface CreateSystemBody {
   metadata?: Record<string, any>;
 }
 
-export interface UpdateSystemBody {
-  name: string;
-  urlHost: string;
+export interface PatchSystemBody {
+  name?: string;
+  url?: string;
   specificInstructions?: string;
   icon?: string;
   credentials?: Record<string, any>;
   metadata?: Record<string, any>;
   templateName?: string;
   documentationFiles?: DocumentationFiles;
+}
+
+export interface UploadDocumentationBody {
+  files: Array<{
+    fileName: string;
+    metadata?: {
+      contentType?: string;
+      contentLength?: number;
+      [key: string]: any;
+    };
+  }>;
 }
 
 export interface ScrapeRequestBody {
@@ -146,5 +158,6 @@ export interface DocumentationFileResponse {
   fileName: string;
   sourceUrl?: string;
   error?: string;
-  content?: string;
+  createdAt?: string;
+  contentLength?: number;
 }

@@ -1,7 +1,16 @@
-import { findTemplateForSystem, ServiceMetadata, System, Tool } from "@superglue/shared";
+import {
+  DocumentationFiles,
+  FileStatus,
+  findTemplateForSystem,
+  ServiceMetadata,
+  System,
+  Tool,
+  getToolSystemIds,
+} from "@superglue/shared";
 import { isMainThread, parentPort } from "worker_threads";
 import { DataStore } from "../datastore/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
+import { getFileService, isFileStorageAvailable } from "../filestore/file-service.js";
 import { logMessage } from "../utils/logs.js";
 import { isTokenExpired, refreshOAuthToken } from "../utils/oauth-token-refresh.js";
 
@@ -37,12 +46,18 @@ export class SystemManager {
       this.id = idOrSystem.id;
       this._system = idOrSystem;
 
-      this._documentation = {
-        content: idOrSystem.documentation,
-        openApiSchema: idOrSystem.openApiSchema,
-        isFetched: !!idOrSystem.documentation || !!idOrSystem.openApiSchema,
-        fetchedAt: idOrSystem.documentation ? new Date() : undefined,
-      };
+      if (idOrSystem.documentation || idOrSystem.openApiSchema) {
+        this._documentation = {
+          content: idOrSystem.documentation,
+          openApiSchema: idOrSystem.openApiSchema,
+          isFetched: true,
+          fetchedAt: new Date(),
+        };
+      } else {
+        this._documentation = {
+          isFetched: false,
+        };
+      }
     }
   }
 
@@ -86,21 +101,32 @@ export class SystemManager {
     }
 
     try {
-      const fullSystem = await this.dataStore.getSystem({
-        id: this.id,
-        includeDocs: true,
-        orgId: this.orgId,
-      });
+      const system = await this.getSystem();
 
-      if (fullSystem) {
-        this._documentation = {
-          content: fullSystem.documentation,
-          openApiSchema: fullSystem.openApiSchema,
-          isFetched: true,
-          fetchedAt: new Date(),
-        };
-        this._system = fullSystem;
+      const fileContent = await this.loadFileBasedDocumentation(system);
+      let content = fileContent.docs;
+      let openApiSchema = fileContent.openApi;
+
+      // Legacy fallback: only used when no file-based docs exist in S3.
+      // Once a system has file references, inline docs from integration_details are superseded.
+      if (!content && !openApiSchema) {
+        const legacySystem = await this.dataStore.getSystem({
+          id: this.id,
+          includeDocs: true,
+          orgId: this.orgId,
+        });
+        if (legacySystem) {
+          content = legacySystem.documentation || "";
+          openApiSchema = legacySystem.openApiSchema || "";
+        }
       }
+
+      this._documentation = {
+        content: content || undefined,
+        openApiSchema: openApiSchema || undefined,
+        isFetched: true,
+        fetchedAt: new Date(),
+      };
       logMessage("info", `Documentation loaded for system ${this.id}`, this.metadata);
     } catch (error) {
       logMessage(
@@ -111,6 +137,65 @@ export class SystemManager {
     }
 
     return this._documentation;
+  }
+
+  private async loadFileBasedDocumentation(
+    system: System,
+  ): Promise<{ docs: string; openApi: string }> {
+    const docFiles: DocumentationFiles = system.documentationFiles || {};
+    const uploadIds = docFiles.uploadFileIds || [];
+    const scrapeIds = docFiles.scrapeFileIds || [];
+    const openApiIds = docFiles.openApiFileIds || [];
+    const allIds = [...uploadIds, ...scrapeIds, ...openApiIds];
+
+    if (allIds.length === 0 || !this.dataStore || !isFileStorageAvailable()) {
+      return { docs: "", openApi: "" };
+    }
+
+    try {
+      const fileRefs = await this.dataStore.listFileReferences({
+        fileIds: allIds,
+        orgId: this.orgId,
+      });
+
+      const fileService = getFileService();
+      const docParts: string[] = [];
+      const openApiParts: string[] = [];
+
+      for (const file of fileRefs.items) {
+        if (file.status !== FileStatus.COMPLETED || !file.processedStorageUri) continue;
+
+        try {
+          const buf = await fileService.downloadFile(file.processedStorageUri, this.metadata);
+          const text = buf.toString("utf8");
+          if (!text.trim()) continue;
+
+          if (openApiIds.includes(file.id)) {
+            openApiParts.push(text);
+          } else {
+            docParts.push(text);
+          }
+        } catch (err) {
+          logMessage(
+            "warn",
+            `Failed to download doc file ${file.id} for system ${this.id}: ${err}`,
+            this.metadata,
+          );
+        }
+      }
+
+      return {
+        docs: docParts.join("\n\n"),
+        openApi: openApiParts.join("\n\n"),
+      };
+    } catch (error) {
+      logMessage(
+        "warn",
+        `Failed to load file-based documentation for system ${this.id}: ${error}`,
+        this.metadata,
+      );
+      return { docs: "", openApi: "" };
+    }
   }
   private searchCache = new Map<string, string>();
 
@@ -288,7 +373,6 @@ export class SystemManager {
     tool: Tool,
     dataStore: DataStore,
     metadata: ServiceMetadata,
-    options: { includeDocs?: boolean } = {},
   ): Promise<SystemManager[]> {
     const allIds = new Set<string>();
 
@@ -309,7 +393,7 @@ export class SystemManager {
 
     const systems = await dataStore.getManySystems({
       ids: Array.from(allIds),
-      includeDocs: options.includeDocs ?? false,
+      includeDocs: false,
       orgId: metadata.orgId,
     });
 

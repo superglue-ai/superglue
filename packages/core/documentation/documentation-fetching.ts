@@ -81,6 +81,10 @@ export class DocumentationFetcher {
     this.metadata = metadata;
   }
 
+  public get rawFetchResult(): string | null {
+    return this.lastFetchAndProcessRawResult;
+  }
+
   public async fetchAndProcess(): Promise<string> {
     if (this.lastFetchAndProcessResult) {
       return this.lastFetchAndProcessResult;

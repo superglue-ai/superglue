@@ -15,19 +15,8 @@ import {
   RotateCcw,
   Save,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
-
-interface ToolStep {
-  id: string;
-  systemId: string;
-  executionMode: "DIRECT" | "LOOP";
-  apiConfig: {
-    instruction: string;
-    method: string;
-    urlHost: string;
-    urlPath: string;
-  };
-}
+import React, { useMemo } from "react";
+import { useSystems } from "@/src/app/systems-context";
 
 interface ToolCallToolDisplayProps {
   toolId?: string;
@@ -74,9 +63,8 @@ export function ToolCallToolDisplay({
   hasOutdatedResults = false,
   showPayload = false,
 }: ToolCallToolDisplayProps) {
-  const [copied, setCopied] = useState<string | null>(null);
+  const { systems: contextSystems } = useSystems();
 
-  // Parse output if it's a string (unified logic from ExecuteToolToolCall)
   const parsedOutput = useMemo(() => {
     if (!output) return null;
 
@@ -251,17 +239,50 @@ export function ToolCallToolDisplay({
               <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
 
               {/* Tool Steps */}
-              {steps.map((step, index) => (
-                <React.Fragment key={step.id || `step-${index}`}>
-                  <Card className="p-4 w-64 flex-shrink-0 relative">
-                    <div className="mb-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        {/* System Icon - Left of Step ID */}
-                        <SystemIcon
-                          system={{ id: step.systemId, urlHost: step.apiConfig?.urlHost }}
-                          size={16}
-                        />
-                        <span className="font-medium text-sm">{step.id || "New Step"}</span>
+              {steps.map((step: ToolStep, index: number) => {
+                const stepConfig =
+                  step.config && isRequestConfig(step.config)
+                    ? (step.config as RequestStepConfig)
+                    : null;
+                const systemId = stepConfig?.systemId;
+                const linkedSystem = systemId
+                  ? contextSystems?.find((s) => s.id === systemId)
+                  : undefined;
+                return (
+                  <React.Fragment key={step.id || `step-${index}`}>
+                    <MiniCard isActive={false} onClick={() => {}} width={170} height={125}>
+                      <div className="h-full flex flex-col relative w-full">
+                        <div className="absolute top-0 left-0 flex items-center h-4">
+                          <span className="text-[9px] px-1 py-0.5 rounded font-medium bg-primary/10 text-primary">
+                            {index + 1}
+                          </span>
+                        </div>
+                        {step.dataSelector && (
+                          <div className="absolute top-0 right-0 flex items-center h-4">
+                            <RotateCcw className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                            <SystemIcon system={linkedSystem || { id: systemId }} size={18} />
+                          </div>
+                          {(linkedSystem?.name || systemId) && (
+                            <span
+                              className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
+                              title={linkedSystem?.name || systemId}
+                            >
+                              {linkedSystem?.name || systemId}
+                            </span>
+                          )}
+                          <span
+                            className="text-[11px] font-semibold mt-1 truncate max-w-[140px]"
+                            title={step.id || `Step ${index + 1}`}
+                          >
+                            {step.id || `Step ${index + 1}`}
+                          </span>
+                        </div>
+                      </div>
+                    </MiniCard>
 
                         {/* Loop Icon - Right side (if LOOP) */}
                         {step.executionMode === "LOOP" && (

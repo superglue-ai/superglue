@@ -319,7 +319,7 @@ const ToolsTable = () => {
                                     </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{system.id}</p>
+                                    <p>{system.name || system.id}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>

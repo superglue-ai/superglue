@@ -142,7 +142,7 @@ export default function SystemsPage() {
         if (!system) return false;
         if (debouncedSearchTerm) {
           const searchLower = debouncedSearchTerm.toLowerCase();
-          const searchableText = [system.id, system.urlHost, system.urlPath]
+          const searchableText = [system.id, system.name, system.url]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
@@ -155,9 +155,9 @@ export default function SystemsPage() {
       const dir = sortDirection === "asc" ? 1 : -1;
       switch (sortColumn) {
         case "id":
-          return dir * a.id.localeCompare(b.id);
-        case "urlHost":
-          return dir * (a.urlHost || "").localeCompare(b.urlHost || "");
+          return dir * (a.name || a.id).localeCompare(b.name || b.id);
+        case "url":
+          return dir * (a.url || "").localeCompare(b.url || "");
         case "updatedAt":
           return (
             dir *
@@ -252,7 +252,7 @@ export default function SystemsPage() {
                 onClick={() => handleSort("id")}
               >
                 <div className="flex items-center">
-                  System ID
+                  System Name
                   <SortIcon column="id" />
                 </div>
               </TableHead>
@@ -333,10 +333,10 @@ export default function SystemsPage() {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="truncate">{sys.id}</span>
+                            <span className="truncate">{sys.name || sys.id}</span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>{sys.id}</p>
+                            <p>{sys.name || sys.id}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>

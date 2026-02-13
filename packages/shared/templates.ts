@@ -2908,6 +2908,36 @@ export function findTemplateForSystem(system: {
   return null;
 }
 
+export function uniqueKeywords(keywords: string[] | undefined): string[] {
+  if (!keywords || keywords.length === 0) return [];
+  return [...new Set(keywords)];
+}
+
+export function enrichWithTemplate(input: System): System {
+  const match = findTemplateForSystem(input);
+
+  if (!match) {
+    return input;
+  }
+
+  const { key: templateKey, template: matchingTemplate } = match;
+
+  const mergedUniqueKeywords = uniqueKeywords([
+    ...(input.documentationKeywords || []),
+    ...(matchingTemplate.keywords || []),
+  ]);
+
+  input.openApiUrl = input.openApiUrl || matchingTemplate.openApiUrl;
+  input.openApiSchema = input.openApiSchema || matchingTemplate.openApiSchema;
+  input.documentationUrl = input.documentationUrl || matchingTemplate.docsUrl;
+  input.url = input.url || matchingTemplate.apiUrl;
+  input.documentationKeywords = mergedUniqueKeywords;
+  if (!input.templateName) {
+    input.templateName = templateKey;
+  }
+  return input;
+}
+
 /**
  * Get OAuth configuration for a system
  * @param systemKey - The key of the system

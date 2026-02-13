@@ -1,4 +1,5 @@
 // Import API endpoint modules
+import "./oauth.js";
 import "./runs.js";
 import "./systems.js";
 import "./tools.js";

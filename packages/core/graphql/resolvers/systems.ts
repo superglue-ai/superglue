@@ -1,4 +1,10 @@
-import { findTemplateForSystem, System } from "@superglue/shared";
+import {
+  enrichWithTemplate,
+  findTemplateForSystem,
+  mergeCredentials,
+  System,
+  uniqueKeywords,
+} from "@superglue/shared";
 import { generateUniqueId } from "@superglue/shared/utils";
 import { GraphQLResolveInfo } from "graphql";
 import { PostgresService } from "../../datastore/postgres.js";
@@ -286,32 +292,6 @@ function templateDocumentationExists(
   return [allKeywordsPresent && documentationUrlMatches, matchingTemplate.name];
 }
 
-function enrichWithTemplate(input: System): System {
-  const match = findTemplateForSystem(input);
-
-  if (!match) {
-    return input;
-  }
-
-  const { key: templateKey, template: matchingTemplate } = match;
-
-  const mergedUniqueKeywords = uniqueKeywords([
-    ...(input.documentationKeywords || []),
-    ...(matchingTemplate.keywords || []),
-  ]);
-
-  input.openApiUrl = matchingTemplate.openApiUrl;
-  input.openApiSchema = matchingTemplate.openApiSchema;
-  input.documentationUrl = input.documentationUrl || matchingTemplate.docsUrl;
-  input.urlHost = input.urlHost || matchingTemplate.apiUrl;
-  input.documentationKeywords = mergedUniqueKeywords;
-  // Set templateName if not already set, for future lookups (OAuth, icons, etc.)
-  if (!input.templateName) {
-    input.templateName = templateKey;
-  }
-  return input;
-}
-
 function resolveField<T>(
   newValue: T | null | undefined,
   oldValue: T | undefined,
@@ -321,38 +301,6 @@ function resolveField<T>(
   if (newValue !== undefined) return newValue;
   if (oldValue !== undefined) return oldValue;
   return defaultValue;
-}
-
-function isMaskedValue(value: any): boolean {
-  if (typeof value !== "string") return false;
-  const v = value.trim();
-  if (v.startsWith("<<") && v.endsWith(">>")) return true;
-  if (v.startsWith("{masked_") && v.endsWith("}")) return true;
-  return false;
-}
-
-function mergeCredentials(
-  newCredentials: Record<string, any> | null | undefined,
-  existingCredentials: Record<string, any> | undefined,
-): Record<string, any> {
-  if (newCredentials === null || newCredentials === undefined) {
-    return existingCredentials || {};
-  }
-
-  if (!existingCredentials || Object.keys(existingCredentials).length === 0) {
-    return newCredentials;
-  }
-
-  const merged = { ...existingCredentials };
-
-  for (const [key, value] of Object.entries(newCredentials)) {
-    if (isMaskedValue(value)) {
-      continue;
-    }
-    merged[key] = value;
-  }
-
-  return merged;
 }
 
 function shouldTriggerDocFetch(
@@ -493,11 +441,6 @@ async function triggerAsyncDocumentationFetch(
       );
     }
   }
-}
-
-function uniqueKeywords(keywords: string[] | undefined): string[] {
-  if (!keywords || keywords.length === 0) return [];
-  return [...new Set(keywords)];
 }
 
 export const searchSystemDocumentationResolver = async (

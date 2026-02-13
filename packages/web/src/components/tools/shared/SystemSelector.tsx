@@ -59,9 +59,9 @@ export function SystemSelector({
           <SelectItem key={system.id} value={system.id}>
             <div className="flex items-center gap-2 w-full">
               <SystemIcon system={system} size={16} />
-              <span className="flex-grow">{system.id}</span>
-              {system.urlHost && (
-                <span className="text-muted-foreground text-xs ml-auto">({system.urlHost})</span>
+              <span className="flex-grow">{system.name || system.id}</span>
+              {system.url && (
+                <span className="text-muted-foreground text-xs ml-auto">({system.url})</span>
               )}
             </div>
           </SelectItem>

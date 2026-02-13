@@ -1,12 +1,19 @@
-import { setFileUploadDocumentationURL } from "@/src/lib/file-utils";
+import { truncateToolResult } from "@/src/lib/general-utils";
 import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
-import { splitUrl } from "@/src/lib/client-utils";
-import { ConfirmationAction, ToolResult, UpsertMode } from "@superglue/shared";
+import { applyDiffsToConfig } from "@/src/lib/config-diff-utils";
+import {
+  ConfirmationAction,
+  ToolResult,
+  getToolSystemIds,
+  getConnectionProtocol,
+  mergeCredentials,
+} from "@superglue/shared";
 import { SystemConfig, systems, findTemplateForSystem } from "@superglue/shared/templates";
 import { DraftLookup, findDraftInMessages, formatDiffSummary } from "../agent-context";
 import {
   filterSystemFields,
-  resolveDocumentationFiles,
+  resolveBodyFileReferences,
+  extractFilePayloadsForUpload,
   resolvePayloadWithFiles,
   stripLegacyToolFields,
   truncateResponseData,
@@ -549,15 +556,19 @@ const createSystemDefinition = (): ToolDefinition => ({
   inputSchema: {
     type: "object",
     properties: {
-      id: { type: "string", description: "A unique identifier for the new system" },
-      templateId: {
+      id: {
         type: "string",
         description:
-          "Template ID to auto-populate from (e.g., 'slack', 'github', 'stripe'). See AVAILABLE SYSTEM TEMPLATES in context.",
+          "Unique identifier for the system (e.g., 'slack', 'github-api', 'stripe'). Used as the system ID for credential injection, tool references, etc. If a system with this ID already exists, a suffix like '-1' will be appended.",
       },
       name: {
         type: "string",
-        description: "Human-readable name for the system (auto-populated if using templateId)",
+        description:
+          "Optional human-readable display name for the system (e.g., 'Slack API', 'GitHub REST API'). Falls back to the id if not provided. Auto-populated if using templateId.",
+      },
+      templateId: {
+        type: "string",
+        description: "Template ID to auto-populate from (e.g., 'slack', 'github', 'stripe').",
       },
       urlHost: {
         type: "string",
@@ -570,22 +581,22 @@ const createSystemDefinition = (): ToolDefinition => ({
       },
       documentationUrl: {
         type: "string",
-        description: "URL to the API documentation (auto-populated if using templateId)",
+        description:
+          "URL to API documentation. Triggers a one-time background scrape job. Not stored on the system.",
       },
-      documentation: {
+      openApiUrl: {
         type: "string",
         description:
-          "Raw documentation text or file::filename for uploaded files. Multiple files: file::doc1.pdf,file::doc2.pdf",
+          "Direct URL to an OpenAPI/Swagger spec (JSON or YAML). Validated and stored as a file reference.",
+      },
+      files: {
+        type: "string",
+        description:
+          "Upload documentation files using file::filename syntax. Multiple files: file::doc1.pdf,file::doc2.pdf",
       },
       specificInstructions: {
         type: "string",
         description: "Specific guidance on how to use this system",
-      },
-      documentationKeywords: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Keywords to help with documentation search (auto-populated if using templateId)",
       },
       credentials: {
         type: "object",
@@ -602,7 +613,8 @@ const createSystemDefinition = (): ToolDefinition => ({
 });
 
 const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
-  let { templateId, ...systemInput } = input;
+  let { templateId, sensitiveCredentials, documentationUrl, openApiUrl, files, ...systemInput } =
+    input;
 
   if (templateId) {
     const template = systems[templateId];
@@ -636,46 +648,74 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
     }
 
     systemInput = {
-      name: template.name,
-      urlHost,
-      urlPath,
-      documentationUrl: template.docsUrl,
-      documentationKeywords: template.keywords,
+      name: systemInput.name || template.name,
+      url: template.apiUrl,
       templateName: templateId,
       ...systemInput,
       credentials: { ...oauthCreds, ...systemInput.credentials },
     };
   }
 
-  const docResult = resolveDocumentationFiles(
-    systemInput.documentation,
-    ctx.filePayloads,
-    setFileUploadDocumentationURL,
-  );
-  if ("error" in docResult) {
+  const fileUploadResult = extractFilePayloadsForUpload(files, ctx.filePayloads);
+  if ("error" in fileUploadResult) {
     return {
       success: false,
-      error: docResult.error,
+      error: fileUploadResult.error,
       suggestion:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
-  if (docResult.documentation !== undefined) {
-    systemInput.documentation = docResult.documentation;
-  }
-  if (docResult.documentationUrl) {
-    systemInput.documentationUrl = docResult.documentationUrl;
-  }
+
+  const {
+    documentationUrl: _docUrl,
+    openApiUrl: _oaUrl,
+    documentation: _doc,
+    documentationKeywords: _kw,
+    ...createPayload
+  } = systemInput;
 
   try {
-    const result = await ctx.superglueClient.upsertSystem(
-      systemInput.id,
-      systemInput,
-      UpsertMode.UPSERT,
-    );
+    const result = await ctx.superglueClient.createSystem(createPayload);
+
+    if (fileUploadResult.files.length > 0) {
+      try {
+        await ctx.superglueClient.uploadSystemFileReferences(result.id, fileUploadResult.files);
+      } catch (uploadError: any) {
+        return {
+          success: true,
+          system: filterSystemFields(result),
+          warning: `System created but file upload failed: ${uploadError.message}`,
+        };
+      }
+    }
+
+    if (documentationUrl && !sensitiveCredentials) {
+      try {
+        await ctx.superglueClient.triggerSystemDocumentationScrapeJob(result.id, {
+          url: documentationUrl,
+        });
+      } catch (scrapeError: any) {
+        return {
+          success: true,
+          system: filterSystemFields(result),
+          warning: `System created but documentation scrape failed to start: ${scrapeError.message}`,
+        };
+      }
+    }
+
+    if (openApiUrl && !sensitiveCredentials) {
+      try {
+        await ctx.superglueClient.fetchOpenApiSpec(result.id, openApiUrl);
+      } catch {
+        // non-fatal — spec fetch failure doesn't block system creation
+      }
+    }
+
     return {
       success: true,
       system: filterSystemFields(result),
+      ...(documentationUrl && sensitiveCredentials ? { pendingScrapeUrl: documentationUrl } : {}),
+      ...(openApiUrl && sensitiveCredentials ? { pendingOpenApiUrl: openApiUrl } : {}),
     };
   } catch (error: any) {
     return {
@@ -708,7 +748,7 @@ const processCreateSystemConfirmation = async (
     const userProvidedCredentials =
       confirmationData.userProvidedCredentials || parsedOutput.userProvidedCredentials || {};
 
-    if (!systemConfig || !systemConfig.id) {
+    if (!systemConfig || (!systemConfig.id && !systemConfig.name)) {
       return {
         output: JSON.stringify({
           success: false,
@@ -719,19 +759,51 @@ const processCreateSystemConfirmation = async (
       };
     }
 
-    const finalCredentials = {
-      ...(systemConfig.credentials || {}),
-      ...userProvidedCredentials,
-    };
+    const {
+      sensitiveCredentials: _,
+      templateId,
+      documentationUrl,
+      openApiUrl,
+      documentation: _doc,
+      documentationKeywords: _kw,
+      ...cleanSystemConfig
+    } = systemConfig;
+
+    if (templateId && !cleanSystemConfig.templateName) {
+      cleanSystemConfig.templateName = templateId;
+    }
+
+    const finalCredentials = mergeCredentials(
+      { ...(cleanSystemConfig.credentials || {}), ...userProvidedCredentials },
+      undefined,
+    );
 
     const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
 
     try {
-      const result = await ctx.superglueClient.upsertSystem(
-        cleanSystemConfig.id,
-        { ...cleanSystemConfig, credentials: finalCredentials },
-        UpsertMode.UPSERT,
-      );
+      const result = await ctx.superglueClient.createSystem({
+        ...cleanSystemConfig,
+        credentials: finalCredentials,
+      });
+
+      if (documentationUrl) {
+        try {
+          await ctx.superglueClient.triggerSystemDocumentationScrapeJob(result.id, {
+            url: documentationUrl,
+          });
+        } catch {
+          // scrape failure is non-fatal
+        }
+      }
+
+      if (openApiUrl) {
+        try {
+          await ctx.superglueClient.fetchOpenApiSpec(result.id, openApiUrl);
+        } catch {
+          // spec fetch failure is non-fatal
+        }
+      }
+
       return {
         output: JSON.stringify({ success: true, system: filterSystemFields(result) }),
         status: "completed",
@@ -770,34 +842,33 @@ const editSystemDefinition = (): ToolDefinition => ({
 
     <important_notes>
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide tool building.
-      - Providing a documentationUrl will trigger asynchronous API documentation processing.
-      - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files. For multiple files, use comma-separated: file::doc1.pdf,file::doc2.pdf
-      - When referencing files in the documentation field, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
+      - Use 'files' field with file::filename syntax to upload additional documentation files to the system.
+      - When referencing files, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
       - Files persist for the entire conversation session (until page refresh or new conversation)
-      - When providing files as system documentation input, the files you use will overwrite the current documentation content. Ensure to include ALL required files always, even if the user only asks you to add one.
-      - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
-    </important_notes>`,
+    </important_notes>
+
+    <credential_handling>
+      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
+      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
+      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
+      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
+      - Sensitive credential values you see (like <<masked_api_key>>) are placeholders, not real values
+    </credential_handling>
+    `,
   inputSchema: {
     type: "object",
     properties: {
       id: { type: "string", description: "The unique identifier of the system" },
       name: { type: "string", description: "Human-readable name for the system" },
-      urlHost: { type: "string", description: "Base URL/hostname for the API including protocol" },
-      urlPath: { type: "string", description: "Path component of the URL" },
-      documentationUrl: { type: "string", description: "URL to the API documentation" },
-      documentation: {
+      url: { type: "string", description: "Full URL for the API including protocol" },
+      files: {
         type: "string",
         description:
-          "Raw documentation text or file::filename for uploaded files. Multiple files: file::doc1.pdf,file::doc2.pdf",
+          "Upload documentation files using file::filename syntax. Multiple files: file::doc1.pdf,file::doc2.pdf",
       },
       specificInstructions: {
         type: "string",
         description: "Specific guidance on how to use this system",
-      },
-      documentationKeywords: {
-        type: "array",
-        items: { type: "string" },
-        description: "Keywords to help with documentation search",
       },
       credentials: {
         type: "object",
@@ -809,34 +880,50 @@ const editSystemDefinition = (): ToolDefinition => ({
 });
 
 const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
-  const systemInput = { ...input };
+  let { sensitiveCredentials, files, ...systemInput } = input;
 
-  const docResult = resolveDocumentationFiles(
-    systemInput.documentation,
-    ctx.filePayloads,
-    setFileUploadDocumentationURL,
-  );
-  if ("error" in docResult) {
+  const fileUploadResult = extractFilePayloadsForUpload(files, ctx.filePayloads);
+  if ("error" in fileUploadResult) {
     return {
       success: false,
-      error: docResult.error,
+      error: fileUploadResult.error,
       suggestion:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
-  if (docResult.documentation !== undefined) {
-    systemInput.documentation = docResult.documentation;
-  }
-  if (docResult.documentationUrl) {
-    systemInput.documentationUrl = docResult.documentationUrl;
-  }
+
+  const {
+    documentationUrl: _docUrl,
+    openApiUrl: _oaUrl,
+    documentation: _doc,
+    documentationKeywords: _kw,
+    ...patchPayload
+  } = systemInput;
 
   try {
-    const result = await ctx.superglueClient.upsertSystem(
-      systemInput.id,
-      systemInput,
-      UpsertMode.UPDATE,
-    );
+    const existingSystem = await ctx.superglueClient.getSystem(patchPayload.id);
+    if (patchPayload.credentials) {
+      patchPayload.credentials = mergeCredentials(
+        patchPayload.credentials,
+        existingSystem?.credentials,
+      );
+    }
+
+    const result = await ctx.superglueClient.updateSystem(patchPayload.id, patchPayload);
+
+    if (fileUploadResult.files.length > 0) {
+      try {
+        await ctx.superglueClient.uploadSystemFileReferences(result.id, fileUploadResult.files);
+      } catch (uploadError: any) {
+        return {
+          success: true,
+          systemId: result.id,
+          system: filterSystemFields(result),
+          warning: `System updated but file upload failed: ${uploadError.message}`,
+        };
+      }
+    }
+
     return {
       success: true,
       systemId: result.id,
@@ -884,19 +971,31 @@ const processEditSystemConfirmation = async (
       };
     }
 
-    const finalCredentials = {
-      ...(systemConfig.credentials || {}),
-      ...userProvidedCredentials,
-    };
+    const {
+      sensitiveCredentials: _,
+      templateId,
+      documentationUrl: _docUrl,
+      openApiUrl: _oaUrl,
+      documentation: _doc,
+      documentationKeywords: _kw,
+      ...cleanSystemConfig
+    } = systemConfig;
 
-    const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
+    if (templateId && !cleanSystemConfig.templateName) {
+      cleanSystemConfig.templateName = templateId;
+    }
 
     try {
-      const result = await ctx.superglueClient.upsertSystem(
-        cleanSystemConfig.id,
-        { ...cleanSystemConfig, credentials: finalCredentials },
-        UpsertMode.UPDATE,
+      const existingSystem = await ctx.superglueClient.getSystem(cleanSystemConfig.id);
+      const finalCredentials = mergeCredentials(
+        { ...(cleanSystemConfig.credentials || {}), ...userProvidedCredentials },
+        existingSystem?.credentials,
       );
+
+      const result = await ctx.superglueClient.updateSystem(cleanSystemConfig.id, {
+        ...cleanSystemConfig,
+        credentials: finalCredentials,
+      });
       return {
         output: JSON.stringify({
           success: true,
@@ -1373,7 +1472,7 @@ const processAuthenticateOAuthConfirmation = async (
         expires_at: tokens.expires_at,
       };
 
-      await ctx.superglueClient.upsertSystem(systemId, { credentials: updatedCredentials });
+      await ctx.superglueClient.updateSystem(systemId, { credentials: updatedCredentials });
 
       return {
         output: JSON.stringify({

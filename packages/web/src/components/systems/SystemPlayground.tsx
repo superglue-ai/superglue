@@ -24,18 +24,12 @@ const SECTION_CONFIG: Record<SystemSection, { icon: React.ElementType; label: st
   context: { icon: FileText, label: "Documentation" },
 };
 
-function getStatusColor(status: SectionStatus, isActive: boolean) {
+function getStatusColor(status: SectionStatus) {
   if (status.hasErrors) {
     return { text: "text-red-600 dark:text-red-400", dot: "bg-red-600 dark:bg-red-400" };
   }
   if (status.isComplete) {
     return { text: "text-green-600 dark:text-green-400", dot: "bg-green-600 dark:bg-green-400" };
-  }
-  if (isActive) {
-    return {
-      text: "text-orange-600 dark:text-orange-400",
-      dot: "bg-orange-600 dark:bg-orange-400",
-    };
   }
   return { text: "text-muted-foreground", dot: "bg-muted-foreground" };
 }
@@ -145,18 +139,20 @@ export function SystemPlayground() {
     sendMessageToAgent(testPrompt);
   }, [system.id, setShowAgent, sendMessageToAgent]);
 
-  const renderSectionContent = () => {
-    switch (activeSection) {
-      case "configuration":
-        return <ConfigurationSection />;
-      case "authentication":
-        return <AuthenticationSection />;
-      case "context":
-        return <ContextSection />;
-      default:
-        return null;
-    }
-  };
+  const renderAllSections = () => (
+    <>
+      {SECTIONS.map((section) => {
+        const isActive = activeSection === section;
+        return (
+          <div key={section} className={isActive ? undefined : "hidden"}>
+            {section === "configuration" && <ConfigurationSection />}
+            {section === "authentication" && <AuthenticationSection />}
+            {section === "context" && <ContextSection />}
+          </div>
+        );
+      })}
+    </>
+  );
 
   const activeIndex = SECTIONS.indexOf(activeSection);
 
@@ -204,7 +200,7 @@ export function SystemPlayground() {
           ) : (
             <Blocks className="h-5 w-5 text-muted-foreground" />
           )}
-          <h1 className="text-xl font-semibold">{system.id ? system.id : "New System"}</h1>
+          <h1 className="text-xl font-semibold">{system.name || system.id || "New System"}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -261,7 +257,7 @@ export function SystemPlayground() {
               const Icon = config.icon;
               const isActive = activeSection === section;
               const status = getSectionStatus(section);
-              const statusColor = getStatusColor(status, isActive);
+              const statusColor = getStatusColor(status);
 
               return (
                 <MiniCard
@@ -319,7 +315,7 @@ export function SystemPlayground() {
         </div>
 
         <div className="flex-1 overflow-y-auto pr-4 pt-4" style={{ scrollbarGutter: "stable" }}>
-          <div className="min-h-[400px] max-w-4xl mx-auto px-2">{renderSectionContent()}</div>
+          <div className="min-h-[400px] max-w-4xl mx-auto px-2">{renderAllSections()}</div>
         </div>
       </div>
 

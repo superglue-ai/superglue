@@ -44,32 +44,10 @@ export function ConfigurationSection() {
     <div className="space-y-5">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Label htmlFor="systemId" className="text-sm font-medium">
-            System ID
-          </Label>
-          <HelpTooltip text="A unique identifier for this system. You cannot change this after saving." />
-        </div>
-        <Input
-          id="systemId"
-          value={system.id}
-          onChange={handleIdChange}
-          placeholder="e.g., crm-api"
-          disabled={!isNewSystem}
-          className="h-10 rounded-lg border shadow-sm bg-muted/30 border-border/50 focus:border-primary/50 transition-colors"
-        />
-        {!isNewSystem && (
-          <p className="text-xs text-muted-foreground/80">
-            System ID cannot be changed after creation.
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
           <Label htmlFor="systemName" className="text-sm font-medium">
-            Display Name
+            System Display Name
           </Label>
-          <HelpTooltip text="An optional friendly name for this system." />
+          <HelpTooltip text="A human-readable display name for this system." />
         </div>
         <Input
           id="systemName"
@@ -79,6 +57,41 @@ export function ConfigurationSection() {
           className="h-10 rounded-lg border shadow-sm bg-muted/30 border-border/50 focus:border-primary/50 transition-colors"
         />
       </div>
+
+      {!isNewSystem && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="systemId" className="text-sm font-medium">
+              System ID
+            </Label>
+            <HelpTooltip text="Auto-generated unique identifier. Cannot be changed." />
+          </div>
+          <Input
+            id="systemId"
+            value={system.id}
+            disabled
+            className="h-10 rounded-lg border shadow-sm bg-muted/30 border-border/50 font-mono text-xs"
+          />
+        </div>
+      )}
+
+      {isNewSystem && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="systemId" className="text-sm font-medium">
+              System ID
+            </Label>
+            <HelpTooltip text="A unique identifier for this system. You cannot change this after saving." />
+          </div>
+          <Input
+            id="systemId"
+            value={system.id}
+            onChange={handleIdChange}
+            placeholder="e.g., crm-api"
+            className="h-10 rounded-lg border shadow-sm bg-muted/30 border-border/50 focus:border-primary/50 transition-colors"
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
