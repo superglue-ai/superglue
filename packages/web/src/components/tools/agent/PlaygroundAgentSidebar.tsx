@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import {
@@ -9,11 +10,20 @@ import {
   SystemPlaygroundContextData,
 } from "@/src/lib/agent/agent-context";
 import { cn } from "@/src/lib/general-utils";
-import { Tool, ExecutionStep, ToolDiff } from "@superglue/shared";
-import { BotMessageSquare, Edit2, MessagesSquare, Send, Square, User, Plus, X } from "lucide-react";
+import {
+  Tool,
+  ToolStep,
+  ToolDiff,
+  RequestStepConfig,
+  isRequestConfig,
+  Message,
+} from "@superglue/shared";
+import { MessagesSquare, Pencil, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextProvider";
+import { AgentInputArea } from "../../agent/AgentInputArea";
+import { AgentCapabilities } from "../../agent/AgentCapabilities";
 import { ConversationHistory } from "../../agent/ConversationHistory";
 import type { AgentConfig, PlaygroundToolContext } from "../../agent/hooks/types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
@@ -106,6 +116,7 @@ function PlaygroundAgentContent({
     handleToolUpdate,
     sendAgentRequest,
     bufferAction,
+    filePayloads,
     currentConversationId,
     setCurrentConversationId,
     loadConversation,
@@ -121,7 +132,7 @@ function PlaygroundAgentContent({
   const { registerSetAgentInput, registerResetAgentChat } = useRightSidebar();
   const [inputValue, setInputValue] = useState("");
   const [isHighlighted, setIsHighlighted] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
@@ -131,10 +142,10 @@ function PlaygroundAgentContent({
       setInputValue(message);
       setIsHighlighted(true);
       setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.style.height = "auto";
-          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.style.height = "auto";
+          inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`;
         }
       }, 0);
     });
@@ -158,32 +169,13 @@ function PlaygroundAgentContent({
     }
   }, [initialError, isLoading, messages.length, handleSendMessage, mode]);
 
-  const handleSubmit = useCallback(
-    (e?: React.FormEvent) => {
-      e?.preventDefault();
-      if (inputValue.trim() && !isLoading) {
-        scrollTriggerRef.current?.scrollToBottom();
-        handleSendMessage(inputValue.trim());
-        setInputValue("");
-        setIsHighlighted(false);
-        // Reset textarea height
-        if (textareaRef.current) {
-          textareaRef.current.style.height = "auto";
-        }
-      }
-    },
-    [inputValue, isLoading, handleSendMessage],
-  );
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit],
-  );
+  const handleSend = useCallback(() => {
+    if (!inputValue.trim() || isLoading) return;
+    scrollTriggerRef.current?.scrollToBottom();
+    handleSendMessage(inputValue.trim());
+    setInputValue("");
+    setIsHighlighted(false);
+  }, [inputValue, isLoading, handleSendMessage]);
 
   const formatTimestamp = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -301,6 +293,24 @@ function PlaygroundAgentContent({
                       </Button>
                     )}
                   </div>
+
+                  {message.role === "user" &&
+                    (message as any).attachedFiles &&
+                    (message as any).attachedFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {(message as any).attachedFiles.map((file: any) => (
+                          <FileChip
+                            key={file.key}
+                            file={file}
+                            size="compact"
+                            rounded="md"
+                            showOriginalName={true}
+                            maxWidth="200px"
+                          />
+                        ))}
+                      </div>
+                    )}
+
                   {editingMessageId === message.id ? (
                     <div className="space-y-2">
                       <Textarea
@@ -360,6 +370,7 @@ function PlaygroundAgentContent({
                                 onApplyPayload={onApplyPayload}
                                 currentPayload={currentPayload}
                                 isPlayground={mode === "tool"}
+                                filePayloads={filePayloads}
                               />
                             );
                           }
@@ -385,40 +396,25 @@ function PlaygroundAgentContent({
       </ScrollToBottomContainer>
 
       <div className="p-3">
-        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-          <Textarea
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              setIsHighlighted(false);
-              e.target.style.height = "auto";
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Message superglue..."
-            className={cn(
-              "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all",
-              "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30",
-              "backdrop-blur-sm border-border/50 dark:border-border/70 shadow-sm",
-              "focus:border-border/60 dark:focus:border-border/90",
-              isHighlighted &&
-                "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 focus-visible:ring-1 focus-visible:ring-amber-500",
-            )}
-            rows={1}
-            disabled={isLoading}
-            maxLength={MAX_MESSAGE_LENGTH}
-          />
-          <Button
-            type={isLoading ? "button" : "submit"}
-            size="icon"
-            disabled={!isLoading && !inputValue.trim()}
-            onClick={isLoading ? stopStreaming : undefined}
-            className="h-[36px] w-[36px] shrink-0"
-          >
-            {isLoading ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </form>
+        <AgentInputArea
+          value={inputValue}
+          onChange={(v) => {
+            setInputValue(v);
+            setIsHighlighted(false);
+          }}
+          onSend={handleSend}
+          onStop={stopStreaming}
+          isLoading={isLoading}
+          placeholder="Message superglue..."
+          maxLength={MAX_MESSAGE_LENGTH}
+          compact
+          inputRef={inputRef}
+          inputClassName={cn(
+            isHighlighted &&
+              "!ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30",
+          )}
+          scrollToBottom={() => scrollTriggerRef.current?.scrollToBottom()}
+        />
       </div>
     </div>
   );
