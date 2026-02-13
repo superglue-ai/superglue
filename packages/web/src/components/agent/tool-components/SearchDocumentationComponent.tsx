@@ -1,7 +1,9 @@
 "use client";
 
+import { useSystems } from "@/src/app/systems-context";
 import { ToolCall } from "@superglue/shared";
 import { AlertCircle, BookOpen, FileText, Loader2 } from "lucide-react";
+import { useMemo } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 
 interface SearchDocumentationComponentProps {
@@ -13,9 +15,14 @@ export function SearchDocumentationComponent({
   tool,
   onInputChange,
 }: SearchDocumentationComponentProps) {
+  const { systems } = useSystems();
   const isLoading = tool.status === "pending" || tool.status === "running";
   const keywords = tool.input?.keywords || "";
   const systemId = tool.input?.systemId || "";
+  const systemName = useMemo(() => {
+    const sys = systemId ? systems.find((s) => s.id === systemId) : null;
+    return sys?.name || systemId;
+  }, [systems, systemId]);
 
   const output = typeof tool.output === "string" ? JSON.parse(tool.output) : tool.output;
   const hasNoDocumentation = output?.noDocumentation || false;
@@ -32,7 +39,7 @@ export function SearchDocumentationComponent({
           <div className="flex-1 min-w-0">
             <div className="text-sm">
               <span className="text-muted-foreground">System:</span>{" "}
-              <span className="font-mono text-xs">{systemId}</span>
+              <span className="font-mono text-xs">{systemName}</span>
             </div>
             <div className="text-sm mt-1">
               <span className="text-muted-foreground">Keywords:</span>{" "}

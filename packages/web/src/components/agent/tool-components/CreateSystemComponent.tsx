@@ -180,11 +180,15 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
   const isToolInProgress = tool.status === "running" || tool.status === "pending";
   const hasNoOutput = !output || !output.success;
 
-  // Get system from context (refreshes when OAuth completes), fallback to output/input
-  const systemId = output?.system?.id || input?.id;
+  const systemConfig = output?.systemConfig || input;
+
+  const systemId = output?.system?.id || systemConfig?.id || input?.id;
+  const systemName = output?.system?.name || systemConfig?.name || input?.name;
   const systemFromContext = useMemo(() => {
-    return systemId ? systems.find((i) => i.id === systemId) : null;
-  }, [systems, systemId]);
+    if (systemId) return systems.find((i) => i.id === systemId) || null;
+    if (systemName) return systems.find((i) => i.name === systemName) || null;
+    return null;
+  }, [systems, systemId, systemName]);
 
   const displaySystem = systemFromContext || output?.system || input;
 
@@ -326,7 +330,7 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
           <div className="flex items-start gap-4">
             {/* Icon */}
             <div className="flex-shrink-0">
-              {displaySystem?.id ? (
+              {displaySystem?.name || displaySystem?.id ? (
                 <SystemIcon system={displaySystem} size={24} fallbackClassName="text-foreground" />
               ) : (
                 <Globe className="h-6 w-6 text-foreground" />
@@ -362,9 +366,9 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
 
               {/* 2. System ID */}
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">System ID</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">System</div>
                 <div className="text-sm font-mono bg-muted/50 px-2 py-1 rounded">
-                  {displaySystem.id || "N/A"}
+                  {displaySystem.name || displaySystem.id || "N/A"}
                 </div>
               </div>
 

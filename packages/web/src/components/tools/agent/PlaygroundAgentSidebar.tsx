@@ -17,6 +17,7 @@ import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextP
 import { ConversationHistory } from "../../agent/ConversationHistory";
 import type { AgentConfig, PlaygroundToolContext } from "../../agent/hooks/types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
+import { useSystems } from "@/src/app/systems-context";
 import {
   ScrollToBottomButton,
   ScrollToBottomContainer,
@@ -584,24 +585,28 @@ function SystemPlaygroundAgentSidebar({
   initialError,
   systemConfig,
 }: Omit<PlaygroundAgentSidebarProps, "mode"> & { systemConfig: SystemContextForAgent }) {
+  const { refreshSystems } = useSystems();
+
   const hiddenContextBuilder = useCallback(() => {
     return formatSystemRuntimeContext(systemConfig);
   }, [systemConfig]);
+
+  const onToolComplete = useCallback(
+    (toolName: string, _toolId: string, output: any) => {
+      if ((toolName === "edit_system" || toolName === "create_system") && output?.success) {
+        refreshSystems();
+      }
+    },
+    [refreshSystems],
+  );
 
   const agentConfig = useMemo<AgentConfig>(() => {
     return {
       agentId: AgentType.SYSTEM_PLAYGROUND,
       hiddenContextBuilder,
-      agentParams: {
-        systemConfig: {
-          id: systemConfig.systemId,
-          urlHost: systemConfig.urlHost,
-          urlPath: systemConfig.urlPath,
-          templateName: systemConfig.templateName,
-        },
-      },
+      onToolComplete,
     };
-  }, [systemConfig, hiddenContextBuilder]);
+  }, [hiddenContextBuilder, onToolComplete]);
 
   return (
     <div className={cn("h-full", className)}>

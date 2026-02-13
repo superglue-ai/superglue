@@ -1,5 +1,37 @@
-import { getProtocol } from "../agent-helpers";
-import { ToolExecutionPolicies, ToolPolicy, ExecutionMode } from "../agent-types";
+import { getConnectionProtocol } from "@superglue/shared";
+import { ToolExecutionPolicies, ToolPolicy } from "../agent-types";
+import { ExecutionMode } from "../agent-types";
+import { systems } from "@superglue/shared/templates";
+
+const buildSystemPendingOutput = (input: any) => {
+  let systemConfig = { ...input };
+  const { templateId, sensitiveCredentials, ...rest } = systemConfig;
+
+  if (templateId) {
+    const template = systems[templateId];
+    if (template) {
+      const oauthCreds: Record<string, any> = {};
+      if (template.oauth) {
+        oauthCreds.auth_url = template.oauth.authUrl;
+        oauthCreds.token_url = template.oauth.tokenUrl;
+        oauthCreds.scopes = template.oauth.scopes;
+      }
+      systemConfig = {
+        name: template.name,
+        url: template.apiUrl,
+        templateName: templateId,
+        ...rest,
+        credentials: { ...oauthCreds, ...rest.credentials },
+      };
+    }
+  }
+
+  return {
+    confirmationState: "pending",
+    systemConfig,
+    requiredSensitiveFields: sensitiveCredentials ? Object.keys(sensitiveCredentials) : [],
+  };
+};
 
 export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   build_tool: { defaultMode: "auto" },

@@ -35,11 +35,8 @@ export interface AuthState {
 }
 
 export interface ContextState {
-  documentationUrl: string;
-  documentation: string;
   specificInstructions: string;
-  hasUploadedFile: boolean;
-  isDocumentationPending: boolean;
+  docFileCount: number;
 }
 
 export type SystemSection = "configuration" | "authentication" | "context";
@@ -89,10 +86,8 @@ export interface SystemConfigContextValue {
   setApiKeyCredentials: (credentials: string) => void;
   setUseSuperglueOAuth: (use: boolean) => void;
 
-  setDocumentationUrl: (url: string) => void;
-  setDocumentation: (doc: string) => void;
   setSpecificInstructions: (instructions: string) => void;
-  setHasUploadedFile: (has: boolean) => void;
+  setDocFileCount: (count: number) => void;
 
   setActiveSection: (section: SystemSection) => void;
 
@@ -110,9 +105,6 @@ export interface SystemContextForAgent {
   templateName?: string;
   authType: "none" | "oauth" | "apikey";
   credentialKeys: string[];
-  hasDocumentation: boolean;
-  hasUploadedFile: boolean;
-  documentationUrl: string;
   specificInstructions: string;
   sectionStatuses: {
     configuration: { isComplete: boolean; label: string };

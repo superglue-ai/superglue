@@ -71,7 +71,7 @@ export function AuthenticateOAuthComponent({
       resolvedClientSecret = freshSystem?.credentials?.client_secret;
 
       if (!resolvedClientSecret) {
-        const templateMatch = findTemplateForSystem(system || { id: systemId });
+        const templateMatch = findTemplateForSystem(system || { id: systemId, name: systemId });
         const templateOAuth = templateMatch?.template?.oauth;
         const hasTemplateClientId = !!(
           templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0
@@ -249,21 +249,14 @@ export function AuthenticateOAuthComponent({
           </div>
         )}
 
-        {/* OAuth button */}
-        {requiresOAuth && buttonState !== "completed" && (
-          <Button onClick={handleOAuthClick} disabled={buttonState === "loading"} className="gap-2">
-            {buttonState === "loading" ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Authenticating...
-              </>
-            ) : (
-              <>
-                <Key className="w-4 h-4" />
-                Authenticate with OAuth
-              </>
-            )}
-          </Button>
+        {requiresOAuth && !isOAuthFailed && (
+          <OAuthConnectButton
+            system={system || { id: systemId, name: systemId }}
+            onClick={handleOAuthClick}
+            disabled={buttonState === "loading"}
+            loading={buttonState === "loading"}
+            connected={isOAuthCompleted}
+          />
         )}
 
         {/* Success state */}

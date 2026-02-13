@@ -229,6 +229,46 @@ export function resolveDocumentationFiles(
   }
 }
 
+export function extractFilePayloadsForUpload(
+  filesInput: string | undefined,
+  filePayloads: Record<string, any> | undefined,
+):
+  | { files: Array<{ fileName: string; content: string; contentType?: string }> }
+  | { error: string } {
+  if (!filesInput || !filePayloads || Object.keys(filePayloads).length === 0) {
+    return { files: [] };
+  }
+
+  const hasFileReference = typeof filesInput === "string" && filesInput.includes("file::");
+  if (!hasFileReference) {
+    return { files: [] };
+  }
+
+  const fileRefs = filesInput.split(",").map((ref) => ref.trim().replace(/^file::/, ""));
+  const availableKeys = Object.keys(filePayloads);
+  const files: Array<{ fileName: string; content: string; contentType?: string }> = [];
+
+  for (const ref of fileRefs) {
+    const fileData = filePayloads[ref];
+    if (fileData === undefined) {
+      return {
+        error:
+          `File reference 'file::${ref}' could not be resolved.\n` +
+          `Available file keys: ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}`,
+      };
+    }
+    const content = typeof fileData === "string" ? fileData : JSON.stringify(fileData);
+    const fileName = ref.includes(".") ? ref : `${ref}.txt`;
+    files.push({
+      fileName,
+      content,
+      contentType: "text/plain",
+    });
+  }
+
+  return { files };
+}
+
 const MAX_RESPONSE_DATA_LENGTH = 25_000;
 
 export const truncateResponseData = (result: any): any => {
@@ -259,3 +299,12 @@ export const getProtocol = (url: string): "http" | "postgres" | "sftp" => {
     return "sftp";
   return "http";
 };
+
+export function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as Record<string, unknown>).message);
+  }
+  return String(err);
+}

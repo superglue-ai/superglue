@@ -1,12 +1,23 @@
-import { Message, SuperglueClient } from "@superglue/shared";
-import { initializeAIModel } from "@superglue/shared/utils";
-import { LanguageModel, stepCountIs, streamText } from "ai";
+import { Message } from "@superglue/shared";
+import {
+  estimateTokenCount,
+  getConfiguredModelContextLength,
+  initializeAIModel,
+} from "@superglue/shared/utils";
+import { LanguageModel, stepCountIs, streamText, TextStreamPart, ToolSet } from "ai";
+import { writeFile } from "fs/promises";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import {
   AgentRequest,
   ToolExecutionContext,
   ToolRegistryEntry,
   ValidatedAgentRequest,
+  TextDeltaPart,
+  ToolCallPart,
+  ToolInputStartPart,
+  ToolResultPart,
+  ToolErrorPart,
+  ErrorPart,
 } from "./agent-types";
 import {
   processConfirmation,
@@ -14,9 +25,10 @@ import {
   prepareMessages,
   buildToolsForAISDK,
 } from "./agent-request";
-import { TOOL_REGISTRY } from "./registry/tools";
-import { processToolPolicy } from "./registry/tool-policies";
-import type { ToolConfirmationMetadata } from "@/src/components/agent/hooks/types";
+import { TOOL_REGISTRY } from "./registry/tool-definitions";
+import { getEffectiveMode, getPendingOutput } from "./registry/tool-policies";
+import { EESuperglueClient } from "../ee-superglue-client";
+import { getErrorMessage } from "./agent-helpers";
 
 export interface StreamChunk {
   type:
@@ -278,6 +290,27 @@ export class AgentClient {
     const preparedMessages = await prepareMessages(validated, executionContext);
     executionContext.messages = preparedMessages;
 
+    if (systemMessage) {
+      yield {
+        type: "system_message",
+        systemMessage,
+      };
+    }
+
+    const confirmationResults = await processConfirmations(preparedMessages, executionContext);
+
+    for (const result of confirmationResults) {
+      yield {
+        type: "tool_call_complete",
+        toolCall: {
+          id: result.toolId,
+          name: result.toolName,
+          output: result.output,
+          status: result.status,
+        },
+      };
+    }
+
     const tools = buildToolsForAISDK(validated.agent.toolSet, TOOL_REGISTRY, executionContext);
 
     yield* this.streamLLMResponse(preparedMessages, tools, TOOL_REGISTRY, executionContext);
@@ -341,8 +374,19 @@ export class AgentClient {
                   }
                 : undefined;
 
-            if (generatedId) {
-              toolCallIdMap.set(part.toolCallId, generatedId);
+            const toolId = generatedId || part.toolCallId;
+            toolCallIdMap.set(part.toolCallId, toolId);
+            toolInputMap.set(part.toolCallId, part.input);
+
+            yield {
+              type: "tool_call_start",
+              toolCall: { id: toolId, name: p.toolName, input: p.input },
+              executionMode: effectiveMode,
+            };
+
+            const hasExecuteFunction = !!tools[p.toolName]?.execute;
+            if (effectiveMode === "confirm_before_execution" && !hasExecuteFunction) {
+              const pendingOutput = getPendingOutput(p.toolName, p.input);
               yield {
                 type: "tool_call_start",
                 toolCall: { id: generatedId, name: part.toolName, input: part.input },

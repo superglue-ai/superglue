@@ -2,27 +2,20 @@ import { useConfig } from "@/src/app/config-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createOAuthErrorHandler, triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import type { System } from "@superglue/shared";
-import { SuperglueClient, UpsertMode } from "@superglue/shared";
+import { SuperglueClient } from "@superglue/shared";
 import { tokenRegistry } from "../lib/token-registry";
 
 export function useSystemActions() {
   const config = useConfig();
   const { toast } = useToast();
 
-  // Helper function to clean system data for GraphQL input
+  // Helper function to clean system data for update
   const cleanSystemForInput = (system: System) => {
     return {
       id: system.id,
-      urlHost: system.urlHost,
-      urlPath: system.urlPath,
-      documentationUrl: system.documentationUrl,
-      documentation: system.documentation,
+      url: system.url,
       specificInstructions: system.specificInstructions,
       credentials: system.credentials,
-      // Include documentationPending if it exists (for refresh docs functionality)
-      ...(system.documentationPending !== undefined && {
-        documentationPending: system.documentationPending,
-      }),
     };
   };
 
@@ -37,7 +30,7 @@ export function useSystemActions() {
           apiKey: tokenRegistry.getToken(),
           apiEndpoint: config.apiEndpoint,
         });
-        const savedSystem = await client.upsertSystem(system.id, cleanedSystem, UpsertMode.UPDATE);
+        const savedSystem = await client.updateSystem(system.id, cleanedSystem);
 
         return savedSystem; // Return the saved system with correct ID
       }

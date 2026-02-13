@@ -11,6 +11,38 @@ export * from "./utils/ai-model-init.js";
 // Re-export model context length utilities
 export * from "./utils/model-context-length.js";
 
+// Re-export token counting utilities
+export * from "./utils/token-count.js";
+
+export type ConnectionProtocol = "http" | "postgres" | "sftp" | "smb";
+
+export const getConnectionProtocol = (url: string): ConnectionProtocol => {
+  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
+  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
+    return "sftp";
+  if (url.startsWith("smb://")) return "smb";
+  return "http";
+};
+
+export function validateExternalUrl(raw: string): URL {
+  const parsed = new URL(raw);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0" ||
+    host.startsWith("169.254.") ||
+    host.endsWith(".internal")
+  ) {
+    throw new Error(`URL target is not allowed: ${host}`);
+  }
+  return parsed;
+}
+
 export const ALLOWED_FILE_EXTENSIONS = [
   ".json",
   ".csv",
@@ -340,6 +372,67 @@ export function assertValidArrowFunction(code: string | undefined | null): strin
   }
 
   throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
+}
+
+const NON_SENSITIVE_CREDENTIAL_KEYS = new Set([
+  "client_id",
+  "auth_url",
+  "token_url",
+  "scopes",
+  "grant_type",
+  "redirect_uri",
+  "audience",
+  "host",
+  "port",
+  "database",
+  "username",
+  "region",
+]);
+
+export const isSensitiveCredentialKey = (key: string): boolean => {
+  return !NON_SENSITIVE_CREDENTIAL_KEYS.has(key.toLowerCase().trim());
+};
+
+export const maskSystemCredentials = (
+  credentials: Record<string, any> | undefined,
+): Record<string, any> | undefined => {
+  if (!credentials) return undefined;
+  return Object.fromEntries(
+    Object.entries(credentials).map(([key, value]) => [
+      key,
+      isSensitiveCredentialKey(key) ? `<<masked_${key}>>` : value,
+    ]),
+  );
+};
+
+export function isMaskedValue(value: any): boolean {
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  if (v.startsWith("<<") && v.endsWith(">>")) return true;
+  if (v.startsWith("{masked_") && v.endsWith("}")) return true;
+  return false;
+}
+
+export function mergeCredentials(
+  incoming: Record<string, any> | null | undefined,
+  existing: Record<string, any> | null | undefined,
+): Record<string, any> {
+  if (!incoming || Object.keys(incoming).length === 0) {
+    return existing || {};
+  }
+  if (!existing || Object.keys(existing).length === 0) {
+    return Object.fromEntries(
+      Object.entries(incoming).filter(([_, v]) => !isMaskedValue(v) && v !== true),
+    );
+  }
+
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (isMaskedValue(value)) continue;
+    if (value === true) continue;
+    merged[key] = value;
+  }
+  return merged;
 }
 
 export function maskCredentials(message: string, credentials?: Record<string, string>): string {

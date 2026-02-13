@@ -203,8 +203,9 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
 
       return {
         id: system?.id,
-        urlHost: system?.urlHost,
-        credentials: credentialStatus,
+        name: system?.name || system?.id,
+        credentialKeys: credentialKeys.length > 0 ? credentialKeys : undefined,
+        systemSpecificInstructions: system?.specificInstructions,
       };
     });
 
@@ -526,10 +527,6 @@ export function formatSystemRuntimeContext(ctx: SystemContextForAgent): string {
     .map((key) => `<<${ctx.systemId}_${key}>>`)
     .join(", ");
 
-  const uploadedFileWarning = ctx.hasUploadedFile
-    ? "\nWARNING: Has uploaded file documentation - changing documentationUrl will lose content."
-    : "";
-
   const specificInstructionsLine = ctx.specificInstructions
     ? `\nSpecific Instructions: ${ctx.specificInstructions.substring(0, 200)}${ctx.specificInstructions.length > 200 ? "..." : ""}`
     : "";
@@ -539,8 +536,7 @@ System ID: ${ctx.systemId || "(not set)"}
 URL Host: ${ctx.urlHost || "(not set)"}
 Template: ${ctx.templateName || "(custom)"}
 Auth Type: ${ctx.authType}
-Credentials: ${credentialPlaceholders || "(none)"}
-Documentation: ${ctx.hasDocumentation ? "Yes" : "No"}${ctx.hasUploadedFile ? " (uploaded file)" : ""}${ctx.documentationUrl ? ` - ${ctx.documentationUrl}` : ""}${uploadedFileWarning}${specificInstructionsLine}
+Credentials: ${credentialPlaceholders || "(none)"}${specificInstructionsLine}
 
 Section Status:
 - Configuration: ${ctx.sectionStatuses.configuration.label}

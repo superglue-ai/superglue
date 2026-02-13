@@ -126,7 +126,7 @@ export function ToolBuilder({
   const { openAgentModal } = useAgentModal();
   const { openSystemPicker } = useSystemPickerModal();
 
-  const { systems, pendingDocIds, loading } = useSystems();
+  const { systems, loading } = useSystems();
 
   const [instruction, setInstruction] = useState(initialInstruction);
   const [payload, setPayload] = useState(initialPayload);
