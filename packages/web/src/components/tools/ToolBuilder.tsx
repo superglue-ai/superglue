@@ -74,10 +74,7 @@ const INACTIVE_EMPTY_STYLE = "border-border text-muted-foreground hover:bg-accen
 
 const toSystemInput = (i: System): SystemInput => ({
   id: i.id,
-  urlHost: i.urlHost,
-  urlPath: i.urlPath,
-  documentationUrl: i.documentationUrl,
-  documentation: i.documentation,
+  url: i.url,
   credentials: i.credentials,
 });
 

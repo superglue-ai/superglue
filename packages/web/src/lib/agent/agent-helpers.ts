@@ -11,13 +11,18 @@ export const stripLegacyToolFields = (tool: Tool): Tool => {
 };
 
 export const filterSystemFields = (system: System) => {
-  const { openApiSchema, documentation, credentials, ...filtered } = system;
-
-  const maskedCredentials = credentials
-    ? Object.fromEntries(Object.keys(credentials).map((key) => [key, `<<masked_${key}>>`]))
-    : undefined;
-
-  return { ...filtered, credentials: maskedCredentials };
+  const {
+    documentationUrl: _docUrl,
+    documentation,
+    openApiUrl: _openApiUrl,
+    openApiSchema,
+    documentationKeywords: _docKeywords,
+    documentationPending: _docPending,
+    templateName: _templateName,
+    credentials,
+    ...filtered
+  } = system;
+  return { ...filtered, credentials: maskSystemCredentials(credentials) };
 };
 
 export function resolveFileReferences(

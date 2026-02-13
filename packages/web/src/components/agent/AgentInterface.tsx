@@ -1,30 +1,17 @@
 "use client";
 import { Button } from "@/src/components/ui/button";
-import { FileChip } from "@/src/components/ui/FileChip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
-import { formatBytes } from "@/src/lib/file-utils";
 import { UserAction } from "@/src/lib/agent/agent-types";
-import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
-import {
-  AlertTriangle,
-  BotMessageSquare,
-  ChevronUp,
-  Edit2,
-  Loader2,
-  Paperclip,
-  Plus,
-  Send,
-  Square,
-  User,
-  X,
-} from "lucide-react";
+import { Message, ToolCall } from "@superglue/shared";
+import { AlertTriangle, ChevronDown, ChevronUp, Pencil, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
+import { AgentInputArea } from "./AgentInputArea";
 import { ConversationHistory } from "./ConversationHistory";
 import {
   ScrollToBottomButton,
@@ -272,18 +259,7 @@ function AgentInterfaceContent({
     sendAgentRequest,
     bufferAction,
     abortStream,
-    pendingFiles,
-    sessionFiles,
     filePayloads,
-    isProcessingFiles,
-    isDragging,
-    fileInputRef,
-    handleFilesUpload,
-    handlePendingFileRemove,
-    handleSessionFileRemove,
-    handleDrop,
-    handleDragOver,
-    handleDragLeave,
     currentConversationId,
     setCurrentConversationId,
     loadConversation,
@@ -325,7 +301,6 @@ function AgentInterfaceContent({
   const [input, setInput] = React.useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  const isResizingRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
   const isAnyMessageStreaming = useMemo(() => messages.some((m) => m.isStreaming), [messages]);
@@ -337,18 +312,6 @@ function AgentInterfaceContent({
       hour12: false,
     });
   }, []);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (inputRef.current) {
-      isResizingRef.current = true;
-      inputRef.current.style.height = "auto";
-      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`;
-      setTimeout(() => {
-        isResizingRef.current = false;
-      }, 50);
-    }
-  }, [input]);
 
   // Copy button functionality
   useEffect(() => {
@@ -431,18 +394,6 @@ function AgentInterfaceContent({
     scrollTriggerRef.current?.scrollToBottom();
     await handleSendMessage(content);
   }, [input, handleSendMessage]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        if (input.trim() && input.length <= MAX_MESSAGE_LENGTH) {
-          onSendMessage();
-        }
-      }
-    },
-    [input, onSendMessage],
-  );
 
   const handleStopStreaming = useCallback(() => {
     stopStreaming();
@@ -539,169 +490,19 @@ function AgentInterfaceContent({
         <ScrollToBottomButton />
       </ScrollToBottomContainer>
 
-      <div
-        ref={inputContainerRef}
-        className="sticky bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm"
-      >
-        <div className="mx-2 lg:mx-6 pb-4 px-4">
-          <div className="max-w-7xl mx-auto">
-            <div
-              className={cn(
-                "relative flex flex-col gap-2 rounded-2xl overflow-hidden transition-all duration-200",
-                "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20",
-                "backdrop-blur-sm border border-border/50",
-                "shadow-sm hover:shadow-md focus-within:shadow-md",
-                "hover:border-border/80 focus-within:border-border/80",
-              )}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              {isDragging && (
-                <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl z-10 flex items-center justify-center backdrop-blur-sm">
-                  <div className="text-primary font-medium">Drop files here</div>
-                </div>
-              )}
-
-              {pendingFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-4 pt-3">
-                  {pendingFiles.map((file) => (
-                    <FileChip
-                      key={file.key}
-                      file={file}
-                      onRemove={handlePendingFileRemove}
-                      size="compact"
-                      rounded="md"
-                      showOriginalName={true}
-                      maxWidth="300px"
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="relative flex items-end gap-2">
-                <input
-                  ref={fileInputRef as any}
-                  type="file"
-                  multiple
-                  accept={ALLOWED_FILE_EXTENSIONS.join(",")}
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      handleFilesUpload(Array.from(e.target.files));
-                      e.target.value = "";
-                    }
-                  }}
-                />
-
-                <Textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Message superglue..."
-                  className="flex-1 h-10 min-h-[40px] max-h-[200px] resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[15px] leading-[20px] py-[10px] px-4 pr-28"
-                />
-
-                <div className="absolute right-3 bottom-3 flex items-end gap-1.5">
-                  <div
-                    className={cn(
-                      "flex items-center rounded-xl overflow-hidden",
-                      sessionFiles.length > 0
-                        ? "border border-border/40"
-                        : "border border-border/50",
-                    )}
-                  >
-                    {sessionFiles.length > 0 && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted/80 bg-muted/50 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 gap-1">
-                            <span className="min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
-                              {sessionFiles.length}
-                            </span>
-                            <ChevronUp className="w-3.5 h-3.5" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto min-w-[250px] max-w-[250px] p-2"
-                          align="end"
-                          side="top"
-                          sideOffset={8}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              Session Files ({sessionFiles.length})
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatBytes(sessionFiles.reduce((acc, f) => acc + (f.size || 0), 0))}
-                            </span>
-                          </div>
-                          <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5">
-                            {sessionFiles.map((file) => (
-                              <FileChip
-                                key={file.key}
-                                file={file}
-                                onRemove={handleSessionFileRemove}
-                                size="compact"
-                                rounded="md"
-                                showOriginalName={true}
-                                showSize={true}
-                                className="w-full"
-                              />
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80 bg-muted/50 border-0"
-                      onClick={() => (fileInputRef.current as any)?.click()}
-                      disabled={isProcessingFiles}
-                    >
-                      <Paperclip className="w-5 h-5" />
-                    </Button>
-                  </div>
-
-                  <Button
-                    onClick={isLoading ? handleStopStreaming : onSendMessage}
-                    disabled={!isLoading && (!input.trim() || input.length > MAX_MESSAGE_LENGTH)}
-                    size="sm"
-                    className="h-9 w-9 p-0 rounded-xl bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground shadow-sm"
-                    variant="default"
-                  >
-                    {isLoading ? <Square className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center mt-2 px-2 gap-2">
-              <span
-                className={cn(
-                  "text-xs",
-                  input.length > MAX_MESSAGE_LENGTH
-                    ? "text-amber-600 dark:text-amber-500 font-medium"
-                    : "text-muted-foreground/60",
-                )}
-              >
-                {input.length > MAX_MESSAGE_LENGTH ? (
-                  <>
-                    <AlertTriangle className="w-3 h-3 inline mr-1" />
-                    {input.length.toLocaleString()}/{MAX_MESSAGE_LENGTH.toLocaleString()} chars
-                  </>
-                ) : input.length > MAX_MESSAGE_LENGTH * 0.8 ? (
-                  `${input.length.toLocaleString()}/${MAX_MESSAGE_LENGTH.toLocaleString()} chars`
-                ) : (
-                  ""
-                )}
-              </span>
-              <span className="text-xs text-muted-foreground/60">Press Enter to send</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AgentInputArea
+        value={input}
+        onChange={setInput}
+        onSend={onSendMessage}
+        onStop={handleStopStreaming}
+        isLoading={isLoading}
+        placeholder="Message superglue..."
+        maxLength={MAX_MESSAGE_LENGTH}
+        showCharCount
+        inputContainerRef={inputContainerRef}
+        inputRef={inputRef}
+        scrollToBottom={() => scrollTriggerRef.current?.scrollToBottom()}
+      />
     </div>
   );
 }

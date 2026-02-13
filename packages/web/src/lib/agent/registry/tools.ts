@@ -539,11 +539,11 @@ const createSystemDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
-      - Use templateId when creating systems for known services (slack, github, stripe, etc.) - this auto-populates urlHost, urlPath, documentationUrl, and OAuth config.
-      - When using templateId, you only need to provide: id, templateId, and credentials (if required by the auth type).
-      - For OAuth auth: create the system first, then call authenticate_oauth to trigger the OAuth flow.
-      - Providing a documentationUrl will trigger asynchronous API documentation processing.
-      - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files.
+      - For systems that require OAuth (like Slack, GitHub, etc.) but do not support pre-configured OAuth, you MUST set sensitiveCredentials: { client_secret: true } (and optionally { client_id: true }) when calling create_system.
+      - slack, salesforce, asana, notion, airtable, jira, confluence are the only templates that support pre-configured oauth
+      - Use templateId when creating systems for known services; it auto-populates system endpoints, OAuth settings and . For the list above, this also contains pre-configured client_id and secrets, but ONLY for pre-configured oauth templates.
+      - If you know documentationUrls and/or openapi urls, pass them to initialize the system knowledge base. documentationUrl triggers a one-time background scrape, openApiUrl fetches and stores the OpenAPI spec. The URLs themselves are not stored on the system; the resulting content is stored under documentationFiles.
+      - Use the files field (file::filename) to upload documentation files directly; they are stored under documentationFiles.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions'.
     </important_notes>`,
   inputSchema: {
@@ -676,6 +676,8 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: true,
       system: filterSystemFields(result),
+      ...(documentationUrl ? { documentationUrl } : {}),
+      ...(openApiUrl ? { openApiUrl } : {}),
     };
   } catch (error: any) {
     return {
@@ -733,7 +735,12 @@ const processCreateSystemConfirmation = async (
         UpsertMode.UPSERT,
       );
       return {
-        output: JSON.stringify({ success: true, system: filterSystemFields(result) }),
+        output: JSON.stringify({
+          success: true,
+          system: filterSystemFields(result),
+          ...(documentationUrl ? { documentationUrl } : {}),
+          ...(openApiUrl ? { openApiUrl } : {}),
+        }),
         status: "completed",
       };
     } catch (error: any) {
@@ -769,14 +776,20 @@ const editSystemDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
+      - Never include or modify documentationFiles in your edit payload. It is read-only and managed server-side. The API will ignore it if sent.
+      - You cannot remove or edit existing documentation by editing the system directly. You can add documentation only by using the files field (file::...) when calling edit_system; uploads are appended to the system's documentation.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide tool building.
-      - Providing a documentationUrl will trigger asynchronous API documentation processing.
-      - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files. For multiple files, use comma-separated: file::doc1.pdf,file::doc2.pdf
-      - When referencing files in the documentation field, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
-      - Files persist for the entire conversation session (until page refresh or new conversation)
-      - When providing files as system documentation input, the files you use will overwrite the current documentation content. Ensure to include ALL required files always, even if the user only asks you to add one.
-      - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
-    </important_notes>`,
+      - When referencing files, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
+    </important_notes>
+
+    <credential_handling>
+      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
+      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
+      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
+      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
+      - Sensitive credential values you see (like <<masked_api_key>>) are placeholders, not real values
+    </credential_handling>
+    `,
   inputSchema: {
     type: "object",
     properties: {
@@ -808,6 +821,21 @@ const editSystemDefinition = (): ToolDefinition => ({
   },
 });
 
+const PATCH_SYSTEM_ALLOWED_KEYS = [
+  "name",
+  "url",
+  "specificInstructions",
+  "icon",
+  "credentials",
+  "metadata",
+  "templateName",
+  "documentationFiles",
+] as const;
+
+function hasPatchableSystemFields(payload: Record<string, unknown>): boolean {
+  return PATCH_SYSTEM_ALLOWED_KEYS.some((k) => payload[k] !== undefined);
+}
+
 const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
   const systemInput = { ...input };
 
@@ -824,19 +852,58 @@ const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
-  if (docResult.documentation !== undefined) {
-    systemInput.documentation = docResult.documentation;
-  }
-  if (docResult.documentationUrl) {
-    systemInput.documentationUrl = docResult.documentationUrl;
-  }
+
+  const {
+    documentationUrl: _docUrl,
+    openApiUrl: _oaUrl,
+    documentation: _doc,
+    documentationKeywords: _kw,
+    documentationFiles: _docFiles,
+    ...patchPayload
+  } = systemInput;
 
   try {
-    const result = await ctx.superglueClient.upsertSystem(
-      systemInput.id,
-      systemInput,
-      UpsertMode.UPDATE,
-    );
+    const existingSystem = await ctx.superglueClient.getSystem(patchPayload.id);
+    if (!existingSystem) {
+      return {
+        success: false,
+        error: "System not found",
+        suggestion: "Check the system id and try again.",
+      };
+    }
+
+    if (!hasPatchableSystemFields(patchPayload) && fileUploadResult.files.length > 0) {
+      await ctx.superglueClient.uploadSystemFileReferences(patchPayload.id, fileUploadResult.files);
+      const updated = await ctx.superglueClient.getSystem(patchPayload.id);
+      return {
+        success: true,
+        systemId: patchPayload.id,
+        system: filterSystemFields(updated || existingSystem),
+      };
+    }
+
+    if (patchPayload.credentials) {
+      patchPayload.credentials = mergeCredentials(
+        patchPayload.credentials,
+        existingSystem?.credentials,
+      );
+    }
+
+    const result = await ctx.superglueClient.updateSystem(patchPayload.id, patchPayload);
+
+    if (fileUploadResult.files.length > 0) {
+      try {
+        await ctx.superglueClient.uploadSystemFileReferences(result.id, fileUploadResult.files);
+      } catch (uploadError: any) {
+        return {
+          success: true,
+          systemId: result.id,
+          system: filterSystemFields(result),
+          warning: `System updated but file upload failed: ${uploadError.message}`,
+        };
+      }
+    }
+
     return {
       success: true,
       systemId: result.id,
@@ -884,18 +951,57 @@ const processEditSystemConfirmation = async (
       };
     }
 
-    const finalCredentials = {
-      ...(systemConfig.credentials || {}),
-      ...userProvidedCredentials,
-    };
+    const {
+      sensitiveCredentials: _,
+      templateId,
+      documentationUrl: _docUrl,
+      openApiUrl: _oaUrl,
+      documentation: _doc,
+      documentationKeywords: _kw,
+      documentationFiles: _docFiles,
+      ...cleanSystemConfig
+    } = systemConfig;
 
     const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
 
     try {
-      const result = await ctx.superglueClient.upsertSystem(
-        cleanSystemConfig.id,
-        { ...cleanSystemConfig, credentials: finalCredentials },
-        UpsertMode.UPDATE,
+      const existingSystem = await ctx.superglueClient.getSystem(cleanSystemConfig.id);
+      if (!existingSystem) {
+        return {
+          output: JSON.stringify({
+            success: false,
+            error: "System not found",
+            suggestion: "Check the system id and try again.",
+          }),
+          status: "completed",
+        };
+      }
+
+      const fileUploadResult = extractFilePayloadsForUpload(input.files, ctx.filePayloads);
+      const hasFilesToUpload = !("error" in fileUploadResult) && fileUploadResult.files.length > 0;
+      if (
+        !hasPatchableSystemFields(cleanSystemConfig) &&
+        hasFilesToUpload &&
+        !("error" in fileUploadResult)
+      ) {
+        await ctx.superglueClient.uploadSystemFileReferences(
+          cleanSystemConfig.id,
+          fileUploadResult.files,
+        );
+        const updated = await ctx.superglueClient.getSystem(cleanSystemConfig.id);
+        return {
+          output: JSON.stringify({
+            success: true,
+            systemId: cleanSystemConfig.id,
+            system: filterSystemFields(updated || existingSystem),
+          }),
+          status: "completed",
+        };
+      }
+
+      const finalCredentials = mergeCredentials(
+        { ...(cleanSystemConfig.credentials || {}), ...userProvidedCredentials },
+        existingSystem?.credentials,
       );
       return {
         output: JSON.stringify({
@@ -1747,7 +1853,7 @@ const runFindSystem = async (
   const query = input.query!.toLowerCase();
   const keywords = query.split(/\s+/).filter((k) => k.length > 0);
   const filtered = items.filter((s) => {
-    const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
+    const text = [s.id, s.url].filter(Boolean).join(" ").toLowerCase();
     return keywords.some((kw) => text.includes(kw));
   });
   return { success: true, systems: filtered.map(maskCredentialsInSystem) };
