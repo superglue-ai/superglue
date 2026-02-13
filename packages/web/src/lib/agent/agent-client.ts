@@ -1,6 +1,7 @@
-import { Message, SuperglueClient } from "@superglue/shared";
+import { Message } from "@superglue/shared";
 import { initializeAIModel } from "@superglue/shared/utils";
-import { LanguageModel, stepCountIs, streamText } from "ai";
+import { LanguageModel, stepCountIs, streamText, TextStreamPart, ToolSet } from "ai";
+import { writeFile } from "fs/promises";
 import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
 import {
   AgentRequest,
@@ -57,7 +58,7 @@ export class AgentClient {
   private config: AgentClientConfig;
   private model: LanguageModel;
   private subscriptionClient: GraphQLSubscriptionClient | null = null;
-  private superglueClient: SuperglueClient;
+  private superglueClient: EESuperglueClient;
 
   constructor(config: AgentClientConfig) {
     this.config = config;
@@ -67,7 +68,7 @@ export class AgentClient {
       defaultModel: "claude-sonnet-4-5",
     });
 
-    this.superglueClient = new SuperglueClient({
+    this.superglueClient = new EESuperglueClient({
       endpoint: config.graphqlEndpoint,
       apiKey: config.token,
       apiEndpoint: config.apiEndpoint,
@@ -280,7 +281,7 @@ export class AgentClient {
 
     const tools = buildToolsForAISDK(validated.agent.toolSet, TOOL_REGISTRY, executionContext);
 
-    yield* this.streamLLMResponse(preparedMessages, tools, TOOL_REGISTRY, executionContext);
+    yield* this.streamLLMResponse(preparedMessages, tools, executionContext);
   }
 
   private async *streamLLMResponse(
