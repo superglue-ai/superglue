@@ -1,0 +1,453 @@
+---
+title: "Methods"
+description: "Complete reference for all SDK methods"
+---
+
+## Installation
+
+<CodeGroup>
+
+```bash npm
+npm install @superglue/client
+```
+
+```bash pip
+pip install superglue-client
+```
+
+</CodeGroup>
+
+## Initialization
+
+<CodeGroup>
+
+```typescript TypeScript
+import {
+  configure,
+  listTools,
+  getTool,
+  runTool,
+  getRun,
+  cancelRun,
+  listRuns,
+} from "@superglue/client";
+
+// Configure before making any API calls
+configure({
+  baseUrl: "http://localhost:4000/api/v1",
+  apiKey: "your-api-key",
+});
+```
+
+```python Python
+from superglue_client import SuperglueClient
+
+client = SuperglueClient(
+    base_url="http://localhost:4000/api/v1",
+    token="your-api-key"
+)
+```
+
+</CodeGroup>
+
+## Tools
+
+### listTools
+
+List all available tools with pagination.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { listTools } from "@superglue/client";
+
+const response = await listTools({
+  page: 1,
+  limit: 50,
+});
+
+if (response.status === 200) {
+  const { data, page, total, hasMore } = response.data;
+
+  for (const tool of data) {
+    console.log(`${tool.id}: ${tool.name || tool.instruction}`);
+  }
+
+  console.log(`Page ${page}, Total: ${total}, Has more: ${hasMore}`);
+}
+```
+
+```python Python
+from superglue_client.api.tools import list_tools
+
+response = list_tools.sync(
+    client=client,
+    page=1,
+    limit=50
+)
+
+if response:
+    for tool in response.data:
+        print(f"{tool.id}: {tool.name or tool.instruction}")
+
+    print(f"Page {response.page}, Total: {response.total}, Has more: {response.has_more}")
+```
+
+</CodeGroup>
+
+**Parameters:**
+
+- `page` - Page number (default: `1`)
+- `limit` - Items per page (default: `50`)
+
+**Returns:** List of `Tool` objects with pagination metadata
+
+---
+
+### getTool
+
+Get detailed information about a specific tool.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { getTool } from "@superglue/client";
+
+const response = await getTool("my-tool-id");
+
+if (response.status === 200) {
+  const tool = response.data;
+
+  console.log(`Tool: ${tool.name}`);
+  console.log(`Steps: ${tool.steps.length}`);
+  console.log(`Version: ${tool.version}`);
+  console.log(`Instruction: ${tool.instruction}`);
+}
+```
+
+```python Python
+from superglue_client.api.tools import get_tool
+
+tool = get_tool.sync(
+    tool_id="my-tool-id",
+    client=client
+)
+
+if tool:
+    print(f"Tool: {tool.name}")
+    print(f"Steps: {len(tool.steps)}")
+    print(f"Version: {tool.version}")
+    print(f"Instruction: {tool.instruction}")
+```
+
+</CodeGroup>
+
+**Parameters:**
+
+- `toolId` - Unique tool identifier
+
+**Returns:** `Tool` object with full configuration
+
+---
+
+### runTool
+
+Execute a tool with inputs and options.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { runTool } from "@superglue/client";
+
+const response = await runTool("my-tool-id", {
+  inputs: {
+    userId: "user_123",
+    startDate: "2025-01-01",
+  },
+  options: {
+    async: false,
+    timeout: 60,
+    webhookUrl: "https://your-app.com/webhook",
+  },
+  credentials: {
+    stripeApiKey: "sk_test_...",
+    slackToken: "xoxb-...",
+  },
+});
+
+if (response.status === 200 || response.status === 202) {
+  const run = response.data;
+
+  console.log(`Run ID: ${run.runId}`);
+  console.log(`Status: ${run.status}`);
+
+  if (run.status === "success" && run.data) {
+    console.log("Result:", run.data);
+  } else if (run.status === "running") {
+    console.log("Run in progress...");
+  }
+}
+```
+
+```python Python
+from superglue_client.api.tools import run_tool
+from superglue_client.models import (
+    RunRequest,
+    RunRequestInputs,
+    RunRequestCredentials,
+    RunRequestOptions
+)
+
+# Create typed input/credential objects
+inputs = RunRequestInputs.from_dict({
+    "user_id": "user_123",
+    "start_date": "2025-01-01"
+})
+credentials = RunRequestCredentials.from_dict({
+    "stripe_api_key": "sk_test_...",
+    "slack_token": "xoxb-..."
+})
+
+body = RunRequest(
+    inputs=inputs,
+    options=RunRequestOptions(
+        async_=False,
+        timeout=60,
+        webhook_url="https://your-app.com/webhook"
+    ),
+    credentials=credentials
+)
+
+run = run_tool.sync(
+    tool_id="my-tool-id",
+    client=client,
+    body=body
+)
+
+if run:
+    print(f"Run ID: {run.run_id}")
+    print(f"Status: {run.status.value}")
+
+    if run.status.value == "success" and run.data:
+        print("Result:", run.data)
+    elif run.status.value == "running":
+        print("Run in progress...")
+```
+
+</CodeGroup>
+
+**Parameters:**
+
+- `toolId` - Tool to execute
+- `runRequest` - Execution configuration:
+  - `inputs` - Input data accessible in tool steps
+  - `options` - Execution options:
+    - `async` - If `true`, return 202 immediately and execute asynchronously
+    - `timeout` - Request timeout in seconds (sync only)
+    - `webhookUrl` - URL to POST results when complete
+    - `traceId` - Custom trace ID for log tracking
+  - `credentials` - Runtime credentials to override defaults
+
+**Returns:** `Run` object with execution status and results
+
+**Status Codes:**
+
+- `200` - Tool executed synchronously (completed)
+- `202` - Tool executing asynchronously (in progress)
+- `400` - Invalid request
+- `409` - Concurrent execution limit reached
+- `410` - Tool deleted
+- `429` - Rate limit exceeded
+
+---
+
+## Runs
+
+### getRun
+
+Get the status and results of a tool execution.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { getRun } from "@superglue/client";
+
+const response = await getRun("run_abc123");
+
+if (response.status === 200) {
+  const run = response.data;
+
+  console.log(`Status: ${run.status}`);
+  console.log(`Tool: ${run.toolId}`);
+
+  if (run.status === "success") {
+    console.log("Result:", run.data);
+    console.log("Steps:", run.stepResults);
+  } else if (run.status === "failed") {
+    console.error("Error:", run.error);
+  }
+
+  console.log(`Duration: ${run.metadata.durationMs}ms`);
+}
+```
+
+```python Python
+from superglue_client.api.runs import get_run
+
+run = get_run.sync(
+    run_id="run_abc123",
+    client=client
+)
+
+if run:
+    print(f"Status: {run.status.value}")
+    print(f"Tool: {run.tool_id}")
+
+    if run.status.value == "success":
+        print("Result:", run.data)
+        print("Steps:", run.step_results)
+    elif run.status.value == "failed":
+        print("Error:", run.error)
+
+    print(f"Duration: {run.metadata.duration_ms}ms")
+```
+
+</CodeGroup>
+
+**Parameters:**
+
+- `runId` - Unique run identifier
+
+**Returns:** `Run` object with status, results, and metadata
+
+**Run Statuses:**
+
+- `running` - Execution in progress
+- `success` - Completed successfully
+- `failed` - Failed due to error
+- `aborted` - Cancelled by user or system
+
+---
+
+### cancelRun
+
+Cancel a running tool execution.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { cancelRun } from "@superglue/client";
+
+const response = await cancelRun("run_abc123");
+
+if (response.status === 200) {
+  console.log("Run cancelled successfully");
+  console.log("Status:", response.data.status); // "aborted"
+}
+```
+
+```python Python
+from superglue_client.api.runs import cancel_run
+
+run = cancel_run.sync(
+    run_id="run_abc123",
+    client=client
+)
+
+if run:
+    print("Run cancelled successfully")
+    print(f"Status: {run.status.value}")  # "aborted"
+```
+
+</CodeGroup>
+
+**Parameters:**
+
+- `runId` - Run to cancel
+
+**Returns:** Updated `Run` object with `aborted` status
+
+---
+
+### listRuns
+
+List tool execution runs with filtering and pagination.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { listRuns } from "@superglue/client";
+
+// List all runs
+const response = await listRuns({
+  page: 1,
+  limit: 50,
+});
+
+// Filter by tool
+const toolRuns = await listRuns({
+  toolId: "my-tool-id",
+  page: 1,
+  limit: 50,
+});
+
+// Filter by status
+const failedRuns = await listRuns({
+  status: "failed",
+  page: 1,
+  limit: 50,
+});
+
+if (response.status === 200) {
+  const { data, page, total, hasMore } = response.data;
+
+  for (const run of data) {
+    const status = run.status === "success" ? "✓" : "✗";
+    console.log(`${run.runId}: ${status} - ${run.metadata.startedAt}`);
+  }
+}
+```
+
+```python Python
+from superglue_client.api.runs import list_runs
+from superglue_client.models.list_runs_status import ListRunsStatus
+
+# List all runs
+response = list_runs.sync(
+    client=client,
+    page=1,
+    limit=50
+)
+
+# Filter by tool
+tool_runs = list_runs.sync(
+    client=client,
+    tool_id="my-tool-id",
+    page=1,
+    limit=50
+)
+
+# Filter by status
+failed_runs = list_runs.sync(
+    client=client,
+    status=ListRunsStatus.FAILED,
+    page=1,
+    limit=50
+)
+
+if response:
+    for run in response.data:
+        status = "✓" if run.status.value == "success" else "✗"
+        print(f"{run.run_id}: {status} - {run.metadata.started_at}")
+```
+
+</CodeGroup>
+
+**Parameters:**
+
+- `page` - Page number (default: `1`)
+- `limit` - Items per page (default: `50`)
+- `toolId` - Filter by tool ID (optional)
+- `status` - Filter by status: `running`, `success`, `failed`, `aborted` (optional)
+
+**Returns:** List of `Run` objects with pagination metadata

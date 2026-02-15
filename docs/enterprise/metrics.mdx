@@ -1,0 +1,202 @@
+---
+title: "Metrics & Telemetry"
+description: "Monitor your Superglue usage with Prometheus-compatible metrics"
+---
+
+<Info>
+  **Enterprise Feature** — Metrics & telemetry is available on superglue Enterprise plans. [Contact us](https://cal.com/superglue/superglue-demo) to learn more.
+</Info>
+
+Superglue exposes **organization-scoped** runtime metrics via a **Prometheus text exposition** endpoint. Use these to build dashboards, SLOs, and alerts for your Superglue usage.
+
+## Endpoint
+
+<Card title="GET /v1/metrics" icon="server">
+  ```
+  https://api.superglue.cloud/v1/metrics
+  ```
+  
+  **Auth**: `Authorization: Bearer <SUPERGLUE_API_KEY>`  
+  **Format**: Prometheus text exposition (`text/plain; version=0.0.4`)
+</Card>
+
+<Info>
+  **OpenTelemetry users**: Superglue exposes metrics in Prometheus format. To integrate with an
+  OpenTelemetry stack, use an [OpenTelemetry Collector Prometheus
+  receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
+  and export via OTLP to your backend.
+</Info>
+
+## Quick Setup
+
+<Tabs>
+  <Tab title="Prometheus">
+    ### Option A: Using `authorization` (recommended)
+
+    ```yaml
+    scrape_configs:
+      - job_name: superglue
+        scheme: https
+        metrics_path: /v1/metrics
+        static_configs:
+          - targets: ["api.superglue.cloud"]
+        authorization:
+          type: Bearer
+          credentials: "<SUPERGLUE_API_KEY>"
+    ```
+
+    ### Option B: Using `bearer_token`
+
+    ```yaml
+    scrape_configs:
+      - job_name: superglue
+        scheme: https
+        metrics_path: /v1/metrics
+        static_configs:
+          - targets: ["api.superglue.cloud"]
+        bearer_token: "<SUPERGLUE_API_KEY>"
+        # or: bearer_token_file: /etc/secrets/superglue_api_key
+    ```
+
+  </Tab>
+  <Tab title="OpenTelemetry Collector">
+    Configure the collector to scrape Superglue via the Prometheus receiver:
+
+    ```yaml
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: superglue
+              scheme: https
+              metrics_path: /v1/metrics
+              static_configs:
+                - targets: ["api.superglue.cloud"]
+              authorization:
+                type: Bearer
+                credentials: "<SUPERGLUE_API_KEY>"
+
+    exporters:
+      otlp:
+        endpoint: "<YOUR_OTLP_ENDPOINT>"
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus]
+          exporters: [otlp]
+    ```
+
+  </Tab>
+</Tabs>
+
+## Example Response
+
+```text
+# HELP superglue_runs_total Total number of finished runs (org-scoped).
+# TYPE superglue_runs_total counter
+superglue_runs_total{status="success",source="api"} 12
+superglue_runs_total{status="failed",source="scheduler"} 3
+
+# HELP superglue_run_duration_seconds_p95 p95 run duration over a trailing window (org-scoped).
+# TYPE superglue_run_duration_seconds_p95 gauge
+superglue_run_duration_seconds_p95{source="frontend",window="300s"} 1.23
+```
+
+---
+
+## Metrics Reference
+
+<AccordionGroup>
+  <Accordion title="superglue_runs_total" icon="hashtag">
+    **Type**: Counter
+
+    Total number of finished runs in your org, grouped by outcome and source.
+
+    | Label | Values |
+    |-------|--------|
+    | `status` | `success`, `failed`, `aborted` |
+    | `source` | `api`, `frontend`, `scheduler`, `mcp`, `tool-chain`, `webhook` |
+
+    <Tip>
+      Best used for **rates and error ratios** over time using `increase()` / `rate()`.
+    </Tip>
+
+    **PromQL Examples**
+
+    Total throughput (5m):
+    ```promql
+    sum(increase(superglue_runs_total[5m]))
+    ```
+
+    Error rate (5m):
+    ```promql
+    sum(increase(superglue_runs_total{status=~"failed|aborted"}[5m]))
+    /
+    clamp_min(sum(increase(superglue_runs_total[5m])), 1)
+    ```
+
+    Breakdown by source:
+    ```promql
+    sum by (source) (increase(superglue_runs_total[5m]))
+    ```
+
+  </Accordion>
+
+  <Accordion title="superglue_run_duration_seconds_p95" icon="clock">
+    **Type**: Gauge
+
+    p95 runtime (seconds) for finished runs over a trailing 5-minute window.
+
+    | Label | Values |
+    |-------|--------|
+    | `source` | `api`, `frontend`, `scheduler`, `mcp`, `tool-chain`, `webhook` |
+    | `window` | `300s` |
+
+    <Tip>
+      This is **end-to-end latency** as Superglue sees it. Good for catching tail latency regressions.
+    </Tip>
+
+    **PromQL Examples**
+
+    Alert when API runs get slow:
+    ```promql
+    superglue_run_duration_seconds_p95{source="api"} > 10
+    ```
+
+    Dashboard all sources:
+    ```promql
+    superglue_run_duration_seconds_p95
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Use Cases
+
+<Steps>
+  <Step title="Monitor Scheduled Jobs">
+    Track `superglue_runs_total` filtered by `source="scheduler"` to see successful vs failed runs over time.
+    
+    ```promql
+    sum by (status) (increase(superglue_runs_total{source="scheduler"}[1h]))
+    ```
+  </Step>
+  <Step title="Alert on Failures">
+    Set up alerts when scheduled runs fail — catch issues before they pile up.
+    
+    ```promql
+    increase(superglue_runs_total{source="scheduler",status="failed"}[15m]) > 0
+    ```
+  </Step>
+  <Step title="Investigate in Superglue">
+    When an alert fires, jump into the Superglue dashboard or query the REST API to fetch the latest runs and inspect stack traces.
+    
+    ```bash
+    curl -H "Authorization: Bearer $SUPERGLUE_API_KEY" \
+      "https://api.superglue.cloud/v1/runs?status=failed&limit=10"
+    ```
+  </Step>
+</Steps>
