@@ -1,0 +1,21 @@
+---
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  title?: string;
+  icon?: string;
+}
+
+const { title, icon } = Astro.props;
+---
+
+<details class="group bg-light-nav dark:bg-dark-nav">
+  <summary class="flex items-center gap-3 px-5 py-4 cursor-pointer font-semibold text-light-text dark:text-dark-text list-none select-none hover:bg-light-border/30 dark:hover:bg-dark-border/30 [&::-webkit-details-marker]:hidden">
+    {icon && <Icon name={icon} class="w-5 h-5 shrink-0" />}
+    <span class="flex-1">{title}</span>
+    <span class="text-xs text-light-muted dark:text-dark-muted transition-transform duration-200 group-open:rotate-180">▼</span>
+  </summary>
+  <div class="px-5 pb-5 text-light-muted dark:text-dark-muted leading-relaxed [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
+    <slot />
+  </div>
+</details>

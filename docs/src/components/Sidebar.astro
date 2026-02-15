@@ -1,0 +1,87 @@
+---
+import MobileMenuFooter from 'virtual:starlight/components/MobileMenuFooter';
+import SidebarSublist from './SidebarSublist.astro';
+
+const starlightRoute = Astro.locals.starlightRoute;
+const sidebar = starlightRoute?.sidebar || [];
+---
+
+<sl-sidebar-state-persist>
+  <nav aria-label="Main">
+    <SidebarSublist sublist={sidebar} />
+  </nav>
+</sl-sidebar-state-persist>
+
+<div class="md:sl-hidden">
+  <MobileMenuFooter />
+</div>
+
+<script>
+  // Sidebar state persistence - preserves open/closed state and scroll position across navigation
+  class SidebarStatePersist extends HTMLElement {
+    constructor() {
+      super();
+    }
+    
+    connectedCallback() {
+      // Restore details open/closed state from sessionStorage
+      const stored = sessionStorage.getItem('starlight-sidebar-state');
+      if (stored) {
+        try {
+          const state = JSON.parse(stored);
+          const details = this.querySelectorAll('details');
+          details.forEach((detail, index) => {
+            if (state[index] !== undefined) {
+              detail.open = state[index];
+            }
+          });
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
+      // Restore scroll position
+      const scrollPos = sessionStorage.getItem('starlight-sidebar-scroll');
+      if (scrollPos) {
+        const sidebarPane = document.getElementById('starlight__sidebar');
+        if (sidebarPane) {
+          // Use requestAnimationFrame to ensure DOM is ready
+          requestAnimationFrame(() => {
+            sidebarPane.scrollTop = parseInt(scrollPos, 10);
+          });
+        }
+      }
+      
+      // Save state on toggle
+      this.addEventListener('toggle', (e) => {
+        if (e.target instanceof HTMLDetailsElement) {
+          this.saveState();
+        }
+      }, true);
+      
+      // Save scroll position on scroll
+      const sidebarPane = document.getElementById('starlight__sidebar');
+      if (sidebarPane) {
+        let scrollTimeout: ReturnType<typeof setTimeout>;
+        sidebarPane.addEventListener('scroll', () => {
+          // Debounce scroll saves
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => {
+            sessionStorage.setItem('starlight-sidebar-scroll', String(sidebarPane.scrollTop));
+          }, 100);
+        }, { passive: true });
+      }
+    }
+    
+    saveState() {
+      const details = this.querySelectorAll('details');
+      const state: boolean[] = [];
+      details.forEach((detail) => {
+        state.push(detail.open);
+      });
+      sessionStorage.setItem('starlight-sidebar-state', JSON.stringify(state));
+    }
+  }
+  
+  customElements.define('sl-sidebar-state-persist', SidebarStatePersist);
+</script>

@@ -1,0 +1,32 @@
+---
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  title?: string;
+  icon?: string;
+  href?: string;
+}
+
+const { title, icon, href } = Astro.props;
+
+const baseClasses = "not-content h-full border rounded-xl p-6 transition-all duration-200 bg-gradient-to-br from-[rgba(247,248,250,0.5)] to-[rgba(247,248,250,0.3)] border-[rgba(229,231,235,0.5)] dark:from-[rgba(36,36,36,0.3)] dark:to-[rgba(36,36,36,0.2)] dark:border-[rgba(64,64,64,0.7)] backdrop-blur-sm shadow-sm";
+const linkClasses = "block no-underline text-inherit hover:shadow-md hover:-translate-y-0.5";
+---
+
+{href ? (
+  <a href={href} class:list={[baseClasses, linkClasses]}>
+    {icon && <Icon name={icon} class="w-6 h-6 mb-3 text-[#191c20] dark:text-white opacity-70" />}
+    {title && <h3 class="m-0 mb-2 text-base font-semibold text-[#191c20] dark:text-white">{title}</h3>}
+    <div class="text-sm leading-relaxed text-[#555555] dark:text-[#999999] [&>p]:m-0">
+      <slot />
+    </div>
+  </a>
+) : (
+  <div class={baseClasses}>
+    {icon && <Icon name={icon} class="w-6 h-6 mb-3 text-[#191c20] dark:text-white opacity-70" />}
+    {title && <h3 class="m-0 mb-2 text-base font-semibold text-[#191c20] dark:text-white">{title}</h3>}
+    <div class="text-sm leading-relaxed text-[#555555] dark:text-[#999999] [&>p]:m-0">
+      <slot />
+    </div>
+  </div>
+)}

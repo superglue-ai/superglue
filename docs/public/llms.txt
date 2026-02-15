@@ -1,0 +1,45 @@
+# superglue
+
+> AI-native integration platform for glue code, migrations, and legacy system automation
+
+## Introduction
+[Introduction](/): Sync, migrate, integrate, and manage glue code
+
+## Getting Started
+[Concepts](/getting-started/core-concepts): Understanding superglue fundamentals
+[LLM-driven Development](/getting-started/llm-driven-development): Enhance your AI coding experience with LLM-readable documentation
+[Setup](/getting-started/setup): The 5 minute guide to building your first superglue tool
+
+## Guides
+[Creating a System](/guides/creating-a-system): Connect superglue to any system
+[Creating a Tool](/guides/creating-a-tool): Create tools to connect your systems and do things
+[Debugging a Tool](/guides/debugging-a-tool): Use the tool playground to debug your tool
+[Deploying a Tool](/guides/deploying-a-tool): Execute tools on-demand, schedule them, or trigger via incoming webhooks
+[Using Template Expressions](/guides/using-template-expressions): Understand how template expressions work across systems, tools, and steps.
+[Using the Agent](/guides/using-the-agent): How to interact with the superglue agent
+
+## SDK Reference
+[Methods](/sdk/methods): Complete reference for all SDK methods
+[Overview](/sdk/overview): Quick start with the superglue SDK
+[Types](/sdk/types): TypeScript and Python type definitions for the superglue SDK
+
+## MCP
+[Using the MCP](/mcp/using-the-mcp): Use superglue tools in Cursor, Claude, and other MCP-compatible clients
+
+## API Reference
+[API Reference](/api/reference): Interactive API documentation with built-in testing
+
+## Enterprise
+[End Users](/enterprise/end-users): Let your users connect their own accounts to your AI application
+[Metrics & Telemetry](/enterprise/metrics): Monitor your Superglue usage with Prometheus-compatible metrics
+[Notifications](/enterprise/notifications): Get alerted when tool runs fail
+[Permissioning](/enterprise/permissioning): Control tool access with restricted and unrestricted API keys
+[Run History](/enterprise/run-history): Track every tool execution and debug failures with full context
+[Scheduled Execution](/enterprise/scheduling): Automate tool execution with cron-based scheduling
+[Tool Versioning](/enterprise/tool-versioning): Track changes and restore previous versions of your tools
+[Incoming Webhooks](/enterprise/webhooks): Trigger tool execution from external services
+
+## Optional
+[GitHub Repository](https://github.com/superglue-ai/superglue): Open source and self-hostable
+[Discord Community](https://discord.gg/vUKnuhHtfW): Get help and share ideas
+[Book a Demo](https://cal.com/superglue/superglue-demo): Talk to our team

@@ -1,0 +1,89 @@
+---
+title: "Permissioning"
+description: "Control tool access with restricted and unrestricted API keys"
+---
+import { Card, CardGroup, Steps, Step, Tabs, Tab, Accordion, AccordionGroup, Info, Tip, Note, CodeGroup, Frame } from '@components/mintlify/index.ts';
+
+
+<Info>
+  **Enterprise Feature** — API key permissioning is available on superglue Enterprise plans. [Contact us](https://cal.com/superglue/superglue-demo) to learn more.
+</Info>
+
+superglue uses API keys to control access to tools and APIs. You can create keys with full access or restrict them to specific tools.
+
+## API key types
+
+| Type | Access |
+|------|--------|
+| **Unrestricted** | Full access to GraphQL, REST, MCP, and all tools |
+| **Restricted** | REST and MCP only, limited to specific tools |
+
+## Creating API keys
+
+Create and manage API keys from the dashboard:
+
+<img
+  src="/resources/api-keys.png"
+  alt="API keys management page"
+  className="w-full rounded-lg"
+/>
+
+## Restricted keys
+
+Restricted API keys can only access tools explicitly listed in their `allowedTools` configuration:
+
+| `allowedTools` value | Meaning |
+|---------------------|---------|
+| `['*']` | All tools allowed (wildcard) |
+| `['tool-1', 'tool-2']` | Only these specific tools |
+
+### What restricted keys can do
+
+- Execute tools via REST API (`/v1/tools/{id}/run`)
+- Execute tools via MCP server
+- List only their allowed tools
+
+### What restricted keys cannot do
+
+- Access the GraphQL API
+- View or execute tools not in their allowed list
+- Modify tool configurations
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="AI Agent Access" icon="lucide:bot">
+    Create restricted keys for AI agents that only allow access to approved tools
+  </Card>
+  <Card title="Third-Party Integrations" icon="lucide:plug">
+    Share restricted keys with external services that only need to trigger specific tools
+  </Card>
+</CardGroup>
+
+## Example: Creating a restricted key for an agent
+
+1. Navigate to **Settings → API Keys**
+2. Click **Create API Key**
+3. Enable **Restricted access**
+4. Select the tools this key should access
+5. Copy the generated key
+
+Use this key in your MCP configuration or REST API calls:
+
+```typescript
+// MCP server configuration with restricted key
+{
+  "mcpServers": {
+    "superglue": {
+      "command": "npx",
+      "args": ["-y", "superglue-mcp"],
+      "env": {
+        "SUPERGLUE_API_KEY": "sg_restricted_xxx",
+        "SUPERGLUE_API_URL": "https://api.superglue.cloud"
+      }
+    }
+  }
+}
+```
+
+The agent will only see and execute tools allowed by this key.

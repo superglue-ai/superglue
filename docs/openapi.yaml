@@ -21,6 +21,34 @@ paths:
       operationId: listTools
       tags:
         - Tools
+      x-codeSamples:
+        - lang: TypeScript
+          label: "TypeScript"
+          source: |
+            import { listTools } from "@superglue/client";
+
+            const response = await listTools({
+              page: 1,
+              limit: 50,
+            });
+
+            if (response.status === 200) {
+              const { data, page, total, hasMore } = response.data;
+              console.log(`Found ${total} tools`);
+            }
+        - lang: Python
+          label: "Python"
+          source: |
+            from superglue_client.api.tools import list_tools
+
+            response = list_tools.sync(
+                client=client,
+                page=1,
+                limit=50
+            )
+
+            if response:
+                print(f"Found {response.total} tools")
       parameters:
         - name: page
           in: query
@@ -69,6 +97,32 @@ paths:
       operationId: getTool
       tags:
         - Tools
+      x-codeSamples:
+        - lang: TypeScript
+          label: "TypeScript"
+          source: |
+            import { getTool } from "@superglue/client";
+
+            const response = await getTool({
+              toolId: "550e8400-e29b-41d4-a716-446655440000",
+            });
+
+            if (response.status === 200) {
+              const tool = response.data;
+              console.log(`Tool: ${tool.name}`);
+            }
+        - lang: Python
+          label: "Python"
+          source: |
+            from superglue_client.api.tools import get_tool
+
+            response = get_tool.sync(
+                client=client,
+                tool_id="550e8400-e29b-41d4-a716-446655440000"
+            )
+
+            if response:
+                print(f"Tool: {response.name}")
       parameters:
         - name: toolId
           in: path
@@ -101,6 +155,42 @@ paths:
       operationId: runTool
       tags:
         - Tools
+      x-codeSamples:
+        - lang: TypeScript
+          label: "TypeScript"
+          source: |
+            import { runTool } from "@superglue/client";
+
+            const response = await runTool({
+              toolId: "550e8400-e29b-41d4-a716-446655440000",
+              payload: {
+                customerId: "cust_123",
+                startDate: "2024-01-01",
+              },
+            });
+
+            if (response.status === 200) {
+              const { runId, status } = response.data;
+              console.log(`Run started: ${runId}`);
+            }
+        - lang: Python
+          label: "Python"
+          source: |
+            from superglue_client.api.tools import run_tool
+
+            response = run_tool.sync(
+                client=client,
+                tool_id="550e8400-e29b-41d4-a716-446655440000",
+                json_body={
+                    "payload": {
+                        "customerId": "cust_123",
+                        "startDate": "2024-01-01"
+                    }
+                }
+            )
+
+            if response:
+                print(f"Run started: {response.run_id}")
       parameters:
         - name: toolId
           in: path
@@ -197,6 +287,32 @@ paths:
       operationId: getRun
       tags:
         - Runs
+      x-codeSamples:
+        - lang: TypeScript
+          label: "TypeScript"
+          source: |
+            import { getRun } from "@superglue/client";
+
+            const response = await getRun({
+              runId: "7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b",
+            });
+
+            if (response.status === 200) {
+              const run = response.data;
+              console.log(`Status: ${run.status}`);
+            }
+        - lang: Python
+          label: "Python"
+          source: |
+            from superglue_client.api.runs import get_run
+
+            response = get_run.sync(
+                client=client,
+                run_id="7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b"
+            )
+
+            if response:
+                print(f"Status: {response.status}")
       parameters:
         - name: runId
           in: path
@@ -229,6 +345,31 @@ paths:
       operationId: cancelRun
       tags:
         - Runs
+      x-codeSamples:
+        - lang: TypeScript
+          label: "TypeScript"
+          source: |
+            import { cancelRun } from "@superglue/client";
+
+            const response = await cancelRun({
+              runId: "7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b",
+            });
+
+            if (response.status === 200) {
+              console.log("Run cancelled");
+            }
+        - lang: Python
+          label: "Python"
+          source: |
+            from superglue_client.api.runs import cancel_run
+
+            response = cancel_run.sync(
+                client=client,
+                run_id="7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b"
+            )
+
+            if response:
+                print("Run cancelled")
       parameters:
         - name: runId
           in: path
@@ -338,6 +479,38 @@ paths:
       operationId: listRuns
       tags:
         - Runs
+      x-codeSamples:
+        - lang: TypeScript
+          label: "TypeScript"
+          source: |
+            import { listRuns } from "@superglue/client";
+
+            const response = await listRuns({
+              toolId: "550e8400-e29b-41d4-a716-446655440000",
+              status: "success",
+              page: 1,
+              limit: 50,
+            });
+
+            if (response.status === 200) {
+              const { data, total } = response.data;
+              console.log(`Found ${total} runs`);
+            }
+        - lang: Python
+          label: "Python"
+          source: |
+            from superglue_client.api.runs import list_runs
+
+            response = list_runs.sync(
+                client=client,
+                tool_id="550e8400-e29b-41d4-a716-446655440000",
+                status="success",
+                page=1,
+                limit=50
+            )
+
+            if response:
+                print(f"Found {response.total} runs")
       parameters:
         - name: toolId
           in: query

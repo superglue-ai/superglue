@@ -1,0 +1,14 @@
+---
+// Re-export Starlight's built-in Tabs component with syncKey for global tab sync
+import { Tabs as StarlightTabs } from '@astrojs/starlight/components';
+
+interface Props {
+  syncKey?: string;
+}
+
+const { syncKey = "lang" } = Astro.props;
+---
+
+<StarlightTabs syncKey={syncKey}>
+  <slot />
+</StarlightTabs>

@@ -1,0 +1,106 @@
+---
+title: "Notifications"
+description: "Get alerted when tool runs fail"
+---
+import { Card, CardGroup, Steps, Step, Tabs, Tab, Accordion, AccordionGroup, Info, Tip, Note, CodeGroup, Frame } from '@components/mintlify/index.ts';
+
+
+<Info>
+  **Enterprise Feature** — Notifications are available on superglue Enterprise plans. [Contact us](https://cal.com/superglue/superglue-demo) to learn more.
+</Info>
+
+When tools run on a schedule, failures can go unnoticed. Notifications alert your team immediately when something breaks.
+
+Configure notifications at [app.superglue.cloud/admin?view=notifications](https://app.superglue.cloud/admin?view=notifications).
+
+## How it works
+
+<Steps>
+  <Step title="Connect a channel">
+    Set up Slack (or another supported channel) to receive alerts
+  </Step>
+  <Step title="Test the connection">
+    Send a test notification to verify everything works
+  </Step>
+  <Step title="Create rules">
+    Define which failures should trigger notifications
+  </Step>
+</Steps>
+
+## Channel setup
+
+<Tabs>
+  <Tab label="Slack">
+    <video autoPlay muted loop playsInline className="w-full rounded-lg">
+      <source src="/resources/notifications.mp4" type="video/mp4" />
+    </video>
+
+    ### Authentication
+
+    Choose one of two methods:
+
+    | Method | Best for |
+    |--------|----------|
+    | **Incoming Webhook** | Quick setup, single channel |
+    | **Bot Token** | Multiple channels, auto-join public channels |
+
+    Both require a Slack Workspace Admin. The setup wizard guides you through each step.
+
+    ### Message buttons
+
+    - **View Details** — Opens the run in the admin dashboard
+    - **Investigate Failure** — Opens the AI agent with failure context
+
+    ### Troubleshooting
+
+    **Notifications not sending**
+    - Check that your webhook URL or bot token is valid
+    - Ensure at least one notification rule is enabled
+
+    **Bot can't post to channel**
+    - Public channels: Bot auto-joins on first message
+    - Private channels: Invite manually with `/invite @botname`
+
+  </Tab>
+</Tabs>
+
+## Notification rules
+
+Rules determine which failures trigger notifications.
+
+### Trigger sources
+
+| Source | Description |
+|--------|-------------|
+| **Scheduler** | Runs triggered by cron schedules |
+| **API** | Runs triggered via the REST API or SDK |
+| **Webhook** | Runs triggered by incoming webhooks |
+
+<Tip>
+  Most teams start with **Scheduler** failures only, since scheduled runs happen without human oversight.
+</Tip>
+
+### Tool ID patterns
+
+Filter notifications to specific tools using glob patterns:
+
+- `prod-*` — Only tools starting with "prod-"
+- `*-sync` — Only tools ending with "-sync"
+- Leave empty to match all tools
+
+## Notification content
+
+Each failure notification includes:
+
+- **Tool name** and failure status
+- **Error message** (truncated if long)
+- **Failed step** with its description
+- **Run metadata** — Run ID, source, timestamp
+
+### Investigate Failure
+
+Notifications include an "Investigate Failure" button that opens the superglue agent with the failed run pre-loaded. The agent explains the error, identifies the root cause, and can fix the tool directly.
+
+### Auto-disable
+
+After repeated delivery failures, superglue automatically disables notifications to prevent spam. Fix the underlying issue, then re-enable in the dashboard.

@@ -1,0 +1,671 @@
+---
+/**
+ * Scalar API Reference component
+ * Provides interactive API documentation with built-in testing
+ */
+---
+
+<div class="scalar-wrapper">
+  <div id="scalar-api-reference"></div>
+</div>
+
+<script is:inline>
+  // Load Scalar dynamically and sync with site dark mode
+  (function() {
+    let scalarInstance = null;
+    
+    // Create and load the Scalar script
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.44.18';
+    script.onload = function() {
+      initScalar();
+    };
+    document.head.appendChild(script);
+    
+    function initScalar() {
+      // Get the current theme from Starlight
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      
+      // Initialize Scalar
+      const container = document.getElementById('scalar-api-reference');
+      if (container && window.Scalar) {
+        scalarInstance = window.Scalar.createApiReference(container, {
+          spec: {
+            url: '/openapi.yaml',
+          },
+          theme: 'none',
+          darkMode: isDark,
+          layout: 'modern',
+          hideModels: false,
+          hideDownloadButton: false,
+          defaultHttpClient: {
+            targetKey: 'shell',
+            clientKey: 'curl',
+          },
+          hiddenClients: {
+            c: true,
+            clojure: true,
+            csharp: true,
+            dart: true,
+            fsharp: true,
+            go: true,
+            http: true,
+            java: true,
+            js: true,
+            kotlin: true,
+            node: true,
+            objc: true,
+            ocaml: true,
+            php: true,
+            powershell: true,
+            python: true,
+            r: true,
+            ruby: true,
+            rust: true,
+            shell: ['httpie', 'wget'],  // show only curl
+            swift: true,
+          },
+          showSidebar: false,
+          authentication: {
+            preferredSecurityScheme: 'ApiKeyAuth',
+            apiKey: {
+              token: localStorage.getItem('superglue-api-key') || '',
+            },
+          },
+          servers: [
+            {
+              url: localStorage.getItem('superglue-api-base-url') || 'https://api.superglue.cloud/v1',
+              description: 'Your superglue instance',
+            },
+          ],
+        });
+        
+        // Apply initial dark mode class
+        updateScalarDarkMode(isDark);
+      }
+    }
+    
+    function updateScalarDarkMode(isDark) {
+      const container = document.getElementById('scalar-api-reference');
+      if (!container) return;
+      
+      // Scalar uses a 'dark-mode' class on its container
+      const scalarRoot = container.querySelector('.scalar-app, .scalar-api-reference, [class*="scalar"]');
+      if (scalarRoot) {
+        if (isDark) {
+          scalarRoot.classList.add('dark-mode');
+          scalarRoot.setAttribute('data-theme', 'dark');
+        } else {
+          scalarRoot.classList.remove('dark-mode');
+          scalarRoot.setAttribute('data-theme', 'light');
+        }
+      }
+      
+      // Also toggle on the container itself
+      if (isDark) {
+        container.classList.add('dark-mode');
+        container.setAttribute('data-scalar-dark', 'true');
+      } else {
+        container.classList.remove('dark-mode');
+        container.setAttribute('data-scalar-dark', 'false');
+      }
+      
+      // Try to use Scalar's internal API if available
+      if (window.__SCALAR_DARK_MODE_TOGGLE__) {
+        window.__SCALAR_DARK_MODE_TOGGLE__(isDark);
+      }
+    }
+
+    // Listen for theme changes on the document
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.attributeName === 'data-theme') {
+          const isDark = document.documentElement.dataset.theme === 'dark';
+          updateScalarDarkMode(isDark);
+        }
+      });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+    
+    // Also listen for Astro page transitions
+    document.addEventListener('astro:page-load', function() {
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      // Re-init if needed after navigation
+      if (!document.getElementById('scalar-api-reference')?.children.length) {
+        initScalar();
+      } else {
+        updateScalarDarkMode(isDark);
+      }
+    });
+  })();
+</script>
+
+<style is:global>
+  /* Hide Starlight sidebar only when Scalar client popup is open (not display:none) */
+  body:has(.scalar.scalar-app:not([style*="display: none"])) .sidebar-pane,
+  body:has(.scalar.scalar-app:not([style*="display: none"])) nav.sidebar {
+    display: none !important;
+  }
+  
+  /* Expand main content to fill the space when client is open */
+  body:has(.scalar.scalar-app:not([style*="display: none"])) .main-pane {
+    margin-inline-start: 0 !important;
+  }
+  
+  /* Hide header when Scalar client popup is open */
+  body:has(.scalar.scalar-app:not([style*="display: none"])) header.header {
+    display: none !important;
+  }
+
+  /* Hide "On this page" sidebar on API reference page */
+  body:has(.scalar-wrapper) .right-sidebar,
+  body:has(.scalar-wrapper) aside.right-sidebar,
+  body:has(.scalar-wrapper) starlight-toc,
+  body:has(.scalar-wrapper) [aria-label="On this page"] {
+    display: none !important;
+  }
+
+  /* Expand main content into the right sidebar area on API reference page */
+  body:has(.scalar-wrapper) {
+    --sl-content-width: 100% !important;
+    --sl-content-margin-inline: 0 !important;
+  }
+  
+  body:has(.scalar-wrapper) .right-sidebar-container,
+  body:has(.scalar-wrapper) .right-sidebar {
+    display: none !important;
+  }
+  
+  body:has(.scalar-wrapper) .content-panel,
+  body:has(.scalar-wrapper) .sl-markdown-content,
+  body:has(.scalar-wrapper) .main-frame,
+  body:has(.scalar-wrapper) article.content {
+    max-width: none !important;
+    width: 100% !important;
+    margin-inline-end: 0 !important;
+  }
+  
+  body:has(.scalar-wrapper) .sl-container {
+    max-width: none !important;
+  }
+
+  /* Scalar wrapper - full width */
+  .scalar-wrapper {
+    margin: 2rem -1.5rem -1rem;
+    min-height: calc(100vh - 200px);
+  }
+
+  @media (min-width: 72rem) {
+    .scalar-wrapper {
+      margin: 2rem -2rem -1rem;
+    }
+  }
+
+  /* Scalar theme customization */
+  :root {
+    --scalar-font: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --scalar-font-code: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    
+    /* Light mode colors */
+    --scalar-color-1: #191c20;
+    --scalar-color-2: #32343a;
+    --scalar-color-3: #555555;
+    --scalar-color-accent: #191c20;
+    --scalar-color-green: #22c55e;
+    --scalar-color-red: #ef4444;
+    --scalar-color-yellow: #eab308;
+    --scalar-color-blue: #3b82f6;
+    --scalar-color-orange: #f97316;
+    --scalar-color-purple: #a855f7;
+    
+    --scalar-background-1: #ffffff;
+    --scalar-background-2: #f7f8fa;
+    --scalar-background-3: #e5e7eb;
+    --scalar-background-accent: #f7f8fa;
+    
+    --scalar-border-color: rgba(229, 231, 235, 0.5);
+    --scalar-scrollbar-color: rgba(0, 0, 0, 0.1);
+    --scalar-scrollbar-color-active: rgba(0, 0, 0, 0.2);
+    
+    --scalar-shadow-1: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --scalar-shadow-2: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    
+    --scalar-radius: 0.75rem;
+    --scalar-radius-lg: 1rem;
+    --scalar-radius-xl: 1.25rem;
+  }
+
+  [data-theme='dark'] {
+    --scalar-color-1: #ffffff;
+    --scalar-color-2: #e5e7eb;
+    --scalar-color-3: #999999;
+    --scalar-color-accent: #ffffff;
+    
+    --scalar-background-1: #000000;
+    --scalar-background-2: #1a1a1a;
+    --scalar-background-3: #242424;
+    --scalar-background-accent: #1a1a1a;
+    
+    --scalar-border-color: rgba(64, 64, 64, 0.7);
+    --scalar-scrollbar-color: rgba(255, 255, 255, 0.1);
+    --scalar-scrollbar-color-active: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Hide Scalar's sidebar - we use Starlight's navigation */
+  #scalar-api-reference [class*="sidebar"],
+  #scalar-api-reference nav[aria-label*="Sidebar"],
+  #scalar-api-reference .scalar-sidebar,
+  #scalar-api-reference aside {
+    display: none !important;
+  }
+  
+  /* Hide Scalar's own dark mode toggle - we use Starlight's */
+  #scalar-api-reference [class*="darkmode"],
+  #scalar-api-reference [class*="dark-mode-toggle"],
+  #scalar-api-reference button[aria-label*="dark"],
+  #scalar-api-reference button[aria-label*="light"],
+  #scalar-api-reference button[aria-label*="theme"],
+  #scalar-api-reference [class*="theme-toggle"] {
+    display: none !important;
+  }
+
+  /* Force Scalar dark mode based on site theme */
+  [data-theme='dark'] #scalar-api-reference,
+  [data-theme='dark'] #scalar-api-reference * {
+    color-scheme: dark;
+  }
+  
+  /* Scalar dark mode overrides - force dark styles when site is dark */
+  [data-theme='dark'] #scalar-api-reference {
+    --scalar-color-1: #ffffff !important;
+    --scalar-color-2: #e5e7eb !important;
+    --scalar-color-3: #999999 !important;
+    --scalar-background-1: #000000 !important;
+    --scalar-background-2: #1a1a1a !important;
+    --scalar-background-3: #242424 !important;
+    --scalar-border-color: rgba(64, 64, 64, 0.7) !important;
+  }
+
+  /* Make Scalar content take full width */
+  #scalar-api-reference > div {
+    display: block !important;
+  }
+
+  #scalar-api-reference [class*="references-layout"],
+  #scalar-api-reference [class*="classic-layout"],
+  #scalar-api-reference main {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Scalar component overrides */
+  .scalar-api-reference {
+    font-family: var(--scalar-font) !important;
+  }
+
+  .scalar-api-reference .scalar-card {
+    border-radius: var(--scalar-radius-lg) !important;
+    border: 1px solid var(--scalar-border-color) !important;
+    background: linear-gradient(to bottom right, var(--scalar-background-2), var(--scalar-background-1)) !important;
+  }
+
+  .scalar-api-reference button,
+  .scalar-api-reference input,
+  .scalar-api-reference select,
+  .scalar-api-reference textarea {
+    border-radius: var(--scalar-radius) !important;
+  }
+
+  .scalar-api-reference pre,
+  .scalar-api-reference code {
+    font-family: var(--scalar-font-code) !important;
+    border-radius: var(--scalar-radius) !important;
+  }
+
+  /* Method badges - only target actual HTTP method badges, not buttons */
+  .scalar-api-reference [data-method="get"],
+  #scalar-api-reference span[class*="get"],
+  #scalar-api-reference div[class*="method"][class*="get"] {
+    background: hsl(204, 60%, 94%) !important;
+    color: hsl(204, 80%, 30%) !important;
+    border: 1px solid hsl(204, 70%, 70%) !important;
+  }
+
+  .scalar-api-reference [data-method="post"],
+  #scalar-api-reference span[class*="post"],
+  #scalar-api-reference div[class*="method"][class*="post"] {
+    background: hsl(142, 60%, 92%) !important;
+    color: hsl(142, 80%, 25%) !important;
+    border: 1px solid hsl(142, 70%, 55%) !important;
+  }
+
+  .scalar-api-reference [data-method="put"],
+  #scalar-api-reference span[class*="put"],
+  #scalar-api-reference div[class*="method"][class*="put"] {
+    background: hsl(38, 60%, 92%) !important;
+    color: hsl(38, 80%, 30%) !important;
+    border: 1px solid hsl(38, 70%, 60%) !important;
+  }
+
+  .scalar-api-reference [data-method="delete"],
+  #scalar-api-reference span[class*="delete"],
+  #scalar-api-reference div[class*="method"][class*="delete"] {
+    background: hsl(0, 60%, 94%) !important;
+    color: hsl(0, 80%, 35%) !important;
+    border: 1px solid hsl(0, 70%, 65%) !important;
+  }
+
+  .scalar-api-reference [data-method="patch"],
+  #scalar-api-reference span[class*="patch"],
+  #scalar-api-reference div[class*="method"][class*="patch"] {
+    background: hsl(181, 60%, 92%) !important;
+    color: hsl(181, 80%, 25%) !important;
+    border: 1px solid hsl(181, 70%, 50%) !important;
+  }
+
+  [data-theme='dark'] .scalar-api-reference [data-method="get"],
+  [data-theme='dark'] #scalar-api-reference span[class*="get"],
+  [data-theme='dark'] #scalar-api-reference div[class*="method"][class*="get"] {
+    background: hsl(204, 50%, 15%) !important;
+    color: hsl(204, 80%, 70%) !important;
+    border: 1px solid hsl(204, 60%, 45%) !important;
+  }
+
+  [data-theme='dark'] .scalar-api-reference [data-method="post"],
+  [data-theme='dark'] #scalar-api-reference span[class*="post"],
+  [data-theme='dark'] #scalar-api-reference div[class*="method"][class*="post"] {
+    background: hsl(142, 50%, 12%) !important;
+    color: hsl(142, 80%, 65%) !important;
+    border: 1px solid hsl(142, 60%, 40%) !important;
+  }
+
+  [data-theme='dark'] .scalar-api-reference [data-method="put"],
+  [data-theme='dark'] #scalar-api-reference span[class*="put"],
+  [data-theme='dark'] #scalar-api-reference div[class*="method"][class*="put"] {
+    background: hsl(38, 50%, 15%) !important;
+    color: hsl(38, 80%, 70%) !important;
+    border: 1px solid hsl(38, 60%, 45%) !important;
+  }
+
+  [data-theme='dark'] .scalar-api-reference [data-method="delete"],
+  [data-theme='dark'] #scalar-api-reference span[class*="delete"],
+  [data-theme='dark'] #scalar-api-reference div[class*="method"][class*="delete"] {
+    background: hsl(0, 50%, 15%) !important;
+    color: hsl(0, 80%, 70%) !important;
+    border: 1px solid hsl(0, 60%, 45%) !important;
+  }
+
+  [data-theme='dark'] .scalar-api-reference [data-method="patch"],
+  [data-theme='dark'] #scalar-api-reference span[class*="patch"],
+  [data-theme='dark'] #scalar-api-reference div[class*="method"][class*="patch"] {
+    background: hsl(181, 50%, 12%) !important;
+    color: hsl(181, 80%, 65%) !important;
+    border: 1px solid hsl(181, 60%, 40%) !important;
+  }
+
+  /* ===== Scalar API Client Popup Styling ===== */
+  
+  /* Main client container */
+  .scalar.scalar-app {
+    font-family: var(--scalar-font) !important;
+  }
+
+  /* Improve accordion/collapsible sections */
+  #scalar-api-reference details,
+  .scalar.scalar-app details {
+    border: 1px solid var(--scalar-border-color) !important;
+    border-radius: var(--scalar-radius) !important;
+    margin-bottom: 0.5rem !important;
+    overflow: hidden;
+  }
+
+  #scalar-api-reference summary,
+  .scalar.scalar-app summary {
+    padding: 0.75rem 1rem !important;
+    cursor: pointer;
+    font-weight: 500 !important;
+    background: var(--scalar-background-2) !important;
+    transition: background 0.15s ease !important;
+  }
+
+  #scalar-api-reference summary:hover,
+  .scalar.scalar-app summary:hover {
+    background: var(--scalar-background-3) !important;
+  }
+
+  #scalar-api-reference details[open] > summary,
+  .scalar.scalar-app details[open] > summary {
+    border-bottom: 1px solid var(--scalar-border-color) !important;
+  }
+
+  /* Input fields styling */
+  #scalar-api-reference input[type="text"],
+  #scalar-api-reference input[type="password"],
+  #scalar-api-reference input[type="number"],
+  #scalar-api-reference textarea,
+  .scalar.scalar-app input[type="text"],
+  .scalar.scalar-app input[type="password"],
+  .scalar.scalar-app input[type="number"],
+  .scalar.scalar-app textarea {
+    background: var(--scalar-background-1) !important;
+    border: 1px solid var(--scalar-border-color) !important;
+    border-radius: 0.5rem !important;
+    font-size: 0.875rem !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+  }
+
+  #scalar-api-reference input:focus,
+  #scalar-api-reference textarea:focus,
+  .scalar.scalar-app input:focus,
+  .scalar.scalar-app textarea:focus {
+    outline: none !important;
+    border-color: var(--scalar-color-blue) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  }
+
+  /* Table styling for key-value pairs */
+  #scalar-api-reference table,
+  .scalar.scalar-app table {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+  }
+
+  #scalar-api-reference th,
+  #scalar-api-reference td,
+  .scalar.scalar-app th,
+  .scalar.scalar-app td {
+    padding: 0.625rem 0.75rem !important;
+    text-align: left !important;
+    border-bottom: 1px solid var(--scalar-border-color) !important;
+  }
+
+  #scalar-api-reference th,
+  .scalar.scalar-app th {
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.025em !important;
+    color: var(--scalar-color-3) !important;
+    background: var(--scalar-background-2) !important;
+  }
+
+  /* Button styling */
+  #scalar-api-reference button:not([class*="method"]),
+  .scalar.scalar-app button:not([class*="method"]) {
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+  }
+
+  /* Response panel */
+  #scalar-api-reference [class*="response"],
+  .scalar.scalar-app [class*="response"] {
+    border-radius: var(--scalar-radius) !important;
+  }
+
+  /* Code blocks in response */
+  #scalar-api-reference pre,
+  .scalar.scalar-app pre {
+    background: var(--scalar-background-2) !important;
+    border: 1px solid var(--scalar-border-color) !important;
+    border-radius: var(--scalar-radius) !important;
+    padding: 1rem !important;
+    overflow-x: auto !important;
+  }
+
+  /* Status badges */
+  #scalar-api-reference [class*="status"],
+  .scalar.scalar-app [class*="status"] {
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+  }
+
+  /* Tabs styling */
+  #scalar-api-reference [role="tablist"],
+  .scalar.scalar-app [role="tablist"] {
+    border-bottom: 1px solid var(--scalar-border-color) !important;
+    gap: 0 !important;
+  }
+
+  #scalar-api-reference [role="tab"],
+  .scalar.scalar-app [role="tab"] {
+    padding: 0.75rem 1rem !important;
+    font-weight: 500 !important;
+    font-size: 0.875rem !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    transition: all 0.15s ease !important;
+  }
+
+  #scalar-api-reference [role="tab"][aria-selected="true"],
+  .scalar.scalar-app [role="tab"][aria-selected="true"] {
+    border-bottom-color: var(--scalar-color-1) !important;
+    color: var(--scalar-color-1) !important;
+  }
+
+  #scalar-api-reference [role="tab"]:hover,
+  .scalar.scalar-app [role="tab"]:hover {
+    background: var(--scalar-background-2) !important;
+  }
+
+  /* Scrollbar styling */
+  #scalar-api-reference ::-webkit-scrollbar,
+  .scalar.scalar-app ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  #scalar-api-reference ::-webkit-scrollbar-track,
+  .scalar.scalar-app ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  #scalar-api-reference ::-webkit-scrollbar-thumb,
+  .scalar.scalar-app ::-webkit-scrollbar-thumb {
+    background: var(--scalar-scrollbar-color);
+    border-radius: 4px;
+  }
+
+  #scalar-api-reference ::-webkit-scrollbar-thumb:hover,
+  .scalar.scalar-app ::-webkit-scrollbar-thumb:hover {
+    background: var(--scalar-scrollbar-color-active);
+  }
+
+  /* Panel headers */
+  #scalar-api-reference [class*="panel-header"],
+  .scalar.scalar-app [class*="panel-header"] {
+    background: var(--scalar-background-2) !important;
+    border-bottom: 1px solid var(--scalar-border-color) !important;
+    padding: 0.75rem 1rem !important;
+  }
+
+  /* Reduce heading sizes in Scalar */
+  #scalar-api-reference h1,
+  .scalar.scalar-app h1 {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+  }
+
+  #scalar-api-reference h2,
+  .scalar.scalar-app h2 {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+  }
+
+  #scalar-api-reference h3,
+  .scalar.scalar-app h3 {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+  }
+
+  #scalar-api-reference h4,
+  #scalar-api-reference h5,
+  #scalar-api-reference h6,
+  .scalar.scalar-app h4,
+  .scalar.scalar-app h5,
+  .scalar.scalar-app h6 {
+    font-size: 0.8125rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+  }
+
+  /* Section titles like "Authentication Required", "Cookies", etc. */
+  #scalar-api-reference [class*="section-title"],
+  .scalar.scalar-app [class*="section-title"] {
+    font-size: 0.8125rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.025em !important;
+  }
+
+  /* Hide Cookies and Headers sections in the test tool */
+  #scalar-client-7,
+  #scalar-client-8,
+  #scalar-client-48,
+  #scalar-client-66,
+  #scalar-client-49 {
+    display: none !important;
+  }
+
+  /* Client Libraries section styling */
+  #scalar-api-reference [class*="client"],
+  .scalar.scalar-app [class*="client"] {
+    font-family: var(--scalar-font) !important;
+  }
+
+  /* Client library tabs - cleaner styling */
+  #scalar-api-reference [class*="client-libraries"] [role="tablist"],
+  .scalar.scalar-app [class*="client-libraries"] [role="tablist"] {
+    background: var(--scalar-background-2) !important;
+    border: 1px solid var(--scalar-border-color) !important;
+    border-radius: var(--scalar-radius) !important;
+    padding: 0.25rem !important;
+    gap: 0.25rem !important;
+  }
+
+  #scalar-api-reference [class*="client-libraries"] [role="tab"],
+  .scalar.scalar-app [class*="client-libraries"] [role="tab"] {
+    border: none !important;
+    border-radius: 0.5rem !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.8125rem !important;
+    background: transparent !important;
+  }
+
+  #scalar-api-reference [class*="client-libraries"] [role="tab"][aria-selected="true"],
+  .scalar.scalar-app [class*="client-libraries"] [role="tab"][aria-selected="true"] {
+    background: var(--scalar-background-1) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  #scalar-api-reference [class*="client-libraries"] [role="tab"]:hover:not([aria-selected="true"]),
+  .scalar.scalar-app [class*="client-libraries"] [role="tab"]:hover:not([aria-selected="true"]) {
+    background: var(--scalar-background-3) !important;
+  }
+</style>

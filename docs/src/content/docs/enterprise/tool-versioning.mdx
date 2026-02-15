@@ -1,0 +1,35 @@
+---
+title: "Tool Versioning"
+description: "Track changes and restore previous versions of your tools"
+---
+import { Card, CardGroup, Steps, Step, Tabs, Tab, Accordion, AccordionGroup, Info, Tip, Note, CodeGroup, Frame } from '@components/mintlify/index.ts';
+
+
+<Info>
+  **Enterprise Feature** — Tool versioning is available on superglue Enterprise plans. [Contact us](https://cal.com/superglue/superglue-demo) to learn more.
+</Info>
+
+Every time you save a tool, superglue automatically archives the previous version. View the full change history and restore any previous version with a single click.
+
+<video autoPlay muted loop playsInline className="w-full rounded-lg">
+  <source src="/resources/using-tool-versions.mp4" type="video/mp4" />
+</video>
+
+## How it works
+
+- **Automatic versioning**: Each save creates a new version in the history
+- **Change tracking**: See exactly what changed between versions with diff highlighting
+- **One-click restore**: Restore any previous version instantly
+- **User attribution**: Track who made each change and when
+
+## Viewing version history
+
+Click the history icon on any tool to open the version history panel. Each entry shows:
+
+- Version number
+- Timestamp and author
+- Expandable diff showing what changed
+
+## Restoring a version
+
+Click "Restore" on any historical version to revert the tool to that state. The current version is automatically archived before the restore, so you never lose work.

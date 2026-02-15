@@ -1,0 +1,264 @@
+---
+title: "Using the MCP"
+description: "Use superglue tools in Cursor, Claude, and other MCP-compatible clients"
+---
+import { Card, CardGroup, Steps, Step, Tabs, Tab, Accordion, AccordionGroup, Info, Tip, Note, CodeGroup, Frame } from '@components/mintlify/index.ts';
+
+
+superglue exposes your tools through [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), giving AI agents direct access to execute pre-built superglue tools.
+
+<Note>
+  The MCP interface provides **discovery and execution** of pre-built superglue
+  tools. It does **not** support ad-hoc system creation or tool building.
+  Use MCP in production for agentic use cases and internal GPTs.
+</Note>
+
+## When to use MCP
+
+<CardGroup cols={2}>
+  <Card title="Controlled Access" icon="lucide:shield-check">
+    Execute only pre-approved, tested tools. No ad-hoc code generation or system
+    modification.
+  </Card>
+  <Card title="Tool Execution in Production" icon="lucide:rocket">
+    Execute saved tools from your custom GPTs with full observability and error
+    handling.
+  </Card>
+  <Card title="Agent Workflows" icon="lucide:bot">
+    Give AI agents the ability to discover and execute complex multi-system
+    workflows without manual API wiring.
+  </Card>
+  <Card title="Internal Tooling" icon="lucide:hammer">
+    Expose business logic as AI-accessible tools for customer support, ops
+    teams, or automated workflows.
+  </Card>
+</CardGroup>
+
+---
+
+## Installation
+
+### Cursor
+
+Add to your Cursor MCP settings (`.cursor/config.json` or via Settings → MCP):
+
+```json
+{
+  "mcpServers": {
+    "superglue": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://app.superglue.cloud/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "superglue": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://app.superglue.cloud/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+### Self-Hosted
+
+Point to your self-hosted instance:
+
+```json
+{
+  "mcpServers": {
+    "superglue": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:3000/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+<Tip>
+  Get your API key from the superglue web application sidebar under **API
+  Keys**.
+</Tip>
+
+---
+
+## Available Tools
+
+The MCP server exposes two core tools for discovery and execution:
+
+### `find_relevant_tools`
+
+Search for pre-built tools using natural language queries.
+
+**Input Schema:**
+
+```typescript
+{
+  searchTerms: string; // Space separated search terms
+}
+```
+
+**Returns:**
+
+```typescript
+{
+  success: boolean;
+  tools: Array<{
+    id: string;
+    instruction: string;
+    inputSchema?: Record<string, any>;
+    responseSchema?: Record<string, any>;
+    steps: Array<{
+      systemId?: string;
+      stepId: string;
+    }>;
+  }>;
+}
+```
+
+**Use Cases:**
+
+- Discover available tools for a specific task
+- Browse all tools (use `*` as wildcard)
+- Find tools by system type or capability
+
+**Example:**
+
+```json
+{
+  "searchTerms": "sync shopify orders to postgres"
+}
+```
+
+---
+
+### `execute_tool`
+
+Execute a saved tool by its ID.
+
+**Input Schema:**
+
+```typescript
+{
+  id: string                    // Tool ID to execute
+  payload?: Record<string, any> // Optional JSON payload
+}
+```
+
+**Returns:**
+
+```typescript
+{
+  success: boolean
+  data?: any      // Execution result (truncated if > 20KB)
+  error?: string  // Error message if failed
+  suggestion?: string
+}
+```
+
+**Behavior:**
+
+- Executes with saved credentials from systems used during build
+- Full execution logs available in superglue dashboard
+
+**Example:**
+
+```json
+{
+  "id": "tool_abc123",
+  "payload": {
+    "startDate": "2024-01-01",
+    "endDate": "2024-01-31"
+  }
+}
+```
+
+---
+
+## Usage Patterns
+
+### Discovery → Execution Flow
+
+```typescript
+// 1. Find relevant tools
+find_relevant_tools({
+  searchTerms: "customer data from salesforce",
+});
+
+// 2. Execute the tool
+execute_tool({
+  id: "tool_xyz789",
+  payload: { accountId: "001..." },
+});
+```
+
+## Troubleshooting
+
+### Connection Issues
+
+```bash
+# Test MCP endpoint
+curl https://app.superglue.cloud/mcp \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+```
+
+### Tool Not Found
+
+```
+Error: "Tool ID does not exist"
+```
+
+**Solution:** Use `find_relevant_tools` to get valid tool IDs or check the dashboard.
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create a Tool" href="/guides/creating-a-tool" icon="lucide:hammer">
+    Build tools to expose via MCP
+  </Card>
+  <Card title="Using the Agent" href="/guides/using-the-agent" icon="lucide:message-circle">
+    Build systems and tools with the agent
+  </Card>
+<Card title="API Reference" href="/api-reference" icon="lucide:code">
+  Direct REST API access
+</Card>
+  <Card title="Set Up Guide" href="/getting-started/setup" icon="lucide:server">
+    Deploy self-hosted MCP server
+  </Card>
+</CardGroup>
