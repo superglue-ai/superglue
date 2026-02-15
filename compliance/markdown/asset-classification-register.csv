@@ -1,0 +1,16 @@
+Asset_Name,Asset_Type,Owner,Description,Confidentiality,Integrity,Availability,Location,Last_Review,Next_Review,Notes
+api.superglue.cloud,API Endpoint,Engineering,Main API Gateway,confidential,high,critical,AWS us-east-1,2026-01-15,2026-04-15,Customer-facing API
+app.superglue.cloud,Web Application,Engineering,Customer Dashboard,confidential,high,critical,AWS + CloudFront,2026-01-15,2026-04-15,MFA required
+docs.superglue.cloud,Documentation,Engineering,Public API Docs,public,medium,elevated,GitHub Pages,2026-01-15,2026-04-15,Public information
+customer-workflows-db,Database,Engineering,Workflow Definitions,strictly_confidential,high,critical,Supabase,2026-01-15,2026-04-15,Row-level security enabled
+integration-credentials,Secrets Store,Engineering,Third-party API Keys,strictly_confidential,high,elevated,AWS Secrets Manager,2026-01-15,2026-04-15,Rotation every 90 days
+execution-logs,Log Storage,Engineering,Workflow Execution Logs,internal,medium,standard,CloudWatch Logs,2026-01-15,2026-04-15,90 day retention
+github-repos,Source Code,Engineering,All Repositories,confidential,high,elevated,GitHub,2026-01-15,2026-04-15,Branch protection enabled
+customer-s3-data,Object Storage,Engineering,Customer File Storage,strictly_confidential,high,critical,AWS S3,2026-01-15,2026-04-15,Encrypted at rest
+monitoring-metrics,Metrics,Engineering,System Performance Data,internal,low,standard,CloudWatch,2026-01-15,2026-04-15,No PII
+ssl-certificates,Certificates,Engineering,TLS Certificates,confidential,high,critical,AWS ACM,2026-01-15,2026-04-15,Auto-renewal enabled
+ci-cd-pipeline,CI/CD,Engineering,GitHub Actions,confidential,high,elevated,GitHub,2026-01-15,2026-04-15,Secrets in vault
+team-laptops,Hardware,Engineering,Developer Machines,confidential,medium,standard,Remote,2026-01-15,2026-04-15,Encrypted disks
+rds-backups,Backup,Engineering,Database Backups,strictly_confidential,high,elevated,AWS RDS,2026-01-15,2026-04-15,Automated daily
+customer-pii,Data,Engineering,Personal Information,strictly_confidential,high,critical,Supabase,2026-01-15,2026-04-15,GDPR compliance
+superglue-loadbalancer,Load Balancer,Engineering,Main ALB,confidential,high,critical,AWS us-east-1,2026-01-15,2026-04-15,TLS termination
