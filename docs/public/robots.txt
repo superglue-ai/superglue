@@ -1,9 +1,0 @@
-# https://www.robotstxt.org/robotstxt.html
-User-agent: *
-Allow: /
-
-# Sitemap
-Sitemap: https://docs.superglue.ai/sitemap-index.xml
-
-# Disallow admin/internal paths if any
-Disallow: /404
