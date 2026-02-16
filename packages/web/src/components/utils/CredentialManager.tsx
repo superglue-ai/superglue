@@ -104,15 +104,32 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
 
   return (
     <div className={cn(className)}>
-      <div className="w-full">
+      {credentials.length === 0 ? (
+        <div
+          className="flex flex-col items-center justify-center py-8 border border-dashed rounded-xl bg-background/40 backdrop-blur-sm hover:bg-background/60 transition-colors cursor-pointer"
+          onClick={() => setIsAddDialogOpen(true)}
+        >
+          <div className="p-3 rounded-full bg-muted mb-3">
+            <KeyRound className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground mb-1">
+            No credentials configured
+          </p>
+          <p className="text-xs text-muted-foreground/70">Click to add your first credential</p>
+        </div>
+      ) : (
         <div className="space-y-2">
-          <div className="overflow-x-auto w-full">
-            {credentials.length === 0 ? (
-              <div className="flex justify-center py-2 border rounded-md border-dashed">
-                <Button variant="outline" size="sm" onClick={addCredential} className="h-7 text-xs">
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add
-                </Button>
+          {credentials.map((cred, index) => (
+            <div
+              key={index}
+              className={cn(
+                "group flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 border border-border/50 transition-all",
+                "hover:from-muted/70 hover:to-muted/40",
+                duplicateIndexes.has(index) && "border-red-500/50 bg-red-500/5",
+              )}
+            >
+              <div className="flex-shrink-0 p-2 rounded-md">
+                <KeyRound className="h-4 w-4 text-muted-foreground" />
               </div>
             ) : (
               <div className="flex flex-col gap-2 min-w-[400px] p-1">
@@ -157,20 +174,112 @@ export function CredentialsManager({ value, onChange, className }: CredentialsMa
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
-                    {duplicateIndexes.has(index) && cred.key.trim() && (
-                      <span className="ml-2 text-xs text-red-600 whitespace-nowrap">
-                        Credential "{cred.key}" already defined
-                      </span>
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                onClick={() => removeCredential(index)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+
+          <Button
+            variant="glass"
+            size="sm"
+            onClick={() => setIsAddDialogOpen(true)}
+            className="h-10 border-dashed hover:border-solid hover:bg-muted/50 transition-all"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Credential
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-md bg-primary/10">
+                <KeyRound className="h-4 w-4 text-primary" />
+              </div>
+              {templateMode ? "Add Credential Field" : "Add Credential"}
+            </DialogTitle>
+            <DialogDescription>
+              {templateMode
+                ? "Add the name of a credential field that end users will provide."
+                : "Add a new API key, token, or secret for this system."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cred-name" className="text-sm font-medium">
+                {templateMode ? "Field Name" : "Credential Name"}
+              </Label>
+              <Input
+                id="cred-name"
+                value={newCredName}
+                onChange={(e) => setNewCredName(e.target.value)}
+                placeholder={placeholder}
+                autoComplete="off"
+                className={cn(
+                  "h-10",
+                  isDuplicateName &&
+                    newCredName.trim() &&
+                    "border-red-500 focus-visible:ring-red-500",
+                )}
+              />
+              {isDuplicateName && newCredName.trim() && (
+                <p className="text-xs text-red-500">A credential with this name already exists</p>
+              )}
+            </div>
+            {!templateMode && (
+              <div className="space-y-2">
+                <Label htmlFor="cred-value" className="text-sm font-medium">
+                  Value
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="cred-value"
+                    type={showNewCredValue ? "text" : "password"}
+                    value={newCredValue}
+                    onChange={(e) => setNewCredValue(e.target.value)}
+                    placeholder="Enter your credential value"
+                    autoComplete="new-password"
+                    className="h-10 pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-10 w-10 hover:bg-transparent"
+                    onClick={() => setShowNewCredValue(!showNewCredValue)}
+                  >
+                    {showNewCredValue ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-          {credentials.length > 0 && (
-            <Button variant="outline" size="sm" onClick={addCredential} className="text-xs h-6">
-              <Plus className="w-3 h-3 mr-1" />
-              Add Field
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="glass"
+              onClick={() => {
+                setIsAddDialogOpen(false);
+                setNewCredName("");
+                setNewCredValue("");
+                setShowNewCredValue(false);
+              }}
+            >
+              Cancel
             </Button>
           )}
         </div>

@@ -261,40 +261,103 @@ export function AuthenticationSection() {
         </Select>
       </div>
 
+      {/* Multi-tenancy Mode Toggle - only show for apikey and oauth */}
+      {auth.authType !== "none" && (
+        <div className="border-t border-border/40 pt-4">
+          <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 p-4 border border-border/50">
+            <div>
+              <div className="font-medium text-sm flex items-center gap-2">
+                Let each user authenticate with their own credentials
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {auth.authType === "oauth"
+                  ? "If enabled, each end user connects their own account. Otherwise, all users will use the system-level credentials."
+                  : "If enabled, each end user provides their own credentials. Otherwise, all users will use the system-level credentials."}
+              </div>
+            </div>
+            <Switch
+              checked={auth.multiTenancyMode === "enabled"}
+              onCheckedChange={(checked) => setMultiTenancyMode(checked ? "enabled" : "disabled")}
+            />
+          </div>
+        </div>
+      )}
+
       {auth.authType === "apikey" && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Label htmlFor="credentials" className="text-sm font-medium">
               API Credentials
             </Label>
-            <HelpTooltip text="Add API keys or tokens needed for this system. Common keys include: api_key, bearer_token, api_secret." />
+            <HelpTooltip
+              text={
+                isMultiTenancy
+                  ? "Define credential names that end users will provide in the portal (e.g., api_key, bearer_token, api_secret)."
+                  : "Add API keys or tokens needed for this system. Common keys include: api_key, bearer_token, api_secret."
+              }
+            />
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/30 p-4">
+          {isMultiTenancy ? (
+            <div className="space-y-3">
+              <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-500/5 p-4 border border-amber-500/30">
+                <p className="text-sm text-muted-foreground">
+                  Define the credential field names below. End users can then enter their own
+                  credentials.
+                </p>
+              </div>
+              <div>
+                <CredentialsManager
+                  value={auth.apiKeyCredentials}
+                  onChange={setApiKeyCredentials}
+                  className="min-h-20"
+                  placeholder="Field name (e.g., api_key)"
+                  templateMode={true}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Add field names only. End users will enter their own values in the portal.
+                </p>
+              </div>
+            </div>
+          ) : (
             <CredentialsManager
               value={auth.apiKeyCredentials}
               onChange={setApiKeyCredentials}
               className="min-h-20"
             />
-          </div>
+          )}
         </div>
       )}
 
       {auth.authType === "oauth" && (
         <div className="space-y-5">
-          <OAuthConnectButton
-            system={system}
-            onClick={handleConnect}
-            disabled={isConnectDisabled()}
-            loading={connectLoading}
-          />
-
-          {hasTemplateClient && (
-            <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 p-4 border border-border/50">
-              <div>
-                <div className="font-medium text-sm">Use superglue OAuth</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  Preconfigured client for{" "}
-                  {systemOptions.find((o) => o.value === system.templateName)?.label}
+          {isMultiTenancy ? (
+            <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-500/5 p-4 border border-amber-500/30">
+              <p className="text-sm text-muted-foreground">
+                Configure the settings below as a template. Each end user will authenticate using
+                these settings to connect their own account.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <OAuthConnectButton
+                system={system}
+                onClick={handleConnect}
+                disabled={isConnectDisabled()}
+                loading={connectLoading}
+              />
+              {hasTemplateClient && (
+                <div className="flex items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 px-4 py-3 border border-border/50 min-w-0">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm">Use superglue OAuth</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Preconfigured client for{" "}
+                      {systemOptions.find((o) => o.value === system.templateName)?.label}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={auth.useSuperglueOAuth}
+                    onCheckedChange={(v) => setUseSuperglueOAuth(Boolean(v))}
+                  />
                 </div>
               </div>
               <Switch
