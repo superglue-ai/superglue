@@ -13,8 +13,6 @@ import {
   Monitor,
   Moon,
   Sun,
-  User,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,30 +22,15 @@ const navItems = [
   { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
-];
-
-const docsNavItem = {
-  icon: Book,
-  label: "Docs",
-  href: "https://docs.superglue.cloud",
-  target: "_blank",
-};
-
-const adminSubItems = [
-  { icon: Home, label: "Overview", view: null },
-  { icon: History, label: "Runs", view: "runs" },
-  { icon: Clock, label: "Schedules", view: "schedules" },
-  { icon: Key, label: "API Keys", view: "api-keys" },
-  { icon: Users, label: "Organization", view: "organization" },
-  { icon: Bell, label: "Notifications", view: "notifications" },
+  { icon: Book, label: "Docs", href: "https://docs.superglue.cloud", target: "_blank" },
+  /*  { icon: AlertCircle, label: 'Error Monitoring', href: '/analytics' },
+  { icon: Shield, label: 'Access Control', href: '/access-control' },
+  { icon: Code, label: 'SDK Generation', href: '/sdk' },
+*/
 ];
 
 export function LeftSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const supabase = useSupabaseClient();
-  const [isOpen, setIsOpen] = useState(false);
   const [theme, setTheme, resolvedTheme] = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
