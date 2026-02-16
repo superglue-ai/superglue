@@ -32,6 +32,7 @@ export interface AuthState {
   apiKeyCredentials: string;
   isOAuthConfigured: boolean;
   useSuperglueOAuth: boolean;
+  multiTenancyMode: "disabled" | "enabled";
 }
 
 export interface ContextState {
@@ -88,6 +89,7 @@ export interface SystemConfigContextValue {
   setOAuthFields: (fields: Partial<OAuthFields>) => void;
   setApiKeyCredentials: (credentials: string) => void;
   setUseSuperglueOAuth: (use: boolean) => void;
+  setMultiTenancyMode: (mode: "disabled" | "enabled") => void;
 
   setDocumentationUrl: (url: string) => void;
   setDocumentation: (doc: string) => void;

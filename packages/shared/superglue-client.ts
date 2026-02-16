@@ -794,6 +794,19 @@ export class SuperglueClient {
     return {
       ...openAPIRun,
       status: statusMap[openAPIRun.status] ?? RunStatus.FAILED,
+      toolPayload: openAPIRun.toolPayload,
+      data: openAPIRun.data,
+      toolResult: openAPIRun.data,
+      error: openAPIRun.error,
+      stepResults: openAPIRun.stepResults,
+      options: openAPIRun.options,
+      requestSource: openAPIRun.requestSource,
+      traceId: openAPIRun.traceId,
+      resultStorageUri: openAPIRun.resultStorageUri,
+      userId: openAPIRun.userId,
+      userEmail: openAPIRun.userEmail,
+      userName: openAPIRun.userName,
+      metadata: openAPIRun.metadata,
     } as Run;
   }
 
@@ -803,8 +816,18 @@ export class SuperglueClient {
     toolId?: string;
     status?: "running" | "success" | "failed" | "aborted";
     requestSources?: ("api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook")[];
+    userId?: string;
+    systemId?: string;
   }): Promise<{ items: Run[]; total: number; page: number; limit: number; hasMore: boolean }> {
-    const { limit = 100, page = 1, toolId, status, requestSources } = options ?? {};
+    const {
+      limit = 100,
+      page = 1,
+      toolId,
+      status,
+      requestSources,
+      userId,
+      systemId,
+    } = options ?? {};
     const params = new URLSearchParams({
       limit: String(limit),
       page: String(page),
@@ -814,6 +837,8 @@ export class SuperglueClient {
     if (requestSources && requestSources.length > 0) {
       params.set("requestSources", requestSources.join(","));
     }
+    if (userId) params.set("userId", userId);
+    if (systemId) params.set("systemId", systemId);
 
     const response = await this.restRequest<{
       data: any[];
@@ -957,44 +982,33 @@ export class SuperglueClient {
     return response.data;
   }
 
-  async upsertSystem(
-    id: string,
-    input: Partial<System>,
-    mode: UpsertMode = UpsertMode.UPSERT,
-    credentialMode?: CredentialMode,
-  ): Promise<System> {
-    const mutation = `
-        mutation UpsertSystem($input: SystemInput!, $mode: UpsertMode, $credentialMode: CredentialMode) {
-          upsertSystem(input: $input, mode: $mode, credentialMode: $credentialMode) {
-            id
-            name
-            type
-            urlHost
-            urlPath
-            credentials
-            documentationUrl
-            documentation
-            documentationPending
-            openApiSchema
-            openApiUrl
-            specificInstructions
-            documentationKeywords
-            icon
-            metadata
-            templateName
-            version
-            createdAt
-            updatedAt
-          }
-        }
-      `;
-    const systemInput = { id, ...input };
-    const response = await this.request<{ upsertSystem: System }>(mutation, {
-      input: systemInput,
-      mode,
-      credentialMode,
-    });
-    return response.upsertSystem;
+  async createSystem(input: {
+    id?: string;
+    name: string;
+    url: string;
+    credentials?: Record<string, any>;
+    specificInstructions?: string;
+    icon?: string;
+    templateName?: string;
+    documentationFiles?: Record<string, string[]>;
+    metadata?: Record<string, any>;
+    multiTenancyMode?: string;
+  }): Promise<System> {
+    const response = await this.restRequest<{ success: boolean; data: System }>(
+      "POST",
+      "/v1/systems",
+      input,
+    );
+    return response.data;
+  }
+
+  async updateSystem(id: string, input: Partial<System>): Promise<System> {
+    const response = await this.restRequest<{ success: boolean; data: System }>(
+      "PATCH",
+      `/v1/systems/${encodeURIComponent(id)}`,
+      input,
+    );
+    return response.data;
   }
 
   async deleteSystem(id: string): Promise<boolean> {

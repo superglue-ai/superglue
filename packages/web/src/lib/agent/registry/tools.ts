@@ -1594,7 +1594,7 @@ const getRunsDefinition = (): ToolDefinition => ({
   name: "get_runs",
   description: `
     <use_case>
-      Fetches recent run history. Use this to debug webhook payload mismatches by inspecting what payloads were actually received, or to see recent executions filtered by status or source.
+      Fetches recent run history. Use this to debug webhook payload mismatches by inspecting what payloads were actually received, see recent executions filtered by status or source, or investigate what end users (agents) did and how they affected systems ("blast radius").
     </use_case>
 
     <important_notes>
@@ -1602,6 +1602,10 @@ const getRunsDefinition = (): ToolDefinition => ({
       - Useful for debugging when a webhook-triggered tool fails due to unexpected payload format
       - Compare the returned toolPayload against the tool's inputSchema to identify mismatches
       - Can filter by toolId, status (running, success, failed, aborted), or requestSources (api, frontend, scheduler, mcp, tool-chain, webhook)
+      - Can filter by userId to see what a specific user or end user did
+      - Can filter by systemId to see all runs that touched a specific system
+      - Can use search to find runs containing specific text in their payload or results (e.g., "issue XYZ", "user@email.com")
+      - Set fetchResults=true to load full execution details (stepResults, toolResult) for runs that have stored results (only use if needed e.g. for investigation, can bloat context, and not if just listing runs)
       - All filters are optional - you can combine them or use none
     </important_notes>
     `,
@@ -1616,6 +1620,10 @@ const getRunsDefinition = (): ToolDefinition => ({
         type: "number",
         description: "Maximum number of runs to return (default: 10, max: 50)",
       },
+      offset: {
+        type: "number",
+        description: "Optional: Number of runs to skip for pagination (default: 0)",
+      },
       status: {
         type: "string",
         enum: ["running", "success", "failed", "aborted"],
@@ -1629,48 +1637,137 @@ const getRunsDefinition = (): ToolDefinition => ({
         },
         description: "Optional: Filter runs by how they were triggered (can specify multiple)",
       },
+      userId: {
+        type: "string",
+        description: "Optional: Filter runs by user ID to see what a specific user or end user did",
+      },
+      systemId: {
+        type: "string",
+        description:
+          "Optional: Filter runs by system ID to see all runs that touched a specific system",
+      },
+      search: {
+        type: "string",
+        description:
+          "Optional: Full-text search across run results (payload, API responses, etc.). Automatically fetches S3 results to search. Use to find runs containing specific text like issue IDs, email addresses, or other identifiers.",
+      },
     },
     required: [],
   },
 });
 
 const runGetRuns = async (
-  input: { toolId?: string; limit?: number; status?: string; requestSources?: string[] },
+  input: {
+    toolId?: string;
+    limit?: number;
+    offset?: number;
+    status?: string;
+    requestSources?: string[];
+    fetchResults?: boolean;
+    userId?: string;
+    systemId?: string;
+    search?: string;
+  },
   ctx: ToolExecutionContext,
 ) => {
-  const { toolId, limit = 10, status, requestSources } = input;
-  const cappedLimit = Math.min(limit, 50);
+  const {
+    toolId,
+    limit = 10,
+    offset = 0,
+    status,
+    requestSources,
+    fetchResults = false,
+    userId,
+    systemId,
+    search,
+  } = input;
+
+  // If searching, fetch more runs to filter through
+  const fetchLimit = search ? Math.min(limit * 5, 200) : Math.min(limit, 50);
+  // Convert offset to page for the API
+  const page = Math.floor(offset / fetchLimit) + 1;
+  // Calculate how many items to skip within the fetched page
+  const skipWithinPage = offset % fetchLimit;
 
   try {
     const result = await ctx.superglueClient.listRuns({
       toolId,
-      limit: cappedLimit,
+      limit: fetchLimit,
+      page,
       status: status as "running" | "success" | "failed" | "aborted" | undefined,
       requestSources: requestSources as
         | ("api" | "frontend" | "scheduler" | "mcp" | "tool-chain" | "webhook")[]
         | undefined,
+      userId,
+      systemId,
     });
 
-    // Map to a simplified format with the key info for debugging
-    const simplifiedRuns = result.items.map((run) => ({
-      runId: run.runId,
-      toolId: run.toolId,
-      status: run.status,
-      requestSource: run.requestSource,
-      toolPayload: run.toolPayload,
-      error: run.error,
-      metadata: run.metadata,
-    }));
+    const searchTerm = search?.toLowerCase();
+    const shouldFetchResults = fetchResults || !!search;
+
+    // Strip large fields from runs to avoid JSON serialization issues
+    const stripRun = (run: any) => {
+      const { tool, data, stepResults, ...rest } = run;
+      return rest;
+    };
+
+    // Skip items within the page to handle offset correctly
+    let runs = result.items.slice(skipWithinPage);
+
+    // If fetching results or searching, enrich runs with S3 data
+    if (shouldFetchResults) {
+      const enrichedRuns = [];
+      for (const run of runs) {
+        if (run.resultStorageUri) {
+          try {
+            const fullResults = await ctx.superglueClient.getRunResults(run.runId);
+            if (fullResults) {
+              // If searching, check if results match
+              if (searchTerm) {
+                const fullResultsStr = JSON.stringify(fullResults).toLowerCase();
+                if (!fullResultsStr.includes(searchTerm)) {
+                  continue; // Skip runs that don't match search
+                }
+              }
+              // Enrich run with fetched results (stripped)
+              enrichedRuns.push({
+                ...stripRun(run),
+                data: fullResults.data,
+                stepResults: fullResults.stepResults,
+                toolPayload: fullResults.toolPayload || run.toolPayload,
+              });
+            } else {
+              enrichedRuns.push(stripRun(run));
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch results for run ${run.runId}:`, err);
+            enrichedRuns.push(stripRun(run));
+          }
+        } else if (searchTerm) {
+          // No stored results to search through
+          continue;
+        } else {
+          enrichedRuns.push(stripRun(run));
+        }
+
+        if (enrichedRuns.length >= limit) break;
+      }
+      runs = enrichedRuns;
+    } else {
+      runs = runs.slice(0, limit).map(stripRun);
+    }
 
     return {
       success: true,
       toolId: toolId || "all",
-      total: result.total,
-      runs: simplifiedRuns,
+      total: search ? runs.length : result.total,
+      runs,
       note:
-        simplifiedRuns.length > 0
-          ? "Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches."
-          : "No runs found matching the filters.",
+        runs.length > 0
+          ? `Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches.${search ? ` Searched through ${result.items.length} runs for "${search}".` : ""}`
+          : search
+            ? `No runs found containing "${search}".`
+            : "No runs found matching the filters.",
     };
   } catch (error: any) {
     return {

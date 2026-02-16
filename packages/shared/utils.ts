@@ -516,3 +516,115 @@ export function normalizeToolDiffs<T extends { op: string; path: string; value?:
 ): T[] {
   return diffs.map((diff) => normalizeToolDiff(diff));
 }
+
+export function composeUrl(host: string, path: string) {
+  // Handle empty/undefined inputs
+  if (!host) host = "";
+  if (!path) path = "";
+
+  // Add https:// if protocol is missing
+  if (!/^(https?|postgres(ql)?|ftp(s)?|sftp|smb|file):\/\//i.test(host)) {
+    host = `https://${host}`;
+  }
+
+  // Trim slashes in one pass
+  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+  return `${cleanHost}/${cleanPath}`;
+}
+
+// ============================================================================
+// System Auth Status
+// ============================================================================
+
+export type SystemAuthType = "none" | "oauth" | "apikey";
+
+export interface SystemAuthStatus {
+  authType: SystemAuthType;
+  isComplete: boolean;
+  label: string;
+}
+
+/**
+ * Detect the authentication type from system credentials
+ */
+export const detectSystemAuthType = (
+  credentials: Record<string, any> | undefined,
+): SystemAuthType => {
+  if (!credentials || Object.keys(credentials).length === 0) return "none";
+
+  const oauthFields = [
+    "auth_url",
+    "token_url",
+    "client_id",
+    "client_secret",
+    "access_token",
+    "refresh_token",
+  ];
+  const hasOAuthFields = oauthFields.some((field) => field in credentials);
+
+  if (hasOAuthFields) return "oauth";
+  return "apikey";
+};
+
+/**
+ * Get the authentication status for a system.
+ * Handles both normal mode and multi-tenancy mode.
+ */
+export const getSystemAuthStatus = (system: {
+  credentials?: Record<string, any>;
+  multiTenancyMode?: string;
+}): SystemAuthStatus => {
+  const creds = system.credentials || {};
+  const authType = detectSystemAuthType(creds);
+  const isMultiTenancy = system.multiTenancyMode === "enabled";
+
+  if (authType === "none") {
+    return { authType: "none", isComplete: true, label: "No auth" };
+  }
+
+  if (authType === "oauth") {
+    // In multi-tenancy mode, check for OAuth template fields (not tokens)
+    if (isMultiTenancy) {
+      const hasAuthUrl = Boolean(creds.auth_url);
+      const hasTokenUrl = Boolean(creds.token_url);
+      const hasClientId = Boolean(creds.client_id);
+      const isComplete = hasAuthUrl && hasTokenUrl && hasClientId;
+      return {
+        authType: "oauth",
+        isComplete,
+        label: isComplete ? "Ready for end users" : "OAuth template incomplete",
+      };
+    }
+
+    // Normal mode: check for access token
+    const grantType = creds.grant_type || "authorization_code";
+    const hasAccessToken = Boolean(creds.access_token);
+    const hasRefreshToken = Boolean(creds.refresh_token);
+    const isComplete =
+      grantType === "client_credentials" ? hasAccessToken : hasAccessToken && hasRefreshToken;
+
+    return {
+      authType: "oauth",
+      isComplete,
+      label: isComplete ? "OAuth configured" : "OAuth incomplete",
+    };
+  }
+
+  // API Key mode
+  const hasKeys = Object.keys(creds).length > 0;
+  if (isMultiTenancy) {
+    return {
+      authType: "apikey",
+      isComplete: hasKeys,
+      label: hasKeys ? "Ready for end users" : "No credential fields",
+    };
+  }
+
+  return {
+    authType: "apikey",
+    isComplete: hasKeys,
+    label: hasKeys ? "API Key configured" : "No credentials",
+  };
+};

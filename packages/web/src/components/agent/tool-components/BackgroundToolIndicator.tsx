@@ -48,10 +48,10 @@ const BACKGROUND_TOOL_CONFIG: Record<
     label: "Saved tool",
     activeLabel: "Saving tool...",
   },
-  get_runs: {
-    icon: History,
-    label: "Fetched runs",
-    activeLabel: "Fetching runs...",
+  find_system_templates: {
+    icon: Search,
+    label: "Found templates",
+    activeLabel: "Finding templates...",
   },
 };
 

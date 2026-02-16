@@ -48,8 +48,14 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
       userEmail: req.authInfo?.userEmail,
       orgName: req.authInfo?.orgName,
       orgRole: req.authInfo?.orgRole,
+      isRestricted: req.authInfo?.isRestricted,
       toMetadata: function () {
-        return { traceId: this.traceId, orgId: this.orgId };
+        return {
+          traceId: this.traceId,
+          orgId: this.orgId,
+          userId: this.userId,
+          isRestricted: this.isRestricted,
+        };
       },
     };
     return context;
@@ -110,8 +116,14 @@ export async function startGraphqlServer(datastore: DataStore, workerPools: Work
           userEmail: authResult.userEmail,
           orgName: authResult.orgName,
           orgRole: authResult.orgRole,
+          isRestricted: authResult.isRestricted,
           toMetadata: function () {
-            return { traceId: this.traceId, orgId: this.orgId };
+            return {
+              traceId: this.traceId,
+              orgId: this.orgId,
+              userId: this.userId,
+              isRestricted: this.isRestricted,
+            };
           },
         };
         return context;

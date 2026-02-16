@@ -28,7 +28,7 @@ type ConfigType = "api" | "workflow";
 type ConfigData = ApiConfig | Tool;
 
 export class PostgresService implements DataStore {
-  private pool: Pool;
+  protected pool: Pool;
 
   constructor(config: PoolConfig) {
     this.pool = new Pool({
@@ -81,7 +81,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.multi_tenancy_mode, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -89,7 +89,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, version, created_at, updated_at
                  FROM integrations WHERE id = ANY($1) AND org_id = $2`;
       }
 
@@ -112,6 +112,9 @@ export class PostgresService implements DataStore {
           documentationKeywords: row.documentation_keywords,
           icon: row.icon,
           metadata: row.metadata,
+          templateName: row.template_name,
+          documentationFiles: row.documentation_files || {},
+          multiTenancyMode: row.multi_tenancy_mode || "disabled",
           version: row.version,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -161,6 +164,13 @@ export class PostgresService implements DataStore {
       // Backwards-compatible schema updates for existing deployments
       await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS status VARCHAR(50)`);
       await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS request_source VARCHAR(50)`);
+      await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS result_storage_uri TEXT`);
+      await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)`);
+
+      // Index for user_id queries
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_runs_user_id ON runs(user_id) WHERE user_id IS NOT NULL
+      `);
 
       // Ensure request_source is constrained to allowed enum values (idempotent)
       await client.query(`
@@ -250,6 +260,13 @@ export class PostgresService implements DataStore {
       await client.query(`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS metadata JSONB`);
       await client.query(
         `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS template_name VARCHAR(255)`,
+      );
+      await client.query(
+        `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS documentation_files JSONB DEFAULT '{}'`,
+      );
+      await client.query(`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS url VARCHAR(1000)`);
+      await client.query(
+        `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS multi_tenancy_mode VARCHAR(50) DEFAULT 'disabled'`,
       );
 
       // Integration templates table for Superglue OAuth credentials (and potentially further fields in the future)
@@ -561,7 +578,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at, request_source FROM runs WHERE id = $1 AND org_id = $2",
+        "SELECT id, config_id, data, started_at, completed_at, request_source, result_storage_uri, user_id FROM runs WHERE id = $1 AND org_id = $2",
         [id, orgId || ""],
       );
       if (!result.rows[0]) return null;
@@ -572,6 +589,9 @@ export class PostgresService implements DataStore {
         config_id: row.config_id,
         started_at: row.started_at,
         completed_at: row.completed_at,
+        request_source: row.request_source,
+        result_storage_uri: row.result_storage_uri,
+        user_id: row.user_id,
       });
       // Source of truth for requestSource is the column, not the JSON
       run.requestSource = row.request_source || run.requestSource;
@@ -588,13 +608,24 @@ export class PostgresService implements DataStore {
     status?: RunStatus;
     requestSources?: RequestSource[];
     orgId?: string;
+    userId?: string;
+    systemId?: string;
   }): Promise<{ items: Run[]; total: number }> {
-    const { limit = 10, offset = 0, configId, status, requestSources, orgId } = params || {};
+    const {
+      limit = 10,
+      offset = 0,
+      configId,
+      status,
+      requestSources,
+      orgId,
+      userId,
+      systemId,
+    } = params || {};
     const client = await this.pool.connect();
     try {
       let selectQuery = `
                 SELECT 
-                    id, config_id, data, started_at, completed_at, request_source,
+                    id, config_id, data, started_at, completed_at, request_source, result_storage_uri, user_id,
                     COUNT(*) OVER() as total_count
                 FROM runs
                 WHERE org_id = $1
@@ -618,6 +649,23 @@ export class PostgresService implements DataStore {
         queryParams.push(requestSources);
       }
 
+      if (userId !== undefined) {
+        const paramIndex = queryParams.length + 1;
+        selectQuery += ` AND user_id = $${paramIndex}`;
+        queryParams.push(userId);
+      }
+
+      if (systemId !== undefined) {
+        // Filter by systemId - check if any step uses this system
+        // Guard against null/non-array steps values which would crash jsonb_array_elements
+        const paramIndex = queryParams.length + 1;
+        selectQuery += ` AND jsonb_typeof(data->'tool'->'steps') = 'array' AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(data->'tool'->'steps') AS step
+          WHERE step->'config'->>'systemId' = $${paramIndex}
+        )`;
+        queryParams.push(systemId);
+      }
+
       selectQuery +=
         " ORDER BY started_at DESC LIMIT $" +
         (queryParams.length + 1) +
@@ -635,11 +683,11 @@ export class PostgresService implements DataStore {
           config_id: row.config_id,
           started_at: row.started_at,
           completed_at: row.completed_at,
-        });
-        // Source of truth for requestSource is the column, not the JSON
-        run.requestSource = row.request_source || run.requestSource;
-        return run;
-      });
+          request_source: row.request_source,
+          result_storage_uri: row.result_storage_uri,
+          user_id: row.user_id,
+        }),
+      );
 
       return { items, total };
     } finally {
@@ -654,8 +702,8 @@ export class PostgresService implements DataStore {
     try {
       const result = await client.query(
         `
-                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at, result_storage_uri, user_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 ON CONFLICT (id, org_id) DO NOTHING
             `,
         [
@@ -667,6 +715,8 @@ export class PostgresService implements DataStore {
           JSON.stringify(run),
           run.metadata.startedAt,
           run.metadata.completedAt ?? null,
+          null, // Storage URI will be set later if enabled
+          run.userId ?? null,
         ],
       );
 
@@ -685,7 +735,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const existingResult = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at, request_source FROM runs WHERE id = $1 AND org_id = $2",
+        "SELECT id, config_id, data, started_at, completed_at, request_source, result_storage_uri, user_id FROM runs WHERE id = $1 AND org_id = $2",
         [id, orgId],
       );
 
@@ -699,6 +749,9 @@ export class PostgresService implements DataStore {
         config_id: row.config_id,
         started_at: row.started_at,
         completed_at: row.completed_at,
+        request_source: row.request_source,
+        result_storage_uri: row.result_storage_uri,
+        user_id: row.user_id,
       });
       // Source of truth for requestSource is the column, not the JSON
       existingRun.requestSource = row.request_source || existingRun.requestSource;
@@ -1242,7 +1295,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.multi_tenancy_mode, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -1250,7 +1303,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, version, created_at, updated_at
                  FROM integrations WHERE id = $1 AND org_id = $2`;
       }
 
@@ -1275,6 +1328,8 @@ export class PostgresService implements DataStore {
         icon: row.icon,
         metadata: row.metadata,
         templateName: row.template_name,
+        documentationFiles: row.documentation_files || {},
+        multiTenancyMode: row.multi_tenancy_mode || "disabled",
         version: row.version,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -1305,7 +1360,7 @@ export class PostgresService implements DataStore {
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
-                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.version, i.created_at, i.updated_at,
+                        i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.multi_tenancy_mode, i.version, i.created_at, i.updated_at,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
@@ -1314,7 +1369,7 @@ export class PostgresService implements DataStore {
       } else {
         query = `SELECT id, name, type, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, version, created_at, updated_at
                  FROM integrations WHERE org_id = $1 
                  ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
       }
@@ -1339,6 +1394,8 @@ export class PostgresService implements DataStore {
           icon: row.icon,
           metadata: row.metadata,
           templateName: row.template_name,
+          documentationFiles: row.documentation_files || {},
+          multiTenancyMode: row.multi_tenancy_mode || "disabled",
           version: row.version,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -1370,27 +1427,28 @@ export class PostgresService implements DataStore {
         INSERT INTO integrations (
             id, org_id, name, type, url_host, url_path, credentials,
             documentation_url, documentation_pending,
-            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, version, created_at, updated_at
+            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, version, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
         )
         ON CONFLICT (id, org_id) 
         DO UPDATE SET 
             name = $3,
             type = $4,
-            url_host = $5,
-            url_path = $6,
-            credentials = $7,
-            documentation_url = $8,
-            documentation_pending = $9,
-            open_api_url = $10,
-            specific_instructions = $11,
-            documentation_keywords = $12,
-            icon = $13,
-            metadata = $14,
-            template_name = $15,
-            version = $16,
-            updated_at = $18
+            url = $5,
+            credentials = $6,
+            documentation_url = $7,
+            documentation_pending = $8,
+            open_api_url = $9,
+            specific_instructions = $10,
+            documentation_keywords = $11,
+            icon = $12,
+            metadata = $13,
+            template_name = $14,
+            documentation_files = $15,
+            multi_tenancy_mode = $16,
+            version = $17,
+            updated_at = $19
       `,
         [
           id,
@@ -1408,6 +1466,8 @@ export class PostgresService implements DataStore {
           system.icon,
           system.metadata ? JSON.stringify(system.metadata) : null,
           system.templateName,
+          system.documentationFiles ? JSON.stringify(system.documentationFiles) : "{}",
+          system.multiTenancyMode || "disabled",
           system.version,
           system.createdAt || new Date(),
           system.updatedAt || new Date(),
@@ -1432,6 +1492,193 @@ export class PostgresService implements DataStore {
 
       await client.query("COMMIT");
       return { ...system, id };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createSystem(params: { system: System; orgId?: string }): Promise<System> {
+    const { system, orgId } = params;
+    if (!system?.id) throw new Error("System id is required");
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const encryptedCredentials = system.credentials
+        ? credentialEncryption.encrypt(system.credentials)
+        : null;
+
+      const result = await client.query(
+        `
+        INSERT INTO integrations (
+            id, org_id, name, type, url, credentials,
+            documentation_url, documentation_pending,
+            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, version, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+        )
+        RETURNING id
+      `,
+        [
+          system.id,
+          orgId || "",
+          system.name,
+          system.type,
+          system.url,
+          encryptedCredentials,
+          system.documentationUrl,
+          system.documentationPending,
+          system.openApiUrl,
+          system.specificInstructions,
+          system.documentationKeywords,
+          system.icon,
+          system.metadata ? JSON.stringify(system.metadata) : null,
+          system.templateName,
+          system.documentationFiles ? JSON.stringify(system.documentationFiles) : "{}",
+          system.multiTenancyMode || "disabled",
+          system.version,
+          system.createdAt || new Date(),
+          system.updatedAt || new Date(),
+        ],
+      );
+
+      if (result.rowCount === 0) {
+        throw new Error("Failed to create system");
+      }
+
+      if (system.documentation || system.openApiSchema) {
+        await client.query(
+          `
+            INSERT INTO integration_details (
+                integration_id, org_id, documentation, open_api_schema
+            ) VALUES ($1, $2, $3, $4)
+          `,
+          [system.id, orgId || "", system.documentation, system.openApiSchema],
+        );
+      }
+
+      await client.query("COMMIT");
+      return { ...system };
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      if (error.code === "23505") {
+        throw new Error(`System with id '${system.id}' already exists`);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateSystem(params: {
+    id: string;
+    system: Partial<System>;
+    orgId?: string;
+  }): Promise<System | null> {
+    const { id, system, orgId } = params;
+    if (!id) throw new Error("System id is required");
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const encryptedCredentials = system.credentials
+        ? credentialEncryption.encrypt(system.credentials)
+        : null;
+
+      const result = await client.query(
+        `
+        UPDATE integrations SET
+            name = COALESCE($3, name),
+            type = COALESCE($4, type),
+            url = COALESCE($5, url),
+            credentials = COALESCE($6, credentials),
+            documentation_url = COALESCE($7, documentation_url),
+            documentation_pending = COALESCE($8, documentation_pending),
+            open_api_url = COALESCE($9, open_api_url),
+            specific_instructions = COALESCE($10, specific_instructions),
+            documentation_keywords = COALESCE($11, documentation_keywords),
+            icon = COALESCE($12, icon),
+            metadata = COALESCE($13, metadata),
+            template_name = COALESCE($14, template_name),
+            documentation_files = COALESCE($15, documentation_files),
+            multi_tenancy_mode = COALESCE($16, multi_tenancy_mode),
+            version = COALESCE($17, version),
+            updated_at = $18
+        WHERE id = $1 AND org_id = $2
+        RETURNING *
+      `,
+        [
+          id,
+          orgId || "",
+          system.name,
+          system.type,
+          system.url,
+          encryptedCredentials,
+          system.documentationUrl,
+          system.documentationPending,
+          system.openApiUrl,
+          system.specificInstructions,
+          system.documentationKeywords,
+          system.icon,
+          system.metadata ? JSON.stringify(system.metadata) : null,
+          system.templateName,
+          system.documentationFiles ? JSON.stringify(system.documentationFiles) : null,
+          system.multiTenancyMode,
+          system.version,
+          new Date(),
+        ],
+      );
+
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+
+      if (system.documentation || system.openApiSchema) {
+        await client.query(
+          `
+            INSERT INTO integration_details (
+                integration_id, org_id, documentation, open_api_schema
+            ) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (integration_id, org_id)
+            DO UPDATE SET
+                documentation = COALESCE($3, integration_details.documentation),
+                open_api_schema = COALESCE($4, integration_details.open_api_schema)
+          `,
+          [id, orgId || "", system.documentation, system.openApiSchema],
+        );
+      }
+
+      await client.query("COMMIT");
+
+      const row = result.rows[0];
+      const decryptedCredentials = row.credentials
+        ? credentialEncryption.decrypt(row.credentials)
+        : {};
+
+      return {
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        url: row.url || (row.url_host ? composeUrl(row.url_host, row.url_path || "") : ""),
+        credentials: decryptedCredentials,
+        documentationUrl: row.documentation_url,
+        documentationPending: row.documentation_pending,
+        openApiUrl: row.open_api_url,
+        specificInstructions: row.specific_instructions,
+        documentationKeywords: row.documentation_keywords,
+        icon: row.icon,
+        metadata: row.metadata,
+        templateName: row.template_name,
+        documentationFiles: row.documentation_files,
+        multiTenancyMode: row.multi_tenancy_mode || "disabled",
+        version: row.version,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

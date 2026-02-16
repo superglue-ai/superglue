@@ -3,6 +3,7 @@ import { toolDefinitions } from "./mcp-server.js";
 
 const executeTool = toolDefinitions.superglue_execute_tool.execute;
 const findRelevantTools = toolDefinitions.superglue_find_relevant_tools.execute;
+const authenticate = toolDefinitions.superglue_authenticate.execute;
 
 describe("superglue_execute_tool", () => {
   it("executes tool successfully and returns only data", async () => {
@@ -174,5 +175,48 @@ describe("superglue_find_relevant_tools", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Search failed");
+  });
+});
+
+describe("superglue_authenticate", () => {
+  it("returns portal URL on success", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockResolvedValue({
+        success: true,
+        portalUrl: "https://app.example.com/portal?token=abc123",
+      }),
+    };
+    const args = { client, orgId: "test-org" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(true);
+    expect(result.portalUrl).toBe("https://app.example.com/portal?token=abc123");
+    expect(result.message).toContain("share this link");
+  });
+
+  it("returns error when API key is not linked to end user", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockResolvedValue({
+        success: false,
+        error: "This endpoint requires an API key linked to an end user",
+      }),
+    };
+    const args = { client, orgId: "test-org" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("API key linked to an end user");
+    expect(result.suggestion).toBeDefined();
+  });
+
+  it("handles network errors gracefully", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockRejectedValue(new Error("Network error")),
+    };
+    const args = { client, orgId: "test-org" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Network error");
   });
 });

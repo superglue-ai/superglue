@@ -25,6 +25,8 @@ export const ExecuteToolInputSchema = z.object({
     .describe("JSON payload to pass to the tool"),
 });
 
+export const AuthenticateInputSchema = z.object({});
+
 // REST API client for MCP operations
 class McpRestClient {
   private apiEndpoint: string;
@@ -83,6 +85,25 @@ class McpRestClient {
   async listTools(): Promise<any[]> {
     const result = await this.request<{ data: any[] }>("GET", "/tools?limit=1000");
     return result.data || [];
+  }
+
+  async generatePortalLink(): Promise<{ success: boolean; portalUrl?: string; error?: string }> {
+    try {
+      // Generate a portal link for the end user to authenticate with all systems
+      const result = await this.request<{
+        success: boolean;
+        data: { portalUrl: string; token: string; expiresAt: string };
+      }>("POST", `/authenticate`, {});
+      return {
+        success: true,
+        portalUrl: result.data.portalUrl,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 }
 
@@ -197,6 +218,48 @@ export const toolDefinitions: Record<string, any> = {
       }
     },
   },
+  superglue_authenticate: {
+    description: `
+    <use_case>
+      Generates an authentication portal link for an end user to connect their accounts.
+      Use this when a tool execution fails because the end user hasn't authenticated with required systems.
+    </use_case>
+
+    <important_notes>
+      - This tool generates a secure, time-limited link to the authentication portal.
+      - The link should be shared with the end user so they can connect their accounts.
+      - The portal allows users to authenticate with all available systems that require credentials.
+      - After the user authenticates, they will be able to use tools that require those systems.
+      - The API key must be linked to an end user for this to work.
+    </important_notes>
+    `,
+    inputSchema: AuthenticateInputSchema,
+    execute: async (args: { client: McpRestClient; orgId: string }, request: any) => {
+      try {
+        const result = await args.client.generatePortalLink();
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error,
+            suggestion: "Ensure the API key is linked to an end user",
+          };
+        }
+
+        return {
+          success: true,
+          portalUrl: result.portalUrl,
+          message: `Please share this link with the user to authenticate: ${result.portalUrl}`,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion: "Ensure the API key is linked to an end user",
+        };
+      }
+    },
+  },
 };
 
 interface McpAuthContext {
@@ -307,6 +370,43 @@ export const createMcpServer = async (apiKey: string) => {
         event: "mcp_superglue_find_relevant_tools",
         properties: {
           toolName: "superglue_find_relevant_tools",
+          orgId: authContext.orgId,
+        },
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result),
+          },
+        ],
+      };
+    },
+  );
+
+  // EE: Register authenticate tool for multi-tenancy
+  mcpServer.registerTool(
+    "authenticate",
+    {
+      description: toolDefinitions.superglue_authenticate.description,
+      inputSchema: AuthenticateInputSchema,
+    },
+    async (args, extra) => {
+      const authContext = await getAuthContext();
+
+      const result = await toolDefinitions.superglue_authenticate.execute(
+        { ...args, client, orgId: authContext.orgId },
+        extra,
+      );
+
+      logMessage("debug", "superglue_authenticate executed via MCP", {
+        orgId: authContext.orgId,
+      });
+      telemetryClient?.capture({
+        distinctId: authContext.orgId || sessionId,
+        event: "mcp_superglue_authenticate",
+        properties: {
+          toolName: "superglue_authenticate",
           orgId: authContext.orgId,
         },
       });

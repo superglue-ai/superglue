@@ -44,6 +44,8 @@ export function mapRunToOpenAPI(run: Run): OpenAPIRun {
     options: run.options as Record<string, unknown>,
     requestSource: run.requestSource,
     traceId: run.traceId,
+    resultStorageUri: run.resultStorageUri,
+    userId: run.userId,
     metadata: run.metadata,
   };
 }
@@ -74,6 +76,8 @@ const listRuns: RouteHandler = async (request, reply) => {
     requestSources?: string;
     page?: string;
     limit?: string;
+    userId?: string;
+    systemId?: string;
   };
 
   const { page, limit, offset } = parsePaginationParams(query);
@@ -94,6 +98,8 @@ const listRuns: RouteHandler = async (request, reply) => {
     status: internalStatus,
     requestSources: internalRequestSources,
     orgId: authReq.authInfo.orgId,
+    userId: query.userId,
+    systemId: query.systemId,
   });
 
   const data = result.items.map(mapRunToOpenAPI);

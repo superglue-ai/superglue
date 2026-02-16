@@ -5,7 +5,11 @@ import { useSystems } from "@/src/app/systems-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient, needsUIToTriggerDocFetch } from "@/src/lib/client-utils";
 import type { System } from "@superglue/shared";
-import { CredentialMode, UpsertMode, systems as systemTemplates } from "@superglue/shared";
+import {
+  systems as systemTemplates,
+  findTemplateForSystem,
+  getSystemAuthStatus,
+} from "@superglue/shared";
 import {
   createContext,
   ReactNode,
@@ -167,7 +171,13 @@ export function SystemConfigProvider({
         : JSON.stringify(initialSystem.credentials, null, 2)
       : "{}",
   );
-  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(false);
+  // Detect if system was created with superglue OAuth by comparing stored client_id with template's
+  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(() =>
+    isSystemUsingTemplateOAuth(initialSystem),
+  );
+  const [multiTenancyMode, setMultiTenancyMode] = useState<"disabled" | "enabled">(
+    (initialSystem?.multiTenancyMode as "disabled" | "enabled") || "disabled",
+  );
 
   const [documentationUrl, setDocumentationUrl] = useState(initialSystem?.documentationUrl || "");
   const [documentation, setDocumentation] = useState(initialSystem?.documentation || "");
@@ -206,7 +216,7 @@ export function SystemConfigProvider({
       setDocumentationUrl(updatedSystem.documentationUrl || "");
       setDocumentation(updatedSystem.documentation || "");
       setSpecificInstructions(updatedSystem.specificInstructions || "");
-      setHasUploadedFile(updatedSystem.documentationUrl?.startsWith("file://") || false);
+      setMultiTenancyMode((updatedSystem.multiTenancyMode as "disabled" | "enabled") || "disabled");
 
       const newAuthType = detectAuthType(updatedSystem.credentials || {});
       setAuthType(newAuthType);
@@ -233,17 +243,18 @@ export function SystemConfigProvider({
       urlPath !== (initialSystem.urlPath || "") ||
       documentationUrl !== (initialSystem.documentationUrl || "") ||
       specificInstructions !== (initialSystem.specificInstructions || "") ||
-      authType !== detectAuthType(initialSystem.credentials || {});
+      authType !== detectAuthType(initialSystem.credentials || {}) ||
+      multiTenancyMode !==
+        ((initialSystem.multiTenancyMode as "disabled" | "enabled") || "disabled");
 
     setHasUnsavedChanges(hasChanges);
   }, [
     systemId,
     systemName,
-    urlHost,
-    urlPath,
-    documentationUrl,
+    url,
     specificInstructions,
     authType,
+    multiTenancyMode,
     initialSystem,
   ]);
 
@@ -259,14 +270,12 @@ export function SystemConfigProvider({
   }, []);
 
   const isOAuthConfigured = useMemo(() => {
-    const effectiveGrantType = oauthFields.grant_type || "authorization_code";
-    const effectiveAccessToken = oauthFields.access_token;
-    const effectiveRefreshToken = oauthFields.refresh_token;
-
-    return effectiveGrantType === "client_credentials"
-      ? Boolean(effectiveAccessToken)
-      : Boolean(effectiveAccessToken && effectiveRefreshToken);
-  }, [oauthFields]);
+    const status = getSystemAuthStatus({
+      credentials: oauthFields,
+      multiTenancyMode,
+    });
+    return status.authType === "oauth" && status.isComplete;
+  }, [oauthFields, multiTenancyMode]);
 
   const system = useMemo<SystemDefinition>(
     () => ({
@@ -290,8 +299,17 @@ export function SystemConfigProvider({
       apiKeyCredentials,
       isOAuthConfigured,
       useSuperglueOAuth,
+      multiTenancyMode,
     }),
-    [authType, credentials, oauthFields, apiKeyCredentials, isOAuthConfigured, useSuperglueOAuth],
+    [
+      authType,
+      credentials,
+      oauthFields,
+      apiKeyCredentials,
+      isOAuthConfigured,
+      useSuperglueOAuth,
+      multiTenancyMode,
+    ],
   );
 
   const isDocumentationPending = useMemo(() => {
@@ -366,19 +384,26 @@ export function SystemConfigProvider({
             return { isComplete: true, hasErrors: false, label: "No auth" };
           }
           if (authType === "oauth") {
+            const status = getSystemAuthStatus({
+              credentials: oauthFields,
+              multiTenancyMode,
+            });
             return {
               isComplete: isOAuthConfigured,
               hasErrors: false,
-              label: isOAuthConfigured ? "OAuth configured" : "OAuth incomplete",
+              label: status.label,
             };
           }
           try {
             const parsed = JSON.parse(apiKeyCredentials);
-            const hasKeys = Object.keys(parsed).length > 0;
+            const status = getSystemAuthStatus({
+              credentials: parsed,
+              multiTenancyMode,
+            });
             return {
-              isComplete: hasKeys,
+              isComplete: status.isComplete,
               hasErrors: false,
-              label: hasKeys ? "API Key set" : "No credentials",
+              label: status.label,
             };
           } catch {
             return { isComplete: false, hasErrors: true, label: "Invalid JSON" };
@@ -400,10 +425,13 @@ export function SystemConfigProvider({
       urlHost,
       authType,
       isOAuthConfigured,
+      oauthFields,
       apiKeyCredentials,
       documentationUrl,
       documentation,
       specificInstructions,
+      docFileCount,
+      multiTenancyMode,
     ],
   );
 
@@ -533,6 +561,7 @@ export function SystemConfigProvider({
           specificInstructions: specificInstructions.trim(),
           credentials: finalCredentials,
           templateName: templateName || undefined,
+          multiTenancyMode: multiTenancyMode,
         };
 
         const existingSystem = systems.find((s) => s.id === systemId);
@@ -554,12 +583,6 @@ export function SystemConfigProvider({
         await refreshSystems();
         setHasUnsavedChanges(false);
         initialRef.current = savedSystem;
-
-        toast({
-          title: "Success",
-          description: `System "${systemId}" saved successfully`,
-        });
-
         return true;
       } catch (error) {
         console.error("Error saving system:", error);
@@ -585,6 +608,7 @@ export function SystemConfigProvider({
       oauthFields,
       apiKeyCredentials,
       templateName,
+      multiTenancyMode,
       systems,
       config.superglueEndpoint,
       refreshSystems,
@@ -613,7 +637,7 @@ export function SystemConfigProvider({
       setDocumentationUrl(initial.documentationUrl || "");
       setDocumentation(initial.documentation || "");
       setSpecificInstructions(initial.specificInstructions || "");
-      setHasUploadedFile(initial.documentationUrl?.startsWith("file://") || false);
+      setMultiTenancyMode((initial.multiTenancyMode as "disabled" | "enabled") || "disabled");
     } else {
       setSystemId("");
       setSystemName("");
@@ -628,7 +652,7 @@ export function SystemConfigProvider({
       setDocumentationUrl("");
       setDocumentation("");
       setSpecificInstructions("");
-      setHasUploadedFile(false);
+      setMultiTenancyMode("disabled");
     }
     setHasUnsavedChanges(false);
   }, []);
@@ -744,6 +768,34 @@ export function SystemConfigProvider({
       setUseSuperglueOAuth: (use) => {
         setUseSuperglueOAuth(use);
         setHasUnsavedChanges(true);
+      },
+      setMultiTenancyMode: (mode) => {
+        setMultiTenancyMode(mode);
+        setHasUnsavedChanges(true);
+
+        // When enabling multi-tenancy, remove user-specific OAuth tokens
+        // Keep only OAuth setup credentials (template for end users)
+        if (mode === "enabled" && authType === "oauth") {
+          const oauthSetupFields = [
+            "client_id",
+            "client_secret",
+            "auth_url",
+            "token_url",
+            "scopes",
+            "grant_type",
+            "oauth_cert",
+            "oauth_key",
+          ];
+
+          const cleanedOAuthFields: OAuthFields = { ...DEFAULT_OAUTH_FIELDS };
+          oauthSetupFields.forEach((field) => {
+            if (oauthFields[field as keyof OAuthFields]) {
+              (cleanedOAuthFields as any)[field] = oauthFields[field as keyof OAuthFields];
+            }
+          });
+
+          setOAuthFields(cleanedOAuthFields);
+        }
       },
 
       setDocumentationUrl: (url) => {

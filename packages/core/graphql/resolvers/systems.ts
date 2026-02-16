@@ -139,6 +139,11 @@ export const upsertSystemResolver = async (
       icon: resolveField(input.icon, existingSystemOrNull?.icon, ""),
       metadata: resolveField(input.metadata, existingSystemOrNull?.metadata, {}),
       templateName: resolveField(input.templateName, existingSystemOrNull?.templateName, ""),
+      multiTenancyMode: resolveField(
+        input.multiTenancyMode,
+        existingSystemOrNull?.multiTenancyMode,
+        "disabled",
+      ),
       createdAt: existingSystemOrNull?.createdAt || now,
       updatedAt: now,
     };

@@ -1,6 +1,8 @@
 export type ServiceMetadata = {
   traceId?: string;
   orgId?: string;
+  userId?: string;
+  isRestricted?: boolean; // true if userId is from a restricted API key
 };
 
 export interface Log {
@@ -320,6 +322,7 @@ export interface System extends BaseConfig {
   metadata?: Record<string, any>;
   templateName?: string;
   documentationFiles?: DocumentationFiles;
+  multiTenancyMode?: MultiTenancyMode; // EE: When 'enabled', end users must authenticate themselves
 }
 
 export interface SystemInput {
@@ -406,6 +409,19 @@ export interface Run {
   requestSource?: RequestSource;
   traceId?: string;
   metadata: RunMetadata;
+  resultStorageUri?: string; // FileService URI where full results are stored (EE feature)
+  userId?: string; // User or end user who triggered this run
+}
+
+// Stored run results in FileService (EE feature)
+export interface StoredRunResults {
+  runId: string;
+  success: boolean;
+  data: any;
+  stepResults: ToolStepResult[];
+  toolPayload: Record<string, any>;
+  error?: string;
+  storedAt: Date;
 }
 
 export interface ApiCallArgs {
@@ -727,4 +743,43 @@ export interface OrgSettings {
   preferences: Record<string, any>;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+// ============================================
+// MULTI-TENANCY TYPES (EE)
+// ============================================
+
+export type MultiTenancyMode = "disabled" | "enabled";
+
+export interface EndUser {
+  id: string;
+  orgId: string;
+  externalId: string;
+  email?: string;
+  name?: string;
+  allowedSystems?: string[] | null; // ['*'] = all access, specific IDs = restricted, null/[] = no access
+  metadata?: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface EndUserInput {
+  externalId?: string; // Optional - same as id if not provided
+  email?: string;
+  name?: string;
+  allowedSystems?: string[] | null; // ['*'] = all access, specific IDs = restricted, null/[] = no access
+  metadata?: Record<string, any>;
+}
+
+export interface EndUserCredentialStatus {
+  systemId: string;
+  systemName?: string;
+  hasCredentials: boolean;
+  authType?: string;
+  connectedAt?: Date;
+}
+
+export interface PortalToken {
+  token: string;
+  expiresAt: Date;
 }

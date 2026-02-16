@@ -312,6 +312,7 @@ input SystemInput {
   icon: String
   metadata: JSON
   templateName: String
+  multiTenancyMode: String
 }
 
 type Log {
@@ -519,6 +520,7 @@ type System {
   icon: String
   metadata: JSON
   templateName: String
+  multiTenancyMode: String
   version: String
   createdAt: DateTime
   updatedAt: DateTime

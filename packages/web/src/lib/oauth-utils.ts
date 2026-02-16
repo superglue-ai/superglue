@@ -149,7 +149,7 @@ export const buildOAuthFieldsFromSystem = (system: System) => {
 
 const buildOAuthState = (params: {
   systemId: string;
-  apiKey: string;
+  apiKey?: string;
   tokenUrl: string;
   templateId?: string;
   clientId?: string;
@@ -161,6 +161,7 @@ const buildOAuthState = (params: {
   tokenAuthMethod?: "body" | "basic_auth";
   tokenContentType?: "form" | "json";
   extraHeaders?: Record<string, string>;
+  portalToken?: string; // Portal flow - token to fetch credentials server-side
 }): OAuthState => {
   return {
     systemId: params.systemId,
@@ -177,6 +178,7 @@ const buildOAuthState = (params: {
     ...(params.tokenAuthMethod && { tokenAuthMethod: params.tokenAuthMethod }),
     ...(params.tokenContentType && { tokenContentType: params.tokenContentType }),
     ...(params.extraHeaders && { extraHeaders: params.extraHeaders }),
+    ...(params.portalToken && { portalToken: params.portalToken }),
   };
 };
 
@@ -415,6 +417,7 @@ export const triggerOAuthFlow = (
   endpoint?: string,
   suppressErrorUI?: boolean,
   apiEndpoint?: string,
+  portalToken?: string, // Portal flow - token to fetch credentials server-side
 ): (() => void) | null => {
   if (authType !== "oauth") return null;
 
@@ -455,6 +458,7 @@ export const triggerOAuthFlow = (
     tokenAuthMethod: oauthFields.tokenAuthMethod,
     tokenContentType: oauthFields.tokenContentType,
     extraHeaders: oauthFields.extraHeaders,
+    portalToken,
   });
 
   // Determine if PKCE should be used - from oauthFields or template

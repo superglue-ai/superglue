@@ -25,6 +25,7 @@ import { SystemActionsMenu } from "@/src/components/systems/SystemActionsMenu";
 import { SystemTemplatePicker } from "@/src/components/systems/SystemTemplatePicker";
 import { useSystemPickerModal } from "@/src/components/systems/SystemPickerModalContext";
 import type { System } from "@superglue/shared";
+import { getSystemAuthStatus } from "@superglue/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -70,25 +71,22 @@ export const getAuthBadge = (
   color: "blue" | "amber" | "green";
   icon: "key" | "clock";
 } => {
-  const creds = system.credentials || {};
-  const authType = detectAuthType(creds);
+  const status = getSystemAuthStatus(system);
 
-  if (authType === "none") {
-    return { type: "none", label: "No auth", color: "amber", icon: "key" };
+  if (status.authType === "none") {
+    return { type: "none", label: status.label, color: "amber", icon: "key" };
   }
 
-  if (authType === "oauth") {
-    const hasAccess = !!creds.access_token;
-    const hasClientConfig = !!creds.client_id || !!creds.client_secret;
-
-    return hasAccess
-      ? { type: "oauth-configured", label: "OAuth configured", color: "blue", icon: "key" }
-      : hasClientConfig
-        ? { type: "oauth-incomplete", label: "OAuth incomplete", color: "amber", icon: "clock" }
-        : { type: "none", label: "No auth", color: "amber", icon: "key" };
+  if (status.authType === "oauth") {
+    return status.isComplete
+      ? { type: "oauth-configured", label: status.label, color: "blue", icon: "key" }
+      : { type: "oauth-incomplete", label: status.label, color: "amber", icon: "clock" };
   }
 
-  return { type: "apikey", label: "API Key", color: "green", icon: "key" };
+  // API Key
+  return status.isComplete
+    ? { type: "apikey", label: status.label, color: "green", icon: "key" }
+    : { type: "none", label: status.label, color: "amber", icon: "key" };
 };
 
 type SortColumn = "id" | "urlHost" | "updatedAt";

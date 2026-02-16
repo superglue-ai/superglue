@@ -4,8 +4,9 @@ import { usePathname } from "next/navigation";
 import { SystemsProvider } from "./systems-context";
 import { SchedulesProvider } from "./schedules-context";
 import { ToolsProvider } from "./tools-context";
+import { OrgMembersProvider } from "./org-members-context";
 
-const BLACKLISTED_PATHS = ["/auth", "/login"];
+const BLACKLISTED_PATHS = ["/auth", "/login", "/portal"];
 
 export function ConditionalDataProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +18,9 @@ export function ConditionalDataProvider({ children }: { children: React.ReactNod
   return (
     <ToolsProvider>
       <SystemsProvider>
-        <SchedulesProvider>{children}</SchedulesProvider>
+        <SchedulesProvider>
+          <OrgMembersProvider>{children}</OrgMembersProvider>
+        </SchedulesProvider>
       </SystemsProvider>
     </ToolsProvider>
   );

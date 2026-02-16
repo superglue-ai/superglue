@@ -16,6 +16,7 @@ export type GraphQLRequestContext = {
   orgName?: string;
   orgRole?: UserRole;
   requestSource?: RequestSource;
+  isRestricted?: boolean; // EE: true if userId is from a restricted API key
 
   toMetadata: () => ServiceMetadata;
 };

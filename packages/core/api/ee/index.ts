@@ -8,9 +8,26 @@
  * The core code will continue to work with "allow all" behavior.
  */
 
+// Import EE feature modules - these self-register their hooks
+import "./api-key-scopes.js";
+import "./discovery-runs.js";
+import "./end-users.js";
+import "./metrics.js";
+import "./schedules.js";
+import "./settings.js";
+import "./run-results.js";
+import "./tool-history.js";
+import "./webhooks.js";
+import "./notify-email.js";
+import "./seed.js";
+
 // Re-export the hook registry for use in core code
 export {
   checkGraphQLAccess,
   checkToolExecutionPermission,
   filterToolsByPermission,
+  checkToolExecutionPermissionAsync,
+  filterToolsByPermissionAsync,
+  type ScopeContext,
+  type AsyncScopeContext,
 } from "./scope-hooks.js";

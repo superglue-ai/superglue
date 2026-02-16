@@ -32,12 +32,68 @@ EE-only code lives in `ee/` subdirs:
 - **Error handling** - use `sendError(reply, 404, "message")` helper, never throw in handlers
 - **Mapping functions** - name them `mapXToY` (e.g., `mapRunToOpenAPI`)
 - **Dates in responses** - always `.toISOString()` for API responses
+- **Object params for functions** - use `{ param1, param2 }` destructuring for exported functions and functions with 3+ parameters
 
 ## After Completing a Feature
 
 1. `npm run lint:fix` - format code
 2. `npm run type-check` - catch type errors
 3. `npm run test` - run tests if you touched tested code
+
+## Rebasing on Main
+
+When rebasing a feature branch onto main, follow this approach:
+
+### Core Principles
+1. **Always ask about conflicts** - never make assumptions about which version to keep
+2. **Verify against source of truth** - check actual state (DB schema, API contracts, config files, etc.)
+3. **Understand what changed** - investigate why main's version differs from yours
+4. **Make informed decisions** - resolve based on context, not convenience
+
+### Process
+```bash
+git rebase main
+```
+
+When conflicts occur:
+
+1. **Understand both versions**:
+   ```bash
+   git show HEAD:path/to/file          # Main's version
+   git show COMMIT_HASH:path/to/file   # Your branch's version
+   git diff HEAD...BRANCH              # See all differences
+   ```
+
+2. **Verify against reality**:
+   - **Database**: Query actual schema, check for views vs tables
+   - **APIs**: Verify endpoint contracts, response shapes
+   - **Environment**: Check actual env vars, config files
+   - **Dependencies**: Confirm installed package versions
+   - **External services**: Validate integration requirements
+
+3. **Ask when unclear**:
+   - "What changed in main that caused this conflict?"
+   - "Which version matches the actual [database/API/config]?"
+   - "Are there related changes I should be aware of?"
+
+4. **Resolve intelligently**:
+   - Don't blindly merge both versions
+   - Don't assume your branch is more up-to-date
+   - Check for subtle differences (field names, types, nullability)
+   - Remove references to non-existent resources
+
+5. **After resolving**:
+   ```bash
+   git add <resolved-files>
+   git rebase --continue
+   ```
+
+### Common Pitfalls
+- **Merging both without verification** - creates invalid code
+- **Assuming field names match** - `end_user_id` in code might be `user_id` in DB
+- **Ignoring auto-generated files** - often safer to use one version entirely
+- **Not checking data sources** - frontend may use different endpoints than backend
+- **Skipping validation** - always verify the resolution makes sense
 
 ## Adding a REST Endpoint
 

@@ -6,27 +6,28 @@ import {
   UserRole,
 } from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
-import type { DataStore } from "../datastore/types.js";
+import type { EEDataStore } from "../datastore/ee/types.js";
 import type { WorkerPools } from "../worker/types.js";
-import type { DocumentationFiles, FileStatus } from "@superglue/shared";
+import type { DocumentationFiles, FileStatus, MultiTenancyMode } from "@superglue/shared";
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
-  authInfo: {
-    orgId: string;
-    userId?: string;
-    userEmail?: string;
-    userName?: string;
-    orgName?: string;
-    orgRole?: UserRole;
-    // EE: API key permission fields
-    isRestricted?: boolean;
-    allowedTools?: string[];
-  };
-  datastore: DataStore;
+  authInfo: AuthInfo;
+  datastore: EEDataStore;
   workerPools: WorkerPools;
 
   toMetadata: () => ServiceMetadata;
+}
+
+export interface AuthInfo {
+  orgId: string;
+  userId?: string;
+  orgName?: string;
+  orgRole?: UserRole;
+  // EE: Effective permissions (intersection of API key + end user scopes)
+  isRestricted?: boolean;
+  allowedTools?: string[]; // ['*'] means all tools allowed
+  allowedSystems?: string[] | null; // null or ['*'] means all systems allowed
 }
 
 export interface RouteHandler {
@@ -82,6 +83,8 @@ export interface OpenAPIRun {
   options?: Record<string, unknown>;
   requestSource?: string;
   traceId?: string;
+  resultStorageUri?: string; // S3 URI where full results are stored (EE feature)
+  userId?: string; // User or end user who triggered this run
   metadata: OpenAPIRunMetadata;
 }
 
@@ -118,6 +121,7 @@ export interface CreateSystemBody {
   credentials?: Record<string, any>;
   specificInstructions?: string;
   templateName?: string;
+  multiTenancyMode?: MultiTenancyMode;
   documentationFiles?: DocumentationFiles;
   icon?: string;
   metadata?: Record<string, any>;
@@ -131,6 +135,7 @@ export interface UpdateSystemBody {
   credentials?: Record<string, any>;
   metadata?: Record<string, any>;
   templateName?: string;
+  multiTenancyMode?: MultiTenancyMode;
   documentationFiles?: DocumentationFiles;
 }
 

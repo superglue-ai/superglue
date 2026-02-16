@@ -1,23 +1,12 @@
-import { FileStore } from "./filestore.js";
-import { MemoryStore } from "./memory.js";
-import { PostgresService } from "./postgres.js";
-import { DataStore } from "./types.js";
+import { EEPostgresService } from "./ee/postgres.js";
+import { EEDataStore } from "./ee/types.js";
 
-export function createDataStore(config: { type: "memory" | "file" | "postgres" }): DataStore {
-  if (config.type === "file") {
-    const fileStoreConfig = getFileStoreConfig();
-    return new FileStore(fileStoreConfig.storageDir);
-  }
+export function createDataStore(config: { type: "postgres" }): EEDataStore {
   if (config.type === "postgres") {
     const postgresConfig = getPostgresConfig();
-    return new PostgresService(postgresConfig);
+    return new EEPostgresService(postgresConfig);
   }
-  if (config.type === "memory") {
-    return new MemoryStore();
-  }
-  throw new Error(
-    `Unsupported datastore type: ${config.type}. Use 'file', 'postgres', or 'memory'.`,
-  );
+  throw new Error(`Unsupported datastore type: ${config.type}.`);
 }
 
 export function getFileStoreConfig() {

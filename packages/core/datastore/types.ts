@@ -54,6 +54,8 @@ export interface DataStore {
     status?: RunStatus;
     requestSources?: RequestSource[];
     orgId?: string;
+    userId?: string;
+    systemId?: string;
   }): Promise<{ items: Run[]; total: number }>;
   createRun(params: { run: Run; orgId?: string }): Promise<Run>;
   updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run>;

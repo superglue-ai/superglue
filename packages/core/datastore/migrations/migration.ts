@@ -5,6 +5,47 @@ export interface LegacyRunRow {
   config_id: string;
   started_at: Date;
   completed_at: Date;
+  request_source?: string;
+  result_storage_uri?: string;
+  user_id?: string;
+}
+
+/**
+ * Normalizes ApiConfig from old urlHost/urlPath to new url field.
+ * Deletes deprecated fields after normalization.
+ */
+export function normalizeApiConfig(config: any): any {
+  if (!config) return config;
+
+  // Compose url from old fields if url doesn't exist
+  if (!config.url && (config.urlHost || config.urlPath)) {
+    config.url = composeUrl(config.urlHost || "", config.urlPath || "");
+  }
+
+  // Delete deprecated fields
+  delete config.urlHost;
+  delete config.urlPath;
+
+  return config;
+}
+
+/**
+ * Normalizes System from old urlHost/urlPath to new url field.
+ * Deletes deprecated fields after normalization.
+ */
+export function normalizeSystem(system: any): System {
+  if (!system) return system;
+
+  // Compose url from old fields if url doesn't exist
+  if (!system.url && (system.urlHost || system.urlPath)) {
+    system.url = composeUrl(system.urlHost || "", system.urlPath || "");
+  }
+
+  // Delete deprecated fields
+  delete system.urlHost;
+  delete system.urlPath;
+
+  return system;
 }
 
 function isLegacyRun(data: any): boolean {
@@ -74,6 +115,8 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
     options: data.options,
     requestSource: data.requestSource,
     traceId: data.traceId,
+    resultStorageUri: row.result_storage_uri || data.resultStorageUri || undefined,
+    userId: row.user_id || data.userId || undefined,
     metadata: {
       startedAt: startedAt.toISOString(),
       completedAt: completedAt?.toISOString(),

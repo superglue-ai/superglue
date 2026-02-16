@@ -26,6 +26,7 @@ export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
   const isEmbeddedPage = pathname?.startsWith("/embedded");
+  const isPortalPage = pathname?.startsWith("/portal");
   const token = useToken();
 
   return (
@@ -35,26 +36,35 @@ export function ClientWrapper({ children, config }: Props) {
           <RightSidebarProvider>
             <AgentModalProvider>
               <SystemPickerModalProvider>
-                <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
-                  {isAuthPage || isEmbeddedPage ? (
-                    children
-                  ) : (
-                    <div className="flex h-screen overflow-hidden">
-                      {token && <LeftSidebar />}
-                      <div className="relative flex-1 min-w-0 h-full">
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={pathname}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="w-full h-full overflow-y-auto"
-                          >
-                            {children}
-                          </motion.div>
-                        </AnimatePresence>
-                        <SystemPickerModalContent />
-                        <AgentModalContent />
+                <UpgradeModalProvider>
+                  <div
+                    className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}
+                  >
+                    {isAuthPage || isEmbeddedPage || isPortalPage ? (
+                      children
+                    ) : (
+                      <div className="flex h-screen overflow-hidden">
+                        {token && <LeftSidebar />}
+                        <div className="relative flex-1 min-w-0 h-full">
+                          <AnimatePresence mode="wait">
+                            <motion.div
+                              key={pathname}
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="w-full h-full overflow-y-auto"
+                            >
+                              {children}
+                            </motion.div>
+                          </AnimatePresence>
+                          <SystemPickerModalContent />
+                          <AgentModalContent />
+                        </div>
+                        {token && (
+                          <div className="hidden lg:flex h-full flex-shrink-0">
+                            <RightSidebar />
+                          </div>
+                        )}
                       </div>
                       {token && (
                         <div className="hidden lg:flex h-full flex-shrink-0">

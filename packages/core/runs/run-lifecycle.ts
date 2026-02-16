@@ -3,8 +3,15 @@
  * Context is passed through (not stored) for stateless operation.
  */
 
-import type { RequestOptions, RequestSource, Tool, ToolStepResult } from "@superglue/shared";
-import { RunStatus, RequestSource as RSrc } from "@superglue/shared";
+import type {
+  RequestOptions,
+  RequestSource,
+  ServiceMetadata,
+  StoredRunResults,
+  Tool,
+  ToolStepResult,
+} from "@superglue/shared";
+import { RunStatus, RequestSource as RSrc, sampleResultObject } from "@superglue/shared";
 import type { DataStore } from "../datastore/types.js";
 import { NotificationService } from "../notifications/index.js";
 import { logMessage } from "../utils/logs.js";
@@ -16,6 +23,7 @@ export interface StartRunParams {
   payload?: Record<string, unknown>;
   options?: RequestOptions;
   requestSource: RequestSource;
+  userId?: string; // User or end user who triggered this run
 }
 
 export interface RunContext {
@@ -40,12 +48,12 @@ const NOTIFICATION_EXCLUDED_SOURCES: RequestSource[] = [RSrc.FRONTEND, RSrc.MCP]
 export class RunLifecycleManager {
   private datastore: DataStore;
   private orgId: string;
-  private metadata: { orgId: string; traceId?: string };
+  private metadata: ServiceMetadata;
 
-  constructor(datastore: DataStore, orgId: string, metadata: { orgId?: string; traceId?: string }) {
+  constructor(datastore: DataStore, orgId: string, metadata: ServiceMetadata) {
     this.datastore = datastore;
     this.orgId = orgId;
-    this.metadata = { orgId, traceId: metadata.traceId };
+    this.metadata = { ...metadata, orgId };
   }
 
   /**
@@ -53,7 +61,7 @@ export class RunLifecycleManager {
    * Returns the full context needed for completeRun/abortRun
    */
   async startRun(params: StartRunParams): Promise<RunContext> {
-    const { tool, payload, options, requestSource } = params;
+    const { tool, payload, options, requestSource, userId } = params;
     const runId = params.runId || crypto.randomUUID();
     const startedAt = new Date();
 
@@ -76,6 +84,7 @@ export class RunLifecycleManager {
         ...(payload !== undefined && { toolPayload: payload }),
         options,
         requestSource,
+        userId: userId || this.metadata.userId,
         metadata: {
           startedAt: startedAt.toISOString(),
         },

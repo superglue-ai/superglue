@@ -1,6 +1,7 @@
 import { findTemplateForSystem, ServiceMetadata, System, Tool } from "@superglue/shared";
 import { isMainThread, parentPort } from "worker_threads";
 import { DataStore } from "../datastore/types.js";
+import { isEEDataStore } from "../datastore/ee/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { logMessage } from "../utils/logs.js";
 import { isTokenExpired, refreshOAuthToken } from "../utils/oauth-token-refresh.js";
@@ -322,6 +323,28 @@ export class SystemManager {
         await manager.refreshTokenIfNeeded();
       }),
     );
+
+    // EE: If this is an end user key, merge end-user credentials for multi-tenancy systems
+    if (metadata.isRestricted && metadata.userId && isEEDataStore(dataStore)) {
+      await Promise.all(
+        managers.map(async (manager) => {
+          const system = manager.toSystemSync();
+          if (system.multiTenancyMode === "enabled") {
+            const endUserCreds = await dataStore.getEndUserCredentials({
+              endUserId: metadata.userId!,
+              systemId: system.id,
+              orgId: metadata.orgId!,
+            });
+            if (endUserCreds) {
+              // Merge end-user credentials over system template credentials
+              // End-user creds take precedence (e.g., their access_token over template client_id)
+              manager._system.credentials = { ...system.credentials, ...endUserCreds };
+              logMessage("debug", `Merged end-user credentials for system ${system.id}`, metadata);
+            }
+          }
+        }),
+      );
+    }
 
     return managers;
   }

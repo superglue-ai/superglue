@@ -62,8 +62,8 @@ export const authMiddleware = async (req: any, res: any, next: any) => {
     userId: authResult.userId,
     orgName: authResult.orgName,
     orgRole: authResult.orgRole,
-    isRestricted: authResult.isRestricted,
     allowedTools: authResult.allowedTools,
+    isRestricted: authResult.isRestricted,
   };
 
   return next();

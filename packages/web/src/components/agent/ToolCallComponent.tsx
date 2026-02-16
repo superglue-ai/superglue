@@ -10,6 +10,7 @@ import {
   DefaultComponent,
   EditPayloadComponent,
   ModifySystemComponent,
+  RunResultsComponent,
   ToolBuilderComponent,
 } from "./tool-components";
 
@@ -122,6 +123,8 @@ export function ToolCallComponent({
       );
 
     case "get_runs":
+      return <RunResultsComponent tool={tool} onInputChange={onInputChange} />;
+
     case "find_system_templates":
     case "web_search":
     case "search_documentation":
