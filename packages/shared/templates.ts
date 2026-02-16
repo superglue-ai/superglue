@@ -2348,6 +2348,12 @@ export const systems: Record<string, SystemConfig> = {
       "graph",
       "oauth",
     ],
+    systemSpecificInstructions: `Azure App Registration Required: Create an app in Azure Portal → App registrations with redirect URI: https://app.superglue.cloud/api/auth/callback
+    Tenant-Specific Endpoints: Multi-tenant apps need tenant ID in OAuth URLs (/04a63d67.../oauth2/v2.0/authorize) instead of /common endpoint
+    Credentials Needed: Application (client) ID + Client Secret (generated under Certificates & secrets - copy the Value immediately, not the Secret ID)
+    API Permissions: Add Microsoft Graph permissions (e.g., Sites.ReadWrite.All) under API permissions, then grant admin consent if you have admin rights
+    Scopes Must Include: Always add offline_access scope to get refresh tokens for long-term access without re-authentication 
+    `,
   },
   redis: {
     name: "redis",

@@ -166,6 +166,7 @@ export class AgentClient {
         if (msg.parts) {
           for (const part of msg.parts) {
             if (part.type === "content") {
+              if (!part.content?.trim()) continue;
               aiMessages.push({
                 role: "assistant",
                 content: [{ type: "text", text: part.content }],

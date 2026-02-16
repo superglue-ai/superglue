@@ -645,6 +645,9 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
       ...systemInput,
       credentials: { ...oauthCreds, ...systemInput.credentials },
     };
+
+    documentationUrl = documentationUrl || template.docsUrl || undefined;
+    openApiUrl = openApiUrl || template.openApiUrl || undefined;
   }
 
   const docResult = resolveDocumentationFiles(
@@ -719,12 +722,28 @@ const processCreateSystemConfirmation = async (
       };
     }
 
-    const finalCredentials = {
-      ...(systemConfig.credentials || {}),
-      ...userProvidedCredentials,
-    };
+    const {
+      sensitiveCredentials: _,
+      templateId,
+      documentationUrl: inputDocUrl,
+      openApiUrl: inputOpenApiUrl,
+      documentation: _doc,
+      documentationKeywords: _kw,
+      ...cleanSystemConfig
+    } = systemConfig;
 
-    const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
+    const templateForDocs = templateId ? systems[templateId] : undefined;
+    const documentationUrl = inputDocUrl || templateForDocs?.docsUrl || undefined;
+    const openApiUrl = inputOpenApiUrl || templateForDocs?.openApiUrl || undefined;
+
+    if (templateId && !cleanSystemConfig.templateName) {
+      cleanSystemConfig.templateName = templateId;
+    }
+
+    const finalCredentials = mergeCredentials(
+      { ...(cleanSystemConfig.credentials || {}), ...userProvidedCredentials },
+      undefined,
+    );
 
     try {
       const result = await ctx.superglueClient.upsertSystem(
