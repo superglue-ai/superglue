@@ -1198,8 +1198,15 @@ export class PostgresService implements DataStore {
   }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
-      const query =
-        "UPDATE workflow_schedules SET next_run_at = $1, last_run_at = $2 WHERE id = $3";
+      // Claim semantics: only update schedules that are still due and enabled.
+      // This prevents multiple scheduler workers from advancing the same schedule.
+      const query = `
+        UPDATE workflow_schedules
+        SET next_run_at = $1, last_run_at = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+          AND enabled = true
+          AND next_run_at <= CURRENT_TIMESTAMP
+      `;
       const result = await client.query(query, [
         params.nextRunAt ? params.nextRunAt.toISOString() : null,
         params.lastRunAt ? params.lastRunAt.toISOString() : null,

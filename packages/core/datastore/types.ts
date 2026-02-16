@@ -134,6 +134,7 @@ export interface DataStore {
   upsertToolSchedule(params: { schedule: ToolScheduleInternal }): Promise<void>;
   deleteToolSchedule(params: { id: string; orgId: string }): Promise<boolean>;
   listDueToolSchedules(): Promise<ToolScheduleInternal[]>;
+  // Claim and advance a due schedule. Returns false when already claimed or not due.
   updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date }): Promise<boolean>;
 
   // DiscoveryRun Methods

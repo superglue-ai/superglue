@@ -798,6 +798,29 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         expect(retrieved[0].nextRunAt.getTime()).toEqual(expectedTime.getTime());
       });
 
+      it("should only allow one scheduler claim for the same due schedule", async () => {
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: testWorkflow,
+          orgId: testOrgId,
+        });
+        await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
+
+        const firstClaim = await store.updateScheduleNextRun({
+          id: testWorkflowSchedule.id,
+          nextRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          lastRunAt: new Date(),
+        });
+        const secondClaim = await store.updateScheduleNextRun({
+          id: testWorkflowSchedule.id,
+          nextRunAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+          lastRunAt: new Date(),
+        });
+
+        expect(firstClaim).toBe(true);
+        expect(secondClaim).toBe(false);
+      });
+
       it("should return false if workflow schedule is not found", async () => {
         const success = await store.updateScheduleNextRun({
           id: testWorkflowSchedule.id,
