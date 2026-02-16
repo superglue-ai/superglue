@@ -81,6 +81,9 @@ const buildToolDefinition = (): ToolDefinition => ({
       - Building can take up to several minutes.
       - Use file::<key> in payload values to reference uploaded files (gets replaced with actual parsed content)
       - Returns a draftId - use this ID with run_tool to test, edit_tool to fix errors, or save_tool to persist.
+      - Only include a response schema (outputSchema) if the user explicitly requests a certain response structure.
+      - If you add a response schema, do not forget to update the outputTransform to map step data to the new response schema.
+      - Keep instructions focused on user intent, required data retrieval steps, transformations and final response structure.
     </important_notes>
     `,
   inputSchema: {
@@ -140,7 +143,7 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: error.message,
-      suggestion: "Check that systems are set up correctly and try again",
+      next_step: "Check that systems are set up correctly and try again",
     };
   }
 };
@@ -177,7 +180,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
 
   const idValidation = validateDraftOrToolId(draftId, toolId);
   if (idValidation.valid === false) {
-    return { success: false, error: idValidation.error, suggestion: idValidation.suggestion };
+    return { success: false, error: idValidation.error, next_step: idValidation.next_step };
   }
 
   const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
@@ -198,7 +201,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       return {
         success: false,
         error: error.message,
-        suggestion: "Check that the tool ID exists and all required credentials are provided",
+        next_step: "Check that the tool ID exists and all required credentials are provided",
       };
     }
   } else {
@@ -207,8 +210,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       return {
         success: false,
         error: `Draft not found: ${draftId}`,
-        suggestion:
-          "Draft not found in conversation history. Use build_tool to create a new draft.",
+        next_step: "Draft not found in conversation history. Use build_tool to create a new draft.",
       };
     }
     toolConfig = draft.config;
@@ -226,7 +228,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       config: stripLegacyToolFields(toolConfig),
       inputSchema: schema,
       providedPayload: resolvedPayload,
-      suggestion: `This tool requires the following inputs: ${JSON.stringify(schema.properties || {}, null, 2)}. Please provide values for: ${missingFields.join(", ")}`,
+      next_step: `This tool requires the following inputs: ${JSON.stringify(schema.properties || {}, null, 2)}. Please provide values for: ${missingFields.join(", ")}`,
     };
   }
 
@@ -257,9 +259,9 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
         config: stripLegacyToolFields(toolConfig),
         data: result.data,
         error: result.error,
-        suggestion: isDraft
-          ? "Use edit_tool with this draftId to fix the error, or try run_tool again."
-          : "Check the error and try again",
+        next_step: isDraft
+          ? "You must use search_documentation and/or web_search to diagnose the issue before making changes. Then use edit_tool with this draftId to fix the error."
+          : "You must use search_documentation and/or web_search to diagnose the issue before trying again.",
       };
     }
 
@@ -281,9 +283,9 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       ...(isDraft ? { draftId, traceId } : {}),
       config: stripLegacyToolFields(toolConfig),
       error: error.message,
-      suggestion: isDraft
-        ? "Use edit_tool with this draftId to fix the error"
-        : "Check that the tool ID exists and all required credentials are provided",
+      next_step: isDraft
+        ? "You must use search_documentation and/or web_search to diagnose the issue before making changes. Then use edit_tool with this draftId to fix the error."
+        : "You must use search_documentation and/or web_search to diagnose the issue. Check that the tool ID exists and all required credentials are provided.",
     };
   }
 };
@@ -296,13 +298,16 @@ const editToolDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
-      - ALWAYS use this instead of build_tool when modifying an existing tool (draft or saved).
+      - You must use this instead of build_tool when modifying an existing tool (draft or saved).
       - Uses diff-based approach - makes minimal targeted changes rather than rebuilding from scratch.
       - Provide either draftId (from build_tool) OR toolId (for saved tools), not both.
       - Provide specific fix instructions (e.g., "change the endpoint to /v2/users", "remove extra fields from finalTransform", "fix the response schema mapping").
       - The fix creates an updated draft - use run_tool to test, then save_tool to persist.
       - After fixing, use run_tool with the returned draftId to test the updated draft.
       - CRITICAL: You MUST include the payload parameter with the exact same test data that was used in build_tool. Copy it from the build_tool call in the conversation history. Without this payload, users cannot test the fixed tool. Use an empty object {} only if the tool genuinely requires no input.
+      - Whenever you add new steps, always make sure that every step has the right systemId for an existing, available system.
+      - If you add a response schema, do not forget to update the outputTransform to map step data to the new response schema.
+      - When you edit an existing saved tool, edits are not automatically persisted. Call save_tool to ensure changes are saved.
     </important_notes>
     `,
   inputSchema: {
@@ -329,7 +334,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
 
   const idValidation = validateDraftOrToolId(draftId, toolId);
   if (idValidation.valid === false) {
-    return { success: false, error: idValidation.error, suggestion: idValidation.suggestion };
+    return { success: false, error: idValidation.error, next_step: idValidation.next_step };
   }
 
   let draft: DraftLookup | null = null;
@@ -342,7 +347,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
         return {
           success: false,
           error: `Tool not found: ${toolId}`,
-          suggestion: "Check that the tool ID exists",
+          next_step: "Check that the tool ID exists",
         };
       }
       const stepSystemIds = savedTool.steps
@@ -359,7 +364,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
       return {
         success: false,
         error: `Failed to fetch tool: ${error.message}`,
-        suggestion: "Check that the tool ID exists and you have access",
+        next_step: "Check that the tool ID exists and you have access",
       };
     }
   } else {
@@ -370,7 +375,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: `Draft not found: ${workingDraftId}`,
-      suggestion: "Draft not found in conversation history. Use build_tool to create a new draft.",
+      next_step: "Draft not found in conversation history. Use build_tool to create a new draft.",
     };
   }
 
@@ -402,7 +407,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
       success: false,
       draftId: workingDraftId,
       error: error.message,
-      suggestion: "Fix failed. Try different fix instructions or rebuild the tool.",
+      next_step: "Fix failed. Try different fix instructions or rebuild the tool.",
     };
   }
 };
@@ -501,7 +506,7 @@ const runSaveTool = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: `Draft not found: ${draftId}`,
-      suggestion: "Draft not found in conversation history. Use build_tool to create a new draft.",
+      next_step: "Draft not found in conversation history. Use build_tool to create a new draft.",
     };
   }
 
@@ -526,7 +531,7 @@ const runSaveTool = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: error.message,
-      suggestion: "Failed to save tool. Check the error and try again.",
+      next_step: "Failed to save tool. Check the error and try again.",
     };
   }
 };
@@ -539,13 +544,21 @@ const createSystemDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
-      - Use templateId when creating systems for known services (slack, github, stripe, etc.) - this auto-populates urlHost, urlPath, documentationUrl, and OAuth config.
-      - When using templateId, you only need to provide: id, templateId, and credentials (if required by the auth type).
-      - For OAuth auth: create the system first, then call authenticate_oauth to trigger the OAuth flow.
-      - Providing a documentationUrl will trigger asynchronous API documentation processing.
-      - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files.
+      - Use find_system first to check if the system exists and get template information (OAuth config, documentation URL, etc.).
+      - For systems that require OAuth (like Slack, GitHub, etc.) but do not support pre-configured OAuth, you MUST set sensitiveCredentials: { client_secret: true, client_id: true } when calling create_system.
+      - slack, salesforce, asana, notion, airtable, jira, confluence are the only templates that support pre-configured oauth
+      - Use templateId when creating systems for known services; it auto-populates system endpoints, OAuth settings and . For the list above, this also contains pre-configured client_id and secrets, but ONLY for pre-configured oauth templates.
+      - If you know documentationUrls and/or openapi urls, pass them to initialize the system knowledge base. documentationUrl triggers a one-time background scrape, openApiUrl fetches and stores the OpenAPI spec. The URLs themselves are not stored on the system; the resulting content is stored under documentationFiles.
+      - Use the files field (file::filename) to upload documentation files directly; they are stored under documentationFiles.
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions'.
-    </important_notes>`,
+      - For OAuth: store client_id and client_secret on the system via create_system FIRST, then call authenticate_oauth. authenticate_oauth reads credentials from the system or our preconfigured oauth templates, not from its own tool args.
+    </important_notes>
+    
+    <credential_handling>
+      - Use 'credentials' for NON-SENSITIVE credentials: auth_url, token_url, scopes, grant_type, redirect_uri
+      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
+      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
+    </credential_handling>`,
   inputSchema: {
     type: "object",
     properties: {
@@ -610,7 +623,7 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
       return {
         success: false,
         error: `Template '${templateId}' not found`,
-        suggestion: `Available templates: ${Object.keys(systems).join(", ")}`,
+        next_step: `Available templates: ${Object.keys(systems).join(", ")}`,
       };
     }
 
@@ -655,8 +668,8 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
   if ("error" in docResult) {
     return {
       success: false,
-      error: docResult.error,
-      suggestion:
+      error: fileUploadResult.error,
+      next_step:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
@@ -681,7 +694,7 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: error.message,
-      suggestion: "Failed to create system. Validate all system inputs and try again.",
+      next_step: "Failed to create system. Validate all system inputs and try again.",
     };
   }
 };
@@ -713,7 +726,7 @@ const processCreateSystemConfirmation = async (
         output: JSON.stringify({
           success: false,
           error: "Missing system configuration",
-          suggestion: "System configuration is required to create the system.",
+          next_step: "System configuration is required to create the system.",
         }),
         status: "completed",
       };
@@ -741,7 +754,7 @@ const processCreateSystemConfirmation = async (
         output: JSON.stringify({
           success: false,
           error: error.message,
-          suggestion: "Failed to create system. Validate all system inputs and try again.",
+          next_step: "Failed to create system. Validate all system inputs and try again.",
         }),
         status: "completed",
       };
@@ -770,13 +783,18 @@ const editSystemDefinition = (): ToolDefinition => ({
 
     <important_notes>
       - When users mention API constraints (rate limits, special endpoints, auth requirements, etc.), capture them in 'specificInstructions' to guide tool building.
-      - Providing a documentationUrl will trigger asynchronous API documentation processing.
-      - For documentation field, you can provide raw documentation text OR use file::filename to reference uploaded files. For multiple files, use comma-separated: file::doc1.pdf,file::doc2.pdf
-      - When referencing files in the documentation field, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
-      - Files persist for the entire conversation session (until page refresh or new conversation)
-      - When providing files as system documentation input, the files you use will overwrite the current documentation content. Ensure to include ALL required files always, even if the user only asks you to add one.
-      - If you provide documentationUrl, include relevant keywords in 'documentationKeywords' to improve documentation search (e.g., endpoint names, data objects, key concepts mentioned in conversation).
-    </important_notes>`,
+      - When referencing files, use the exact file key (file::<key>) exactly as shown (e.g., file::my_data_csv). Do NOT use the original filename.
+      - If you use the same credential key name as an existing credential, the existing credential will be overwritten.
+    </important_notes>
+
+    <credential_handling>
+      - Use 'credentials' for NON-SENSITIVE config: client_id, auth_url, token_url, scopes, grant_type, redirect_uri
+      - Use 'sensitiveCredentials' for SECRETS that require user input: { api_key: true, client_secret: true }
+      - When sensitiveCredentials is set, a secure UI appears for users to enter the actual values
+      - NEVER ask users to paste secrets in chat - always use sensitiveCredentials instead
+      - Sensitive credential values you see (like <<masked_api_key>>) are placeholders, not real values
+    </credential_handling>
+    `,
   inputSchema: {
     type: "object",
     properties: {
@@ -819,8 +837,8 @@ const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
   if ("error" in docResult) {
     return {
       success: false,
-      error: docResult.error,
-      suggestion:
+      error: fileUploadResult.error,
+      next_step:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
@@ -832,11 +850,47 @@ const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
   }
 
   try {
-    const result = await ctx.superglueClient.upsertSystem(
-      systemInput.id,
-      systemInput,
-      UpsertMode.UPDATE,
-    );
+    const existingSystem = await ctx.superglueClient.getSystem(patchPayload.id);
+    if (!existingSystem) {
+      return {
+        success: false,
+        error: "System not found",
+        next_step: "Check the system id and try again.",
+      };
+    }
+
+    if (!hasPatchableSystemFields(patchPayload) && fileUploadResult.files.length > 0) {
+      await ctx.superglueClient.uploadSystemFileReferences(patchPayload.id, fileUploadResult.files);
+      const updated = await ctx.superglueClient.getSystem(patchPayload.id);
+      return {
+        success: true,
+        systemId: patchPayload.id,
+        system: filterSystemFields(updated || existingSystem),
+      };
+    }
+
+    if (patchPayload.credentials) {
+      patchPayload.credentials = mergeCredentials(
+        patchPayload.credentials,
+        existingSystem?.credentials,
+      );
+    }
+
+    const result = await ctx.superglueClient.updateSystem(patchPayload.id, patchPayload);
+
+    if (fileUploadResult.files.length > 0) {
+      try {
+        await ctx.superglueClient.uploadSystemFileReferences(result.id, fileUploadResult.files);
+      } catch (uploadError: any) {
+        return {
+          success: true,
+          systemId: result.id,
+          system: filterSystemFields(result),
+          warning: `System updated but file upload failed: ${uploadError.message}`,
+        };
+      }
+    }
+
     return {
       success: true,
       systemId: result.id,
@@ -846,7 +900,7 @@ const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: error.message,
-      suggestion: "Failed to modify system. Validate all system inputs and try again.",
+      next_step: "Failed to modify system. Validate all system inputs and try again.",
     };
   }
 };
@@ -878,7 +932,7 @@ const processEditSystemConfirmation = async (
         output: JSON.stringify({
           success: false,
           error: "Missing system configuration",
-          suggestion: "System configuration is required to update the system.",
+          next_step: "System configuration is required to update the system.",
         }),
         status: "completed",
       };
@@ -892,10 +946,43 @@ const processEditSystemConfirmation = async (
     const { sensitiveCredentials: _, ...cleanSystemConfig } = systemConfig;
 
     try {
-      const result = await ctx.superglueClient.upsertSystem(
-        cleanSystemConfig.id,
-        { ...cleanSystemConfig, credentials: finalCredentials },
-        UpsertMode.UPDATE,
+      const existingSystem = await ctx.superglueClient.getSystem(cleanSystemConfig.id);
+      if (!existingSystem) {
+        return {
+          output: JSON.stringify({
+            success: false,
+            error: "System not found",
+            next_step: "Check the system id and try again.",
+          }),
+          status: "completed",
+        };
+      }
+
+      const fileUploadResult = extractFilePayloadsForUpload(input.files, ctx.filePayloads);
+      const hasFilesToUpload = !("error" in fileUploadResult) && fileUploadResult.files.length > 0;
+      if (
+        !hasPatchableSystemFields(cleanSystemConfig) &&
+        hasFilesToUpload &&
+        !("error" in fileUploadResult)
+      ) {
+        await ctx.superglueClient.uploadSystemFileReferences(
+          cleanSystemConfig.id,
+          fileUploadResult.files,
+        );
+        const updated = await ctx.superglueClient.getSystem(cleanSystemConfig.id);
+        return {
+          output: JSON.stringify({
+            success: true,
+            systemId: cleanSystemConfig.id,
+            system: filterSystemFields(updated || existingSystem),
+          }),
+          status: "completed",
+        };
+      }
+
+      const finalCredentials = mergeCredentials(
+        { ...(cleanSystemConfig.credentials || {}), ...userProvidedCredentials },
+        existingSystem?.credentials,
       );
       return {
         output: JSON.stringify({
@@ -910,7 +997,7 @@ const processEditSystemConfirmation = async (
         output: JSON.stringify({
           success: false,
           error: error.message,
-          suggestion: "Failed to modify system. Validate all system inputs and try again.",
+          next_step: "Failed to modify system. Validate all system inputs and try again.",
         }),
         status: "completed",
       };
@@ -933,14 +1020,13 @@ const callSystemDefinition = (): ToolDefinition => ({
   name: "call_system",
   description: `
     <use_case>
-      Used to test systems and endpoints before building tools. Use this to explore APIs, databases, and file servers, verify authentication, test endpoints, and examine response formats.
-      Perfect for quickly understanding how a system works before building a tool.
+      Use this to explore APIs, databases, and file servers, verify authentication, test endpoints, and examine response formats BEFORE building tools.
     </use_case>
 
     <important_notes>
-      - Supports HTTP/HTTPS URLs for REST APIs
-      - Supports postgres:// and postgresql:// URLs for PostgreSQL databases
-      - Supports sftp://, ftp://, and ftps:// URLs for file transfer operations
+      - Only call ONE AT A TIME - NEVER multiple call_system in parallel in the same turn.
+      - When constructing auth headers / URLs: Use the exact placeholders from the credential keys stored in the system. You must add authentication params, superglue does not do this for you.
+      - When a call_system fails, You must use search_documentation and/or web_search to diagnose the issue before proceeding.
       - Supports credential injection using placeholders: <<system_id_credential_key>>
       - When a systemId is provided, OAuth tokens are automatically refreshed if expired
     </important_notes>
@@ -1034,13 +1120,18 @@ const runCallSystem = async (
       protocol,
       data: result.data,
       error: result.error,
-    });
+      next_step: result.error
+        ? "You must use search_documentation and/or web_search to diagnose the issue before making changes."
+        : undefined,
+    } as CallSystemResult);
   } catch (error) {
     return {
       success: false,
       protocol,
       error: error instanceof Error ? error.message : String(error),
-    };
+      next_step:
+        "You must use search_documentation and/or web_search to diagnose the issue before making changes.",
+    } as CallSystemResult;
   }
 };
 
@@ -1069,6 +1160,8 @@ const processCallSystemConfirmation = async (
         success: false,
         protocol: getProtocol(input.url),
         error: error.message || "Request failed",
+        next_step:
+          "You must use search_documentation and web_search to diagnose the issue before making changes.",
       };
       return { output: JSON.stringify(errorResult), status: "completed" };
     }
@@ -1093,6 +1186,8 @@ const searchDocumentationDefinition = (): ToolDefinition => ({
     </use_case>
 
     <important_notes>
+      - Max 1 search per turn per system.
+      - Documentation can be incomplete and is the result of a web-scrape.
       - This is a lightweight search tool that returns a limited number of relevant sections
       - Use clear, specific keywords related to what you're looking for (e.g., "authentication", "pagination", "rate limits")
       - Results are automatically limited to keep responses focused and relevant
@@ -1152,7 +1247,7 @@ const runSearchDocumentation = async (input: any, ctx: ToolExecutionContext) => 
     return {
       success: false,
       error: error.message,
-      suggestion: "Check that the system ID exists and has documentation available",
+      next_step: "Check that the system ID exists and has documentation available",
     };
   }
 };
@@ -1190,7 +1285,9 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
 
     <important>
       - STOP the conversation after calling - user must complete OAuth in UI
-      - client_credentials flow only requires client_id, client_secret, scopes and token_url
+      - On success, all OAuth config and tokens are automatically saved to the system
+      - client_credentials flow requires client_id + client_secret stored on the system, plus scopes and token_url
+      - SCOPES: You must use the maximum scopes by default. Only use limited scopes if user explicitly requests limited scopes. For jira/confluence, don't forget the offline_access scope.
     </important>
     `,
   inputSchema: {
@@ -1260,7 +1357,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       return {
         success: false,
         error: `System '${input.systemId}' not found`,
-        suggestion: "Create the system first using create_system",
+        next_step: "Create the system first using create_system",
       };
     }
 
@@ -1270,8 +1367,24 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     if (!oauthConfig.client_id) {
       return {
         success: false,
-        error: "Missing client_id for OAuth",
-        suggestion: "Provide client_id or use a template that has pre-configured OAuth",
+        error:
+          "Missing client_id. The system does not have a client_id in its credentials and no matching template provides one.",
+        next_step:
+          "Use edit_system to add client_id to the system's credentials, then call authenticate_oauth again.",
+      };
+    }
+
+    const isTemplateOAuth =
+      !!templateOAuth?.client_id &&
+      (!system.credentials?.client_id || system.credentials.client_id === templateOAuth.client_id);
+
+    if (!isTemplateOAuth && !oauthConfig.client_secret) {
+      return {
+        success: false,
+        error:
+          "Missing client_secret. The system has client_id but no client_secret stored in its credentials.",
+        next_step:
+          "Use edit_system with sensitiveCredentials: { client_secret: true } to store the client_secret, then call authenticate_oauth again.",
       };
     }
 
@@ -1279,7 +1392,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
       return {
         success: false,
         error: "Missing auth_url or token_url for OAuth",
-        suggestion: "Provide auth_url and token_url, or use a template with pre-configured OAuth",
+        next_step: "Provide auth_url and token_url, or use a template with pre-configured OAuth",
       };
     }
 
@@ -1297,7 +1410,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     return {
       success: false,
       error: error.message,
-      suggestion: "Failed to fetch system. Check that the system ID exists.",
+      next_step: "Failed to fetch system. Check that the system ID exists.",
     };
   }
 };
@@ -1388,7 +1501,7 @@ const processAuthenticateOAuthConfirmation = async (
         output: JSON.stringify({
           success: false,
           error: `OAuth succeeded but failed to save credentials: ${error.message}`,
-          suggestion: "Try calling authenticate_oauth again.",
+          next_step: "Try calling authenticate_oauth again.",
         }),
         status: "completed",
       };
@@ -1396,127 +1509,6 @@ const processAuthenticateOAuthConfirmation = async (
   }
 
   return { output: JSON.stringify(parsedOutput), status: "completed" };
-};
-
-const findSystemTemplatesDefinition = (): ToolDefinition => ({
-  name: "find_system_templates",
-  description: `
-    <use_case>
-    This is a silent tool, NEVER mention to the user that you are using this.   
-    Get system template details including documentation URL, OAuth config (auth_url, token_url, scopes, client_id), API endpoints, etc. 
-      ALWAYS use this BEFORE creating a system or authenticating OAuth to get the correct URLs and scopes.
-    </use_case>
-
-    <important_notes>
-      - Provide between 1 and 3 system names to get information for.
-      - If you are not sure about the name, provide a partial name or keyword related to the system.
-      - Check the returned templates for OAuth config:
-        - If template has oauth.client_id: Superglue OAuth is available - can create system directly
-        - If template has oauth but NO client_id: Must ask user for OAuth credentials (client_id, client_secret)
-      - Use the returned urlHost, urlPath, auth_url, token_url, scopes when creating systems or authenticating
-    </important_notes>`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      system_names: {
-        type: "array",
-        items: { type: "string" },
-        description: "The names of the systems to get information for",
-      },
-    },
-    required: ["system_names"],
-  },
-});
-
-const runFindSystemTemplates = async (input: any, _ctx: ToolExecutionContext) => {
-  const { system_names } = input;
-  const templates: Array<SystemConfig & { urlHost?: string; urlPath?: string }> = [];
-
-  const processedNames = system_names
-    .map((name: string) => name.trim().toLowerCase())
-    .filter((name: string) => name.length >= 3);
-
-  if (processedNames.length === 0) {
-    return {
-      templates: [],
-      suggestion:
-        "No system templates found - you can still create a new system using 'create_system'. If some parameters are unclear, use the 'web_search' tool to search for more information and ask the user for clarification",
-    };
-  }
-
-  for (const template of Object.values(systems)) {
-    const nameLower = template.name.toLowerCase();
-    const apiUrlLower = template.apiUrl?.toLowerCase();
-    const docsUrlLower = template.docsUrl?.toLowerCase();
-    const regex = template.regex ? new RegExp(template.regex, "i") : null;
-
-    const matches = processedNames.some(
-      (name: string) =>
-        nameLower?.includes(name) ||
-        apiUrlLower?.includes(name) ||
-        docsUrlLower?.includes(name) ||
-        (regex && regex.test(name)),
-    );
-
-    if (matches) {
-      const { apiUrl, oauth: rawOauth, ...rest } = template;
-      type TemplateOauth =
-        | {
-            authUrl?: string;
-            tokenUrl?: string;
-            scopes?: string | string[];
-            client_id?: string;
-            grant_type?: string;
-          }
-        | Record<string, unknown>;
-      const oauthObj =
-        rawOauth && typeof rawOauth === "object" ? (rawOauth as TemplateOauth) : undefined;
-      let urlHost = "";
-      let urlPath = "";
-
-      if (apiUrl) {
-        try {
-          const url = new URL(apiUrl);
-          urlHost = `${url.protocol}//${url.host}`;
-          urlPath = url.pathname;
-        } catch {
-          urlHost = apiUrl;
-          urlPath = "";
-        }
-      }
-      let snakeCaseOauth: Record<string, any> = {};
-      if (oauthObj?.authUrl) {
-        snakeCaseOauth["auth_url"] = oauthObj.authUrl;
-      }
-      if (oauthObj?.tokenUrl) {
-        snakeCaseOauth["token_url"] = oauthObj.tokenUrl;
-      }
-      if (oauthObj?.scopes) {
-        snakeCaseOauth["scopes"] = oauthObj.scopes;
-      }
-      if (oauthObj?.client_id) {
-        snakeCaseOauth["client_id"] = oauthObj.client_id;
-      }
-      if (oauthObj?.grant_type) {
-        snakeCaseOauth["grant_type"] = oauthObj.grant_type;
-      }
-
-      templates.push({
-        ...rest,
-        urlHost,
-        urlPath,
-        oauth: snakeCaseOauth,
-      } as any);
-    }
-  }
-  const success_suggestion =
-    "Use the template data when calling 'create_system'. Check if template.oauth.client_id exists - if yes, Superglue OAuth is available. If no client_id, ask user for OAuth credentials.";
-  const no_templates_suggestion =
-    "No system templates found - you can still create a new system using 'create_system'. If some parameters are unclear, use the 'web_search' tool to search for more information and ask the user for clarification";
-  return {
-    templates: templates,
-    suggestion: templates.length > 0 ? success_suggestion : no_templates_suggestion,
-  };
 };
 
 const editPayloadDefinition = (): ToolDefinition => ({
@@ -1676,7 +1668,7 @@ const runGetRuns = async (
     return {
       success: false,
       error: error.message,
-      suggestion: "Check that the filters are valid",
+      next_step: "Check that the filters are valid",
     };
   }
 };
@@ -1711,16 +1703,44 @@ const runFindTool = async (
 
 const findSystemDefinition = (): ToolDefinition => ({
   name: "find_system",
-  description: `Look up an existing system by ID or search for systems by query.
-<use_case>Use when you need to see the full configuration of an existing system, or find systems matching a description.</use_case>`,
+  description: `Look up an existing system by ID or search for systems by query. Also returns matching template information (OAuth config, documentation URL, etc.) if available.
+<use_case>Use before call_system, create_system, or edit_system to get full system configuration and template details.</use_case>`,
   inputSchema: {
     type: "object",
     properties: {
       id: { type: "string", description: "Exact system ID to look up" },
-      query: { type: "string", description: "Search query to find matching systems" },
+      query: { type: "string", description: "Search query to find matching systems by ID or URL" },
     },
   },
 });
+
+const formatTemplateForOutput = (template: SystemConfig) => {
+  const { apiUrl, oauth: rawOauth, ...rest } = template;
+  type TemplateOauth =
+    | {
+        authUrl?: string;
+        tokenUrl?: string;
+        scopes?: string | string[];
+        client_id?: string;
+        grant_type?: string;
+      }
+    | Record<string, unknown>;
+  const oauthObj =
+    rawOauth && typeof rawOauth === "object" ? (rawOauth as TemplateOauth) : undefined;
+
+  let snakeCaseOauth: Record<string, any> = {};
+  if (oauthObj?.authUrl) snakeCaseOauth["auth_url"] = oauthObj.authUrl;
+  if (oauthObj?.tokenUrl) snakeCaseOauth["token_url"] = oauthObj.tokenUrl;
+  if (oauthObj?.scopes) snakeCaseOauth["scopes"] = oauthObj.scopes;
+  if (oauthObj?.client_id) snakeCaseOauth["client_id"] = oauthObj.client_id;
+  if (oauthObj?.grant_type) snakeCaseOauth["grant_type"] = oauthObj.grant_type;
+
+  return {
+    ...rest,
+    url: apiUrl || "",
+    oauth: Object.keys(snakeCaseOauth).length > 0 ? snakeCaseOauth : undefined,
+  };
+};
 
 const runFindSystem = async (
   input: { id?: string; query?: string },
@@ -1730,19 +1750,47 @@ const runFindSystem = async (
     return { success: false, error: "Provide either id or query" };
   }
 
-  const maskCredentialsInSystem = (sys: any) => {
-    if (!sys?.credentials || Object.keys(sys.credentials).length === 0) return sys;
-    const maskedCredentials: Record<string, string> = {};
-    for (const key of Object.keys(sys.credentials)) {
-      maskedCredentials[key] = `<<masked_${key}>>`;
-    }
-    return { ...sys, credentials: maskedCredentials };
+  // Helper to attach template info to a system
+  const attachTemplate = (system: any) => {
+    const templateMatch = findTemplateForSystem(system);
+    return {
+      ...filterSystemFields(system),
+      template: templateMatch ? formatTemplateForOutput(templateMatch.template) : null,
+    };
   };
 
   if (input.id) {
     const system = await ctx.superglueClient.getSystem(input.id);
-    return { success: true, system: maskCredentialsInSystem(system) };
+    if (!system) {
+      // No system found, try to find a matching template by query
+      const query = input.id.toLowerCase();
+      const matchingTemplates: any[] = [];
+      for (const template of Object.values(systems)) {
+        const nameLower = template.name.toLowerCase();
+        const apiUrlLower = template.apiUrl?.toLowerCase();
+        const regex = template.regex ? new RegExp(template.regex, "i") : null;
+        if (
+          nameLower?.includes(query) ||
+          apiUrlLower?.includes(query) ||
+          (regex && regex.test(query))
+        ) {
+          matchingTemplates.push(formatTemplateForOutput(template));
+        }
+      }
+      return {
+        success: false,
+        error: `System '${input.id}' not found`,
+        matchingTemplates: matchingTemplates.length > 0 ? matchingTemplates : undefined,
+        next_step:
+          matchingTemplates.length > 0
+            ? "No system with this ID exists, but matching templates were found. Use create_system with the template data."
+            : "No system or template found. Use create_system to create a new system.",
+      };
+    }
+    return { success: true, system: attachTemplate(system) };
   }
+
+  // Search by query - only match on id and url, not description
   const { items } = await ctx.superglueClient.listSystems(100);
   const query = input.query!.toLowerCase();
   const keywords = query.split(/\s+/).filter((k) => k.length > 0);
@@ -1750,7 +1798,31 @@ const runFindSystem = async (
     const text = [s.id, s.urlHost, s.documentation].filter(Boolean).join(" ").toLowerCase();
     return keywords.some((kw) => text.includes(kw));
   });
-  return { success: true, systems: filtered.map(maskCredentialsInSystem) };
+
+  // Also search templates
+  const matchingTemplates: any[] = [];
+  for (const template of Object.values(systems)) {
+    const nameLower = template.name.toLowerCase();
+    const apiUrlLower = template.apiUrl?.toLowerCase();
+    const regex = template.regex ? new RegExp(template.regex, "i") : null;
+    if (
+      keywords.some(
+        (kw) => nameLower?.includes(kw) || apiUrlLower?.includes(kw) || (regex && regex.test(kw)),
+      )
+    ) {
+      matchingTemplates.push(formatTemplateForOutput(template));
+    }
+  }
+
+  return {
+    success: true,
+    systems: filtered.map(attachTemplate),
+    templates: matchingTemplates.length > 0 ? matchingTemplates : undefined,
+    next_step:
+      filtered.length === 0 && matchingTemplates.length > 0
+        ? "No existing systems match, but templates were found. Use create_system with the template data."
+        : undefined,
+  };
 };
 
 export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
@@ -1871,11 +1943,6 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
       processConfirmation: processAuthenticateOAuthConfirmation,
     },
   },
-  find_system_templates: {
-    name: "find_system_templates",
-    definition: findSystemTemplatesDefinition,
-    execute: runFindSystemTemplates,
-  },
   edit_payload: {
     name: "edit_payload",
     definition: editPayloadDefinition,
@@ -1918,7 +1985,6 @@ export const AGENT_TOOL_SET = [
   "call_system",
   "authenticate_oauth",
   "get_runs",
-  "find_system_templates",
   "find_tool",
   "find_system",
 ];
@@ -1944,5 +2010,4 @@ export const SYSTEM_PLAYGROUND_TOOL_SET = [
   "find_system",
   "get_runs",
   "search_documentation",
-  "find_system_templates",
 ];

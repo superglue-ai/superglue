@@ -1,7 +1,12 @@
-import { Message, Run, Tool } from "@superglue/shared";
-import { systems } from "@superglue/shared/templates";
-import { AgentDefinition, ToolExecutionContext } from "./agent-types";
-import { SUPERGLUE_INFORMATION_PROMPT } from "./agent-prompts";
+import { Message, Run, RunStatus, StoredRunResults, Tool, getDateMessage } from "@superglue/shared";
+import { truncateToolResult } from "../general-utils";
+import { SystemPromptResult, ToolExecutionContext } from "./agent-types";
+import {
+  MAIN_AGENT_SYSTEM_PROMPT,
+  TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT,
+  SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT,
+  SUPERGLUE_INFORMATION_PROMPT,
+} from "./agent-prompts";
 
 export interface DraftLookup {
   config: Tool;
@@ -193,20 +198,10 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
   try {
     const result = await ctx.superglueClient.listSystems(1000);
 
-    const formattedSystems = result.items.map((system: any) => {
-      const credentials = system?.credentials || {};
-      const credentialStatus = Object.entries(credentials).map(([key, value]) => ({
-        key,
-        placeholder: `<<${system?.id}_${key}>>`,
-        hasValue: !!value && value !== "",
-      }));
-
-      return {
-        id: system?.id,
-        urlHost: system?.urlHost,
-        credentials: credentialStatus,
-      };
-    });
+    const systemsSummary = result.items.map((system: any) => ({
+      id: system?.id,
+      name: system?.name || system?.id,
+    }));
 
     return {
       success: true,
@@ -227,38 +222,63 @@ export async function initializeMainAgentContext(ctx: ToolExecutionContext): Pro
     getSystemsForContext(ctx),
   ]);
 
-  const templateIds = Object.keys(systems);
+  const dateMessage = getDateMessage();
 
   const result = `
     [PRELOADED CONTEXT - The user's available superglue tools and systems are listed below]${SUPERGLUE_INFORMATION_PROMPT}
 
-    AVAILABLE SUPERGLUE TOOLS:
-    ${JSON.stringify(toolsResult.tools || [])}
+[GENERAL INFORMATION]
+${SUPERGLUE_INFORMATION_PROMPT}
+[/GENERAL INFORMATION]
 
-    AVAILABLE SUPERGLUE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-    ${JSON.stringify(systemsResult.systems || [])}
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
 
-    AVAILABLE SYSTEM TEMPLATES:
-    ${templateIds.join(", ")}
-    `;
-  return result;
+AVAILABLE TOOLS: ${JSON.stringify(toolsResult.tools || [])}
+
+${dateMessage.content}`;
+  return { content };
 }
 
 export async function initializeToolPlaygroundAgentContext(
   ctx: ToolExecutionContext,
-): Promise<string> {
-  const systemsResult = await getSystemsForContext(ctx);
-  const toolsResult = await getToolsForContext(ctx);
+): Promise<SystemPromptResult> {
+  const [toolsResult, systemsResult] = await Promise.all([
+    getToolsForContext(ctx),
+    getSystemsForContext(ctx),
+  ]);
 
-  return `
-    [PRELOADED CONTEXT - The user's available superglue systems and tools are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+  const dateMessage = getDateMessage();
+
+  const content = `${TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT}
+
+[GENERAL INFORMATION]
+${SUPERGLUE_INFORMATION_PROMPT}
+[/GENERAL INFORMATION]
+
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
+
+AVAILABLE TOOLS: ${JSON.stringify(toolsResult.tools || [])}
+
+${dateMessage.content}`;
+
+  return { content };
+}
+
+export async function generateSystemPlaygroundSystemPrompt(
+  ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
+  const systemsResult = await getSystemsForContext(ctx);
+  const dateMessage = getDateMessage();
+  const content = `${SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT}
 
     AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
     ${JSON.stringify(systemsResult.systems || [])}
 
-    AVAILABLE SUPERGLUE TOOLS:
-    ${JSON.stringify(toolsResult.tools || [])}
-    `;
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
+
+${dateMessage.content}`;
+
+  return { content };
 }
 
 export function getDiscoveryContext(systemIds: string[]): string {

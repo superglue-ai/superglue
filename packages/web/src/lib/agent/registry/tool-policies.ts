@@ -8,7 +8,6 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   find_tool: { defaultMode: "auto" },
   find_system: { defaultMode: "auto" },
   search_documentation: { defaultMode: "auto" },
-  find_system_templates: { defaultMode: "auto" },
   get_runs: { defaultMode: "auto" },
 
   edit_tool: { defaultMode: "confirm_after_execution" },

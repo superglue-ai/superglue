@@ -8,6 +8,7 @@ import {
 } from "@superglue/shared";
 import jsonpatch from "fast-json-patch";
 import z from "zod";
+import { buildSystemContext } from "../context/context-builders.js";
 import { FIX_TOOL_SYSTEM_PROMPT } from "../context/context-prompts.js";
 import { LanguageModel, LLMMessage } from "../llm/llm-base-model.js";
 import { logMessage } from "../utils/logs.js";
@@ -142,11 +143,16 @@ ${JSON.stringify(stepResultsSummary, null, 2)}
 </step_results>`;
     }
 
-    const availableSystemIds = Object.keys(this.systems);
-    if (availableSystemIds.length > 0) {
-      userContent += `\n\n<available_system_ids>
-${availableSystemIds.join(", ")}
-</available_system_ids>`;
+    // Build system context with template info using shared builder
+    const systems = Object.values(this.systems);
+    const systemContextParts = systems.map((system) =>
+      buildSystemContext(system, { characterBudget: 40000, metadata: this.metadata }),
+    );
+
+    if (systemContextParts.length > 0) {
+      userContent += `\n\n<available_systems>
+${systemContextParts.join("\n")}
+</available_systems>`;
     }
 
     return [

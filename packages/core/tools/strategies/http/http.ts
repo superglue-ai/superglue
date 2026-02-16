@@ -545,9 +545,8 @@ export async function callHttp({
 
         throw new Error(
           `Pagination configuration error: The first two API requests returned identical responses with valid data. ` +
-            `This indicates the pagination parameters are not being applied correctly. ` +
-            `Please check your pagination configuration (type: ${config.pagination?.type}, pageSize: ${config.pagination?.pageSize}), ` +
-            `body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`,
+            `This indicates that pagination params are incorrect or not part of the request. ` +
+            `Request body: ${maskedBody}, queryParams: ${maskedParams}, headers: ${maskedHeaders}.`,
         );
       }
 

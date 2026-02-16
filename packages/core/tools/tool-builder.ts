@@ -76,7 +76,7 @@ export class ToolBuilder {
         metadata: this.metadata,
       },
       {
-        characterBudget: 120000,
+        characterBudget: 50000,
         include: {
           systemContext: true,
           availableVariablesContext: true,

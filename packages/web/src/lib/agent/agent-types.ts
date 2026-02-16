@@ -172,4 +172,5 @@ export interface CallSystemResult {
   headers?: Record<string, string>;
   data?: any;
   error?: string;
+  next_step?: string;
 }

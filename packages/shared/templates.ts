@@ -1144,6 +1144,8 @@ export const systems: Record<string, SystemConfig> = {
         "read:jira-work write:jira-work read:jira-user write:jira-user read:jira-work-management write:jira-work-management read:servicedesk-request write:servicedesk-request manage:jira-project manage:jira-configuration manage:jira-data-provider offline_access",
       client_id: "Az7iTb4uWYSv5N4p295PulP8oO2B3PjK",
     },
+    systemSpecificInstructions:
+      "You need a cloud id in the url to connect to the Jira instance. Fetch it from available-resources and store it in the system. The /rest/api/3/search endpoint has been deprecated - Use GET /rest/api/3/search/jql with query parameter 'jql' for searching issues. MUST specify a project in the JQL query. Example: GET /rest/api/3/search/jql?jql=project=KAN&maxResults=100. The jql parameter accepts JQL queries like 'project=KEY', 'assignee=currentUser()', 'order by created DESC'. Always URL-encode the jql parameter value.",
     keywords: [
       "issues",
       "projects",

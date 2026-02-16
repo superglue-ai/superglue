@@ -108,16 +108,12 @@ export function logToolExecution(
   switch (toolName) {
     case "search_documentation": {
       const query = input?.query || "no query";
-      logMessage(
-        "debug",
-        `search_documentation: query="${query}" → ${outputStr.length} chars`,
-        metadata,
-      );
+      logMessage("debug", `search documentation for "${query}"`, metadata);
       break;
     }
     case "web_search": {
       const query = input?.query || "no query";
-      logMessage("debug", `web_search: query="${query}" → ${outputStr.length} chars`, metadata);
+      logMessage("debug", `search web for "${query}"`, metadata);
       break;
     }
   }

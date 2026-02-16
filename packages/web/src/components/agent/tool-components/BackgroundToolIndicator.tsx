@@ -40,8 +40,8 @@ const BACKGROUND_TOOL_CONFIG: Record<
   },
   find_system: {
     icon: Blocks,
-    label: "Found systems",
-    activeLabel: "Finding systems...",
+    label: "Found system",
+    activeLabel: "Finding system...",
   },
   save_tool: {
     icon: Save,

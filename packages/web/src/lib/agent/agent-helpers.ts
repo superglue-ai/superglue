@@ -1,4 +1,13 @@
-import { System, Tool } from "@superglue/shared";
+import { Message, System, Tool } from "@superglue/shared";
+
+// Re-export from shared for backwards compatibility
+export { getConnectionProtocol, type ConnectionProtocol } from "@superglue/shared";
+// Alias for backwards compatibility
+export { getConnectionProtocol as getProtocol } from "@superglue/shared";
+
+export const needsSystemMessage = (messages: Message[]): boolean => {
+  return !messages.some((m) => m.role === "system");
+};
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
   return {
@@ -11,13 +20,16 @@ export const stripLegacyToolFields = (tool: Tool): Tool => {
 };
 
 export const filterSystemFields = (system: System) => {
-  const { openApiSchema, documentation, credentials, ...filtered } = system;
-
-  const maskedCredentials = credentials
-    ? Object.fromEntries(Object.keys(credentials).map((key) => [key, `<<masked_${key}>>`]))
-    : undefined;
-
-  return { ...filtered, credentials: maskedCredentials };
+  const credentialKeys = Object.keys(system.credentials || {});
+  const credentialPlaceholders = credentialKeys.map((key) => `<<${system.id}_${key}>>`);
+  return {
+    id: system.id,
+    name: system.name,
+    url: system.url,
+    specificInstructions: system.specificInstructions,
+    templateName: system.templateName,
+    credentialPlaceholders: credentialPlaceholders,
+  };
 };
 
 export function resolveFileReferences(
@@ -149,7 +161,7 @@ export type FileResolutionError = {
   success: false;
   error: string;
   availableFiles: string[];
-  suggestion: string;
+  next_step: string;
 };
 
 export function resolvePayloadWithFiles(
@@ -163,7 +175,7 @@ export function resolvePayloadWithFiles(
       success: false,
       error: `File references not found: ${validation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
       availableFiles: validation.availableKeys.map((k) => `file::${k}`),
-      suggestion:
+      next_step:
         validation.availableKeys.length > 0
           ? `Available file keys: ${validation.availableKeys.map((k) => `file::${k}`).join(", ")}`
           : "No files are currently available. Ask the user to upload the required files.",
@@ -181,7 +193,7 @@ export function resolvePayloadWithFiles(
       success: false,
       error: error.message,
       availableFiles: Object.keys(filePayloads || {}).map((k) => `file::${k}`),
-      suggestion:
+      next_step:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
@@ -190,12 +202,12 @@ export function resolvePayloadWithFiles(
 export function validateDraftOrToolId(
   draftId?: string,
   toolId?: string,
-): { valid: true } | { valid: false; error: string; suggestion?: string } {
+): { valid: true } | { valid: false; error: string; next_step?: string } {
   if (!draftId && !toolId) {
     return {
       valid: false,
       error: "Either draftId or toolId is required",
-      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
+      next_step: "Provide draftId (from build_tool) or toolId (for saved tools)",
     };
   }
   if (draftId && toolId) {
