@@ -358,9 +358,23 @@ export function resolveSystemIcon(system: {
   // Fallback: try to get icon from templates via findTemplateForSystem
   const match = findTemplateForSystem(system);
   if (match?.template.icon) {
-    const simpleIcon = getSimpleIcon(match.template.icon);
-    if (simpleIcon) {
-      return { type: "simpleicons", icon: simpleIcon };
+    const templateIcon = match.template.icon;
+    const colonIndex = templateIcon.indexOf(":");
+    if (colonIndex !== -1) {
+      const source = templateIcon.substring(0, colonIndex);
+      const name = templateIcon.substring(colonIndex + 1);
+      if (source === "lucide") {
+        return { type: "lucide", name };
+      }
+      const simpleIcon = getSimpleIcon(name);
+      if (simpleIcon) {
+        return { type: "simpleicons", icon: simpleIcon };
+      }
+    } else {
+      const simpleIcon = getSimpleIcon(templateIcon);
+      if (simpleIcon) {
+        return { type: "simpleicons", icon: simpleIcon };
+      }
     }
   }
 

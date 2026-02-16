@@ -281,25 +281,36 @@ export function AuthenticationSection() {
 
       {auth.authType === "oauth" && (
         <div className="space-y-5">
-          <OAuthConnectButton
-            system={system}
-            onClick={handleConnect}
-            disabled={isConnectDisabled()}
-            loading={connectLoading}
-          />
-
-          {hasTemplateClient && (
-            <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 p-4 border border-border/50">
-              <div>
-                <div className="font-medium text-sm">Use superglue OAuth</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  Preconfigured client for{" "}
-                  {systemOptions.find((o) => o.value === system.templateName)?.label}
+          {isMultiTenancy ? (
+            <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-500/5 p-4 border border-amber-500/30">
+              <p className="text-sm text-muted-foreground">
+                Configure the settings below as a template. Each end user will authenticate using
+                these settings to connect their own account.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-stretch justify-center gap-4">
+              {hasTemplateClient && (
+                <div className="flex items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 px-4 py-3 border border-border/50 min-w-0 flex-1 min-w-[200px]">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm">Use superglue OAuth</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Preconfigured client for{" "}
+                      {systemOptions.find((o) => o.value === system.templateName)?.label}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={auth.useSuperglueOAuth}
+                    onCheckedChange={(v) => setUseSuperglueOAuth(Boolean(v))}
+                  />
                 </div>
-              </div>
-              <Switch
-                checked={auth.useSuperglueOAuth}
-                onCheckedChange={(v) => setUseSuperglueOAuth(Boolean(v))}
+              )}
+              <OAuthConnectButton
+                system={system}
+                onClick={handleConnect}
+                disabled={isConnectDisabled()}
+                loading={connectLoading}
+                className="w-auto flex-1 min-w-[200px]"
               />
             </div>
           )}

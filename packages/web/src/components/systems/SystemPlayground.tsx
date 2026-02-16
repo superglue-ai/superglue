@@ -2,13 +2,12 @@
 
 import { Button } from "@/src/components/ui/button";
 import { MiniCard } from "@/src/components/ui/mini-card";
+import { SystemIcon } from "@/src/components/ui/system-icon";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { resolveSystemIcon } from "@/src/lib/general-utils";
 import { cn } from "@/src/lib/general-utils";
 import { Blocks, Check, FileText, FlaskConical, Hammer, KeyRound, Loader2 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 import { useSystemConfig } from "./context";
 import { SectionStatus, SystemContextForAgent, SystemSection } from "./context/types";
 import { ConfigurationSection } from "./sections/ConfigurationSection";
@@ -38,39 +37,6 @@ function getStatusColor(status: SectionStatus, isActive: boolean) {
     };
   }
   return { text: "text-muted-foreground", dot: "bg-muted-foreground" };
-}
-
-function SystemIconDisplay({ system }: { system: { icon?: string; templateName?: string } }) {
-  const resolved = resolveSystemIcon(system);
-
-  if (!resolved) {
-    return <Blocks className="h-5 w-5 text-muted-foreground" />;
-  }
-
-  if (resolved.type === "lucide") {
-    const iconName = resolved.name.charAt(0).toUpperCase() + resolved.name.slice(1);
-    const LucideIcon = (LucideIcons as any)[iconName];
-    if (LucideIcon) {
-      return <LucideIcon className="h-5 w-5 text-primary" />;
-    }
-    return <Blocks className="h-5 w-5 text-muted-foreground" />;
-  }
-
-  if (resolved.type === "simpleicons") {
-    return (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill={`#${resolved.icon.hex}`}
-        className="flex-shrink-0"
-      >
-        <path d={resolved.icon.path} />
-      </svg>
-    );
-  }
-
-  return <Blocks className="h-5 w-5 text-muted-foreground" />;
 }
 
 export function SystemPlayground() {
@@ -199,12 +165,8 @@ export function SystemPlayground() {
     <div className="flex flex-col h-full w-full px-6 py-3">
       <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
-          {system.id ? (
-            <SystemIconDisplay system={system} />
-          ) : (
-            <Blocks className="h-5 w-5 text-muted-foreground" />
-          )}
-          <h1 className="text-xl font-semibold">{system.id ? system.id : "New System"}</h1>
+          <SystemIcon system={system} size={20} fallbackClassName="text-muted-foreground" />
+          <h1 className="text-xl font-semibold">{system.name || system.id || "New System"}</h1>
         </div>
 
         <div className="flex items-center gap-2">

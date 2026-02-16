@@ -38,8 +38,16 @@ export function OAuthConnectButton({
       onClick={onClick}
       disabled={disabled || loading}
       className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
-        "bg-secondary border border-border shadow-md hover:bg-secondary hover:shadow-lg",
+        "flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-all duration-200",
+        connected
+          ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800"
+          : [
+              "!bg-neutral-800 dark:!bg-neutral-200 !text-neutral-100 dark:!text-neutral-900",
+              "backdrop-blur-sm border border-neutral-700/50 dark:border-neutral-300/50 shadow-md",
+              "cursor-pointer hover:!bg-neutral-700 dark:hover:!bg-neutral-300",
+              "hover:shadow-lg hover:-translate-y-px active:translate-y-0 active:shadow-sm",
+              "active:scale-[0.99]",
+            ],
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "active:translate-y-[1px] active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed",
         className,
