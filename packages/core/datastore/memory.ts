@@ -461,9 +461,16 @@ export class MemoryStore implements DataStore {
   }): Promise<boolean> {
     const { id, nextRunAt, lastRunAt } = params;
     if (!id) return false;
+    const now = new Date();
 
     for (const [key, schedule] of this.storage.toolSchedules.entries()) {
       if (schedule.id === id) {
+        // Claim semantics: only update schedules that are still due.
+        // This prevents multiple scheduler workers from advancing the same schedule.
+        if (!schedule.enabled || schedule.nextRunAt > now) {
+          return false;
+        }
+
         const updatedSchedule = {
           ...schedule,
           nextRunAt,

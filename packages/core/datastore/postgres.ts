@@ -1180,9 +1180,9 @@ export class PostgresService implements DataStore {
   async listDueToolSchedules(): Promise<ToolScheduleInternal[]> {
     const client = await this.pool.connect();
 
-    // We check for schedules that are enabled and have a next run time that is in the past (all timestamps in the database are in UTC)
+    // Compare TIMESTAMPTZ to TIMESTAMPTZ to avoid session-timezone coercion issues.
     try {
-      const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP at time zone 'utc'`;
+      const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP`;
       const queryResult = await client.query(query);
 
       return queryResult.rows.map(this.mapToolSchedule);
@@ -1198,8 +1198,15 @@ export class PostgresService implements DataStore {
   }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
-      const query =
-        "UPDATE workflow_schedules SET next_run_at = $1, last_run_at = $2 WHERE id = $3";
+      // Claim semantics: only update schedules that are still due and enabled.
+      // This prevents multiple scheduler workers from advancing the same schedule.
+      const query = `
+        UPDATE workflow_schedules
+        SET next_run_at = $1, last_run_at = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+          AND enabled = true
+          AND next_run_at <= CURRENT_TIMESTAMP
+      `;
       const result = await client.query(query, [
         params.nextRunAt ? params.nextRunAt.toISOString() : null,
         params.lastRunAt ? params.lastRunAt.toISOString() : null,
