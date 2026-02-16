@@ -25,6 +25,13 @@ export const ExecuteToolInputSchema = z.object({
     .describe("JSON payload to pass to the tool"),
 });
 
+export const AuthenticateInputSchema = z.object({
+  systemId: z
+    .string()
+    .optional()
+    .describe("Optional system ID to reauthenticate a specific system"),
+});
+
 // REST API client for MCP operations
 class McpRestClient {
   private apiEndpoint: string;
@@ -193,6 +200,57 @@ export const toolDefinitions: Record<string, any> = {
           success: false,
           error: error.message,
           suggestion: "Check that the query is valid",
+        };
+      }
+    },
+  },
+  superglue_authenticate: {
+    description: `
+    <use_case>
+      Generates an authentication portal link for an end user to connect their accounts.
+      Use this when a tool execution fails because the end user hasn't authenticated with required systems.
+    </use_case>
+
+    <important_notes>
+      - This tool generates a secure, time-limited link to the authentication portal.
+      - The portal allows users to authenticate with all available systems that require credentials.
+      - After the user authenticates, they will be able to use tools that require those systems.
+    </important_notes>
+    `,
+    inputSchema: AuthenticateInputSchema,
+    execute: async (
+      args: { client: McpRestClient; orgId: string; systemId?: string },
+      request: any,
+    ) => {
+      try {
+        const result = await args.client.generatePortalLink();
+
+        // For non-end-user API keys, provide a link to the agent chat instead
+        if (!result.success) {
+          const baseUrl = process.env.WEB_URL || "https://app.superglue.cloud";
+          const systemPrompt = args.systemId
+            ? `Please help me reauthenticate the system "${args.systemId}".`
+            : "Please help me reauthenticate my systems.";
+          const agentUrl = `${baseUrl}/?prompt=${encodeURIComponent(systemPrompt)}`;
+
+          return {
+            success: true,
+            agentUrl,
+            message: `Open this link to reauthenticate via the agent: ${agentUrl}`,
+          };
+        }
+
+        return {
+          success: true,
+          portalUrl: result.portalUrl,
+          message: `Please share this link with the user to authenticate: ${result.portalUrl}`,
+        };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message,
+          suggestion:
+            "This API key is not linked to an end user. For dashboard users, use the agent chat to reauthenticate.",
         };
       }
     },

@@ -30,17 +30,8 @@ export function checkRestrictedAccess(
     return { allowed: false, error: "This API key cannot access this endpoint" };
   }
 
-  // Check resource-level permission (e.g., toolId must be in allowedTools)
-  if (permissions.checkResourceId) {
-    const params = request.params as Record<string, string>;
-    const resourceId = params[permissions.checkResourceId];
-    // ['*'] means ALL tools are allowed for this restricted key
-    const isAllToolsAllowed =
-      authInfo.allowedTools?.length === 1 && authInfo.allowedTools[0] === "*";
-    if (resourceId && !isAllToolsAllowed && !authInfo.allowedTools?.includes(resourceId)) {
-      return { allowed: false, error: "This API key is not authorized for this tool" };
-    }
-  }
+  // Resource-level permission is now handled by allowedSystems in the async check
+  // The sync check here just validates the route is accessible to restricted keys
 
   return { allowed: true };
 }

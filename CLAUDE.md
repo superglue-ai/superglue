@@ -33,6 +33,33 @@ EE-only code lives in `ee/` subdirs:
 - **Mapping functions** - name them `mapXToY` (e.g., `mapRunToOpenAPI`)
 - **Dates in responses** - always `.toISOString()` for API responses
 
+## Avoiding Code Duplication
+
+Before implementing new functionality, search for existing implementations:
+
+1. **Search first** - Use grep/search to find similar patterns before writing new code
+2. **Extend, don't duplicate** - If similar logic exists, add parameters to the existing function rather than copying it
+3. **Common locations to check**:
+   - `packages/shared/utils.ts` - general utilities
+   - `packages/core/auth/` - authentication and API key operations (e.g., `SupabaseAuthManager.createApiKey`)
+   - `packages/core/api/response-helpers.ts` - API response utilities
+   - `packages/web/src/lib/` - frontend utilities and clients
+
+Example: Instead of duplicating API key creation logic, extend the existing method:
+```typescript
+// BAD: Copying the same fetch logic with slight variations
+async function createEndUserApiKey(userId: string, orgId: string) {
+  // 40 lines of duplicated Supabase API key creation...
+}
+
+// GOOD: Extend existing method with a parameter
+// In SupabaseAuthManager:
+public async createApiKey(orgId: string, userId?: string, mode = "backend", isRestricted = false)
+
+// Usage:
+const key = await authManager.createApiKey(orgId, endUserId, "backend", true);
+```
+
 ## After Completing a Feature
 
 1. `npm run lint:fix` - format code

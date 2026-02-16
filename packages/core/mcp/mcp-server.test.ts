@@ -176,3 +176,63 @@ describe("superglue_find_relevant_tools", () => {
     expect(result.error).toBe("Search failed");
   });
 });
+
+describe("superglue_authenticate", () => {
+  it("returns portal URL on success", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockResolvedValue({
+        success: true,
+        portalUrl: "https://app.example.com/portal?token=abc123",
+      }),
+    };
+    const args = { client, orgId: "test-org" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(true);
+    expect(result.portalUrl).toBe("https://app.example.com/portal?token=abc123");
+    expect(result.message).toContain("share this link");
+  });
+
+  it("returns agent URL when API key is not linked to end user", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockResolvedValue({
+        success: false,
+        error: "This endpoint requires an API key linked to an end user",
+      }),
+    };
+    const args = { client, orgId: "test-org" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("API key linked to an end user");
+    expect(result.suggestion).toContain("not linked to an end user");
+    expect(result.agentUrl).toBeDefined();
+    expect(result.agentUrl).toContain("prompt=");
+  });
+
+  it("includes systemId in agent URL prompt when provided", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockResolvedValue({
+        success: false,
+        error: "This endpoint requires an API key linked to an end user",
+      }),
+    };
+    const args = { client, orgId: "test-org", systemId: "stripe" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.agentUrl).toContain("stripe");
+  });
+
+  it("handles network errors gracefully with agent URL fallback", async () => {
+    const client = {
+      generatePortalLink: vi.fn().mockRejectedValue(new Error("Network error")),
+    };
+    const args = { client, orgId: "test-org" };
+    const result = await authenticate(args, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Network error");
+    expect(result.agentUrl).toBeDefined();
+  });
+});

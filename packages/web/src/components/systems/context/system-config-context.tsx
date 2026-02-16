@@ -236,16 +236,7 @@ export function SystemConfigProvider({
       authType !== detectAuthType(initialSystem.credentials || {});
 
     setHasUnsavedChanges(hasChanges);
-  }, [
-    systemId,
-    systemName,
-    urlHost,
-    urlPath,
-    documentationUrl,
-    specificInstructions,
-    authType,
-    initialSystem,
-  ]);
+  }, [systemId, systemName, url, specificInstructions, authType, multiTenancyMode, initialSystem]);
 
   useEffect(() => {
     if (isNew) {

@@ -140,57 +140,25 @@ describe("checkRestrictedAccess", () => {
       checkResourceId: "toolId",
     };
 
-    it("should allow access when tool is in allowedTools", () => {
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: ["tool-1", "tool-2", "tool-3"],
-      });
-      const request = createMockRequest({
-        routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "tool-2" },
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(true);
-    });
-
-    it("should deny access when tool is NOT in allowedTools", () => {
+    // Tool-level permission is now handled by allowedSystems in the async check
+    // The sync check just validates the route is accessible to restricted keys
+    it("should allow access for any tool (filtering done by allowedSystems in async)", () => {
       const authInfo = createAuthInfo({
         isRestricted: true,
         allowedTools: ["tool-1", "tool-2"],
       });
       const request = createMockRequest({
         routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "tool-3" },
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(false);
-      expect(result.error).toBe("This API key is not authorized for this tool");
-    });
-
-    it("should allow access when allowedTools is ['*'] (all tools allowed)", () => {
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: ["*"],
-      });
-      const request = createMockRequest({
-        routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "any-tool-id" },
+        params: { toolId: "tool-3" }, // Not in allowedTools, but sync check allows
       });
       mockGetRoutePermission.mockReturnValue(toolPermissions);
 
       const result = checkRestrictedAccess(authInfo, request);
 
       expect(result.allowed).toBe(true);
-      expect(result.error).toBeUndefined();
     });
 
-    it("should deny access when allowedTools is empty array (no tools allowed)", () => {
+    it("should allow access with empty allowedTools (filtering done by allowedSystems in async)", () => {
       const authInfo = createAuthInfo({
         isRestricted: true,
         allowedTools: [],
@@ -198,25 +166,6 @@ describe("checkRestrictedAccess", () => {
       const request = createMockRequest({
         routeOptions: { url: "/v1/tools/:toolId/run" },
         params: { toolId: "any-tool-id" },
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      // Empty array means "no tools allowed" - the key was created with
-      // specific tool restrictions but no tools were selected
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(false);
-      expect(result.error).toBe("This API key is not authorized for this tool");
-    });
-
-    it("should allow access when resourceId is undefined (no specific tool requested)", () => {
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: ["tool-1"],
-      });
-      const request = createMockRequest({
-        routeOptions: { url: "/v1/tools/:toolId" },
-        params: {}, // No toolId in params
       });
       mockGetRoutePermission.mockReturnValue(toolPermissions);
 
@@ -246,7 +195,9 @@ describe("checkRestrictedAccess", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle special characters in tool IDs", () => {
+    // Tool-level permission is now handled by allowedSystems in the async check
+    // These tests verify the sync check allows access regardless of allowedTools
+    it("should allow access regardless of tool ID format (filtering done in async)", () => {
       const toolPermissions: RoutePermission = {
         type: "execute",
         resource: "tool",
@@ -255,7 +206,7 @@ describe("checkRestrictedAccess", () => {
       };
       const authInfo = createAuthInfo({
         isRestricted: true,
-        allowedTools: ["tool-with-dashes", "tool_with_underscores", "tool.with.dots"],
+        allowedTools: ["other-tool"],
       });
       const request = createMockRequest({
         routeOptions: { url: "/v1/tools/:toolId/run" },
@@ -267,80 +218,11 @@ describe("checkRestrictedAccess", () => {
 
       expect(result.allowed).toBe(true);
     });
-
-    it("should be case-sensitive for tool IDs", () => {
-      const toolPermissions: RoutePermission = {
-        type: "execute",
-        resource: "tool",
-        allowRestricted: true,
-        checkResourceId: "toolId",
-      };
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: ["Tool-ABC"],
-      });
-      const request = createMockRequest({
-        routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "tool-abc" }, // lowercase
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(false);
-    });
   });
 
   describe("regression tests", () => {
-    it("should allow execute permission when allowedTools is ['*'] - all tools allowed", () => {
-      // This test covers restricted keys with "all tools allowed" (allowedTools: ['*'])
-      const toolPermissions: RoutePermission = {
-        type: "execute",
-        resource: "tool",
-        allowRestricted: true,
-        checkResourceId: "toolId",
-      };
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: ["*"], // "all tools allowed"
-      });
-      const request = createMockRequest({
-        method: "POST",
-        routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "my-tool-123" },
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(true);
-      expect(result.error).toBeUndefined();
-    });
-
-    it("should allow read permission when allowedTools is ['*']", () => {
-      const toolPermissions: RoutePermission = {
-        type: "read",
-        resource: "tool",
-        allowRestricted: true,
-        checkResourceId: "toolId",
-      };
-      const authInfo = createAuthInfo({
-        isRestricted: true,
-        allowedTools: ["*"],
-      });
-      const request = createMockRequest({
-        method: "GET",
-        routeOptions: { url: "/v1/tools/:toolId" },
-        params: { toolId: "my-tool-123" },
-      });
-      mockGetRoutePermission.mockReturnValue(toolPermissions);
-
-      const result = checkRestrictedAccess(authInfo, request);
-
-      expect(result.allowed).toBe(true);
-    });
-
-    it("should correctly deny access when allowedTools has specific tools but requested tool is not included", () => {
+    // Tool-level permission is now handled by allowedSystems in the async check
+    it("should allow access for any tool (filtering done by allowedSystems)", () => {
       const toolPermissions: RoutePermission = {
         type: "execute",
         resource: "tool",
@@ -354,14 +236,13 @@ describe("checkRestrictedAccess", () => {
       const request = createMockRequest({
         method: "POST",
         routeOptions: { url: "/v1/tools/:toolId/run" },
-        params: { toolId: "not-allowed-tool" },
+        params: { toolId: "not-in-allowed-list" },
       });
       mockGetRoutePermission.mockReturnValue(toolPermissions);
 
       const result = checkRestrictedAccess(authInfo, request);
 
-      expect(result.allowed).toBe(false);
-      expect(result.error).toBe("This API key is not authorized for this tool");
+      expect(result.allowed).toBe(true);
     });
   });
 });

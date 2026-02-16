@@ -154,3 +154,50 @@ export function getSourceUrl(file: FileReference): string | undefined {
   }
   return undefined;
 }
+
+export function validatePatchSystemBody(body: any): PatchSystemBody {
+  if (!body || typeof body !== "object") {
+    throw new Error("Request body must be a JSON object");
+  }
+  const normalized = normalizeSystem(body);
+  const allowed: (keyof PatchSystemBody)[] = [
+    "name",
+    "url",
+    "specificInstructions",
+    "icon",
+    "credentials",
+    "metadata",
+    "templateName",
+    "multiTenancyMode",
+    "documentationFiles",
+  ];
+  const result: PatchSystemBody = {};
+  for (const key of allowed) {
+    if (normalized[key] !== undefined) {
+      (result as any)[key] = normalized[key];
+    }
+  }
+  if (Object.keys(result).length === 0) {
+    throw new Error("At least one field must be provided for patch");
+  }
+  return result;
+}
+
+export function validateUploadDocumentationBody(body: any): UploadDocumentationBody {
+  if (!body?.files || !Array.isArray(body.files)) {
+    throw new Error("Request body must contain a 'files' array");
+  }
+  if (body.files.length === 0 || body.files.length > 20) {
+    throw new Error("Files array must contain between 1 and 20 files");
+  }
+  for (const file of body.files) {
+    if (!file.fileName || typeof file.fileName !== "string") {
+      throw new Error("Each file must have a 'fileName' string");
+    }
+    const lastDot = file.fileName.lastIndexOf(".");
+    if (lastDot === -1 || lastDot === file.fileName.length - 1) {
+      throw new Error(`File '${file.fileName}' must have a valid extension`);
+    }
+  }
+  return body as UploadDocumentationBody;
+}
