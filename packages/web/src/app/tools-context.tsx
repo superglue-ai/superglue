@@ -28,7 +28,7 @@ export function ToolsProvider({ children }: { children: ReactNode }) {
   const refreshTools = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       const result = await client.listWorkflows(1000, 0);
       setTools(result.items);
 

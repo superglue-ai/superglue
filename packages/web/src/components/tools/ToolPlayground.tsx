@@ -418,7 +418,7 @@ function ToolPlaygroundInner({
 
   const handleUnarchive = async () => {
     try {
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       await client.archiveWorkflow(toolId, false);
       setIsArchived(false);
       refreshTools();

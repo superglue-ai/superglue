@@ -59,7 +59,7 @@ export function useToolData(options: UseToolDataOptions) {
       if (!idToLoad) return;
       setLoading(true);
       setNotFound(false);
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       const loadedTool = await client.getWorkflow(idToLoad);
       if (!loadedTool) {
         setNotFound(true);
@@ -213,7 +213,7 @@ export function useToolData(options: UseToolDataOptions) {
       if (embedded && onSave) {
         await onSave(toolToSave, computedPayload);
       } else {
-        const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+        const client = createSuperglueClient(config.apiEndpoint);
         const savedTool = await client.upsertWorkflow(effectiveToolId, toolToSave as any);
 
         if (!savedTool) {

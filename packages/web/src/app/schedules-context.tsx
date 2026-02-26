@@ -29,7 +29,7 @@ export function SchedulesProvider({ children }: { children: ReactNode }) {
   const refreshSchedules = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const client = createEESuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createEESuperglueClient(config.apiEndpoint);
       const result = await client.listToolSchedules();
       setSchedules(result);
 

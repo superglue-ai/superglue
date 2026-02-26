@@ -91,7 +91,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
           existingKeys.push(key);
 
           try {
-            const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+            const client = createSuperglueClient(config.apiEndpoint);
             const parsedData = await processAndExtractFile(file, client);
 
             newPayloads[key] = parsedData;

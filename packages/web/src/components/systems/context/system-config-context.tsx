@@ -198,7 +198,7 @@ export function SystemConfigProvider({
 
   useEffect(() => {
     if (!initialSystem?.id) return;
-    const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+    const client = createSuperglueClient(config.apiEndpoint);
     client
       .listSystemFileReferences(initialSystem.id)
       .then((result) => {
@@ -515,7 +515,7 @@ export function SystemConfigProvider({
 
         const existingSystem = systems.find((s) => s.id === systemId);
 
-        const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+        const client = createSuperglueClient(config.apiEndpoint);
         const savedSystem = existingSystem
           ? await client.updateSystem(systemId, systemData)
           : await client.createSystem({ ...systemData, name: systemData.name || systemId });

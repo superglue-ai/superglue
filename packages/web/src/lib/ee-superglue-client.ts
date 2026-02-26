@@ -47,9 +47,9 @@ export class EESuperglueClient extends SuperglueClient {
   }
 }
 
-export function createEESuperglueClient(endpoint: string, apiEndpoint?: string): EESuperglueClient {
+export function createEESuperglueClient(apiEndpoint: string): EESuperglueClient {
   return new EESuperglueClient({
     apiKey: tokenRegistry.getToken(),
-    apiEndpoint: apiEndpoint ?? endpoint,
+    apiEndpoint,
   });
 }

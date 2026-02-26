@@ -81,7 +81,7 @@ export function useToolExecution(
     const runIdToAbort = currentRunIdRef.current;
     if (runIdToAbort) {
       markAsStopping();
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       await abortExecution(client, runIdToAbort);
     }
 
@@ -119,7 +119,7 @@ export function useToolExecution(
 
     return executeWithRunId(
       async () => {
-        const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+        const client = createSuperglueClient(config.apiEndpoint);
 
         const originalDataSelector = steps[idx]?.dataSelector;
         let stepToExecute = steps[idx];
@@ -190,7 +190,7 @@ export function useToolExecution(
       });
 
       const parsedSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       const result = await executeOutputTransform({
         client,
         outputTransform: transformStr || outputTransform,
@@ -264,7 +264,7 @@ export function useToolExecution(
 
       setCurrentExecutingStepIndex(0);
 
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       const state = await executeToolStepByStep({
         client,
         tool: executionTool,
@@ -405,7 +405,7 @@ export function useToolExecution(
       // Create run entry in database after execution completes
       if (finalToolConfig || toolId) {
         try {
-          const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+          const client = createSuperglueClient(config.apiEndpoint);
           await client.createRun({
             toolId,
             toolConfig:

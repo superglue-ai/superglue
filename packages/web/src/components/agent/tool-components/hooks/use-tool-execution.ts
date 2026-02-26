@@ -75,7 +75,7 @@ export function useToolExecution({
     if (!currentRunIdRef.current) return;
 
     lastAbortTimeRef.current = Date.now();
-    const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+    const client = createSuperglueClient(config.apiEndpoint);
     const success = await abortExecution(client, currentRunIdRef.current);
 
     if (success) {

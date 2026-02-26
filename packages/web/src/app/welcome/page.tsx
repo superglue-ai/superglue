@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import { useEffect, useState } from "react";
 import { useConfig } from "../config-context";
-import { tokenRegistry } from "@/src/lib/token-registry";
+import { createSuperglueClient } from "@/src/lib/client-utils";
 import { Loader2 } from "lucide-react";
 
 export default function WelcomePage() {
@@ -35,19 +35,8 @@ export default function WelcomePage() {
 
     const checkTenantInfo = async () => {
       try {
-        const response = await fetch(`${config.apiEndpoint}/v1/tenant-info`, {
-          headers: {
-            Authorization: `Bearer ${tokenRegistry.getToken()}`,
-          },
-        });
-
-        if (!response.ok) {
-          console.error("Tenant info request failed:", response.statusText);
-          setLoading(false);
-          return;
-        }
-
-        const data = await response.json();
+        const client = createSuperglueClient(config.apiEndpoint);
+        const data = await client.getTenantInfo();
 
         if (data?.email || data?.emailEntrySkipped) {
           router.push("/");
@@ -89,19 +78,8 @@ export default function WelcomePage() {
         },
       });
 
-      // TODO: remove once client SDK is updated
-      const response = await fetch(`${config.apiEndpoint}/v1/tenant-info`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${tokenRegistry.getToken()}`,
-        },
-        body: JSON.stringify({ email, emailEntrySkipped: false }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save tenant info");
-      }
+      const client = createSuperglueClient(config.apiEndpoint);
+      await client.setTenantInfo({ email, emailEntrySkipped: false });
 
       // Store in cookies for better performance
       document.cookie = `sg_tenant_email=${encodeURIComponent(email)}; path=/; max-age=31536000; SameSite=Strict`;
@@ -126,18 +104,8 @@ export default function WelcomePage() {
 
   const handleSkip = async () => {
     try {
-      const response = await fetch(`${config.apiEndpoint}/v1/tenant-info`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${tokenRegistry.getToken()}`,
-        },
-        body: JSON.stringify({ emailEntrySkipped: true }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save tenant info");
-      }
+      const client = createSuperglueClient(config.apiEndpoint);
+      await client.setTenantInfo({ emailEntrySkipped: true });
 
       // Store in cookies
       document.cookie =

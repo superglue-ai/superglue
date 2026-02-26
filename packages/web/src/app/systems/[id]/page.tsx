@@ -34,7 +34,7 @@ export default function SystemPage() {
       setError(null);
 
       try {
-        const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+        const client = createSuperglueClient(config.apiEndpoint);
         const fetchedSystem = await client.getSystem(decodeURIComponent(systemId));
 
         if (fetchedSystem) {

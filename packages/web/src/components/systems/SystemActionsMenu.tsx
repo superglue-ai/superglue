@@ -56,7 +56,7 @@ export function SystemActionsMenu({
 
   const handleDelete = async () => {
     try {
-      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint);
       await client.deleteSystem(system.id);
       await refreshSystems();
       onDeleted?.();

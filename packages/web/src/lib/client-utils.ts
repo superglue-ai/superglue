@@ -402,9 +402,9 @@ export function generateUUID(): string {
   });
 }
 
-export function createSuperglueClient(endpoint: string, apiEndpoint?: string): SuperglueClient {
+export function createSuperglueClient(apiEndpoint: string): SuperglueClient {
   return new SuperglueClient({
     apiKey: tokenRegistry.getToken(),
-    apiEndpoint: apiEndpoint ?? endpoint,
+    apiEndpoint,
   });
 }

@@ -753,6 +753,17 @@ export class SuperglueClient {
    * Generate a portal link for end-user authentication.
    * Returns a URL that can be shared with end users to authenticate with systems.
    */
+  async getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+    return this.restRequest("GET", "/v1/tenant-info");
+  }
+
+  async setTenantInfo(input: {
+    email?: string;
+    emailEntrySkipped?: boolean;
+  }): Promise<{ email: string | null; emailEntrySkipped: boolean }> {
+    return this.restRequest("PUT", "/v1/tenant-info", input);
+  }
+
   async generatePortalLink(): Promise<{ success: boolean; portalUrl?: string; error?: string }> {
     try {
       const result = await this.restRequest<{
