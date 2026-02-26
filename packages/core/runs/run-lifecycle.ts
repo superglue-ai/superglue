@@ -3,19 +3,52 @@
  * Context is passed through (not stored) for stateless operation.
  */
 
-import type { RequestOptions, RequestSource, Tool, ToolStepResult } from "@superglue/shared";
-import { RunStatus, RequestSource as RSrc } from "@superglue/shared";
+import type {
+  RequestOptions,
+  RequestSource,
+  ServiceMetadata,
+  StoredRunResults,
+  Tool,
+  ToolStepResult,
+} from "@superglue/shared";
+import { RunStatus, RequestSource as RSrc, sampleResultObject } from "@superglue/shared";
 import type { DataStore } from "../datastore/types.js";
+import { isFileStorageAvailable } from "../filestore/file-service.js";
 import { NotificationService } from "../notifications/index.js";
 import { logMessage } from "../utils/logs.js";
+
+// Max size for payload/result stored in DB (10KB) - full data goes to S3
+const MAX_DB_PAYLOAD_SIZE = 10 * 1024;
+
+/**
+ * Truncate a payload for DB storage. If too large, sample it.
+ * Returns null if even sampled version is too large.
+ */
+export function truncateForDB(
+  payload: Record<string, unknown>,
+  maxSize: number = MAX_DB_PAYLOAD_SIZE,
+): Record<string, unknown> | null {
+  const json = JSON.stringify(payload);
+  if (json.length <= maxSize) {
+    return payload;
+  }
+  const sampled = sampleResultObject(payload, 3);
+  const sampledJson = JSON.stringify(sampled);
+
+  // If still too large, return null
+  if (sampledJson.length > maxSize) {
+    return null;
+  }
+  return sampled;
+}
 
 export interface StartRunParams {
   runId?: string;
   tool: Tool;
-  /** Payload to store in DB. Omit for GraphQL (saves DB space), include for REST/Webhook */
   payload?: Record<string, unknown>;
   options?: RequestOptions;
   requestSource: RequestSource;
+  userId?: string; // User or end user who triggered this run
 }
 
 export interface RunContext {
@@ -30,8 +63,10 @@ export interface RunContext {
 export interface CompleteRunParams {
   success: boolean;
   tool?: Tool; // Updated tool config
+  data?: any; // Tool result data
   error?: string;
   stepResults?: ToolStepResult[];
+  payload?: Record<string, unknown>;
 }
 
 // Sources that should NOT trigger notifications (handled by their own UI)
@@ -40,12 +75,12 @@ const NOTIFICATION_EXCLUDED_SOURCES: RequestSource[] = [RSrc.FRONTEND, RSrc.MCP]
 export class RunLifecycleManager {
   private datastore: DataStore;
   private orgId: string;
-  private metadata: { orgId: string; traceId?: string };
+  private metadata: ServiceMetadata;
 
-  constructor(datastore: DataStore, orgId: string, metadata: { orgId?: string; traceId?: string }) {
+  constructor(datastore: DataStore, orgId: string, metadata: ServiceMetadata) {
     this.datastore = datastore;
     this.orgId = orgId;
-    this.metadata = { orgId, traceId: metadata.traceId };
+    this.metadata = { ...metadata, orgId };
   }
 
   /**
@@ -53,7 +88,7 @@ export class RunLifecycleManager {
    * Returns the full context needed for completeRun/abortRun
    */
   async startRun(params: StartRunParams): Promise<RunContext> {
-    const { tool, payload, options, requestSource } = params;
+    const { tool, payload, options, requestSource, userId } = params;
     const runId = params.runId || crypto.randomUUID();
     const startedAt = new Date();
 
@@ -72,10 +107,10 @@ export class RunLifecycleManager {
         toolId: tool.id,
         status: RunStatus.RUNNING,
         tool,
-        // Only include toolPayload if provided (GraphQL omits it to save DB space)
-        ...(payload !== undefined && { toolPayload: payload }),
+        ...(payload !== undefined && { toolPayload: truncateForDB(payload) ?? undefined }),
         options,
         requestSource,
+        userId: userId || this.metadata.userId,
         metadata: {
           startedAt: startedAt.toISOString(),
         },
@@ -100,7 +135,6 @@ export class RunLifecycleManager {
     const status = result.success ? RunStatus.SUCCESS : RunStatus.FAILED;
     const finalTool = result.tool || context.tool;
 
-    // Update run in database
     await this.datastore.updateRun({
       id: context.runId,
       orgId: this.orgId,
@@ -114,6 +148,18 @@ export class RunLifecycleManager {
           durationMs: completedAt.getTime() - context.startedAt.getTime(),
         },
       },
+      // Full (non-truncated) data for S3 storage only
+    });
+
+    // Fire-and-forget: Store run results to S3 if enabled
+    this.maybeStoreRunResults({
+      runId: context.runId,
+      success: result.success,
+      data: result.data ?? null,
+      stepResults: result.stepResults ?? [],
+      toolPayload: result.payload ?? {},
+      error: result.error,
+      storedAt: new Date(),
     });
 
     // Send notification for failed runs (fire-and-forget)
@@ -243,4 +289,22 @@ export class RunLifecycleManager {
       })
       .catch((err) => logMessage("error", `Notification failed: ${err}`, this.metadata));
   }
+
+  /**
+   * Check if run results storage is enabled for this org (EE feature)
+   * Returns true if file storage is available AND org has the feature enabled
+   */
+  private async isRunResultsStorageEnabled(): Promise<boolean> {
+    if (!isFileStorageAvailable()) {
+      return false;
+    }
+    const orgSettings = await this.datastore.getOrgSettings({ orgId: this.orgId });
+    return !!orgSettings?.preferences?.storeRunResults;
+  }
+
+  /**
+   * Fire-and-forget: Check org settings and store run results to S3 if enabled
+   * Also updates the run with the storage URI in the database
+   */
+  private maybeStoreRunResults(_results: StoredRunResults): void {}
 }

@@ -2,13 +2,14 @@
 
 import { Button } from "@/src/components/ui/button";
 import { MiniCard } from "@/src/components/ui/mini-card";
+import { SystemIcon } from "@/src/components/ui/system-icon";
+import { useAgentModal } from "@/src/components/agent/AgentModalContext";
+import { getToolBuilderPrompts } from "@/src/lib/agent/agent-context";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { resolveSystemIcon } from "@/src/lib/general-utils";
 import { cn } from "@/src/lib/general-utils";
 import { Blocks, Check, FileText, FlaskConical, Hammer, KeyRound, Loader2 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 import { useSystemConfig } from "./context";
 import { SectionStatus, SystemContextForAgent, SystemSection } from "./context/types";
 import { ConfigurationSection } from "./sections/ConfigurationSection";
@@ -24,53 +25,14 @@ const SECTION_CONFIG: Record<SystemSection, { icon: React.ElementType; label: st
   context: { icon: FileText, label: "Documentation" },
 };
 
-function getStatusColor(status: SectionStatus, isActive: boolean) {
+function getStatusColor(status: SectionStatus) {
   if (status.hasErrors) {
     return { text: "text-red-600 dark:text-red-400", dot: "bg-red-600 dark:bg-red-400" };
   }
   if (status.isComplete) {
     return { text: "text-green-600 dark:text-green-400", dot: "bg-green-600 dark:bg-green-400" };
   }
-  if (isActive) {
-    return {
-      text: "text-orange-600 dark:text-orange-400",
-      dot: "bg-orange-600 dark:bg-orange-400",
-    };
-  }
   return { text: "text-muted-foreground", dot: "bg-muted-foreground" };
-}
-
-function SystemIconDisplay({ system }: { system: { icon?: string; templateName?: string } }) {
-  const resolved = resolveSystemIcon(system);
-
-  if (!resolved) {
-    return <Blocks className="h-5 w-5 text-muted-foreground" />;
-  }
-
-  if (resolved.type === "lucide") {
-    const iconName = resolved.name.charAt(0).toUpperCase() + resolved.name.slice(1);
-    const LucideIcon = (LucideIcons as any)[iconName];
-    if (LucideIcon) {
-      return <LucideIcon className="h-5 w-5 text-primary" />;
-    }
-    return <Blocks className="h-5 w-5 text-muted-foreground" />;
-  }
-
-  if (resolved.type === "simpleicons") {
-    return (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill={`#${resolved.icon.hex}`}
-        className="flex-shrink-0"
-      >
-        <path d={resolved.icon.path} />
-      </svg>
-    );
-  }
-
-  return <Blocks className="h-5 w-5 text-muted-foreground" />;
 }
 
 export function SystemPlayground() {
@@ -83,6 +45,7 @@ export function SystemPlayground() {
     agentPortalRef,
     AgentSidebarComponent,
   } = useRightSidebar();
+  const { openAgentModal } = useAgentModal();
 
   const {
     system,
@@ -118,8 +81,8 @@ export function SystemPlayground() {
   }, [setContextSystemConfig, systemConfigForAgent]);
 
   const canSave = useMemo(() => {
-    return Boolean(system.id?.trim() && system.urlHost?.trim());
-  }, [system.id, system.urlHost]);
+    return Boolean(system.id?.trim() && system.url?.trim());
+  }, [system.id, system.url]);
 
   const handleSave = useCallback(async () => {
     const success = await saveSystem();
@@ -133,8 +96,10 @@ export function SystemPlayground() {
   }, [saveSystem, isNewSystem, system.id, router]);
 
   const handleBuildTool = useCallback(() => {
-    router.push(`/tools?system=${encodeURIComponent(system.id)}`);
-  }, [router, system.id]);
+    if (!system.id) return;
+    const prompts = getToolBuilderPrompts({ systemIds: [system.id], systems: [system] });
+    openAgentModal(prompts);
+  }, [openAgentModal, system]);
 
   const handleTestSystem = useCallback(() => {
     if (!system.id) return;
@@ -145,18 +110,20 @@ export function SystemPlayground() {
     sendMessageToAgent(testPrompt);
   }, [system.id, setShowAgent, sendMessageToAgent]);
 
-  const renderSectionContent = () => {
-    switch (activeSection) {
-      case "configuration":
-        return <ConfigurationSection />;
-      case "authentication":
-        return <AuthenticationSection />;
-      case "context":
-        return <ContextSection />;
-      default:
-        return null;
-    }
-  };
+  const renderAllSections = () => (
+    <>
+      {SECTIONS.map((section) => {
+        const isActive = activeSection === section;
+        return (
+          <div key={section} className={isActive ? undefined : "hidden"}>
+            {section === "configuration" && <ConfigurationSection />}
+            {section === "authentication" && <AuthenticationSection />}
+            {section === "context" && <ContextSection showRefreshButton />}
+          </div>
+        );
+      })}
+    </>
+  );
 
   const activeIndex = SECTIONS.indexOf(activeSection);
 
@@ -199,12 +166,8 @@ export function SystemPlayground() {
     <div className="flex flex-col h-full w-full px-6 py-3">
       <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
-          {system.id ? (
-            <SystemIconDisplay system={system} />
-          ) : (
-            <Blocks className="h-5 w-5 text-muted-foreground" />
-          )}
-          <h1 className="text-xl font-semibold">{system.id ? system.id : "New System"}</h1>
+          <SystemIcon system={system} size={20} fallbackClassName="text-muted-foreground" />
+          <h1 className="text-xl font-semibold">{system.name || system.id || "New System"}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -261,7 +224,7 @@ export function SystemPlayground() {
               const Icon = config.icon;
               const isActive = activeSection === section;
               const status = getSectionStatus(section);
-              const statusColor = getStatusColor(status, isActive);
+              const statusColor = getStatusColor(status);
 
               return (
                 <MiniCard
@@ -319,7 +282,7 @@ export function SystemPlayground() {
         </div>
 
         <div className="flex-1 overflow-y-auto pr-4 pt-4" style={{ scrollbarGutter: "stable" }}>
-          <div className="min-h-[400px] max-w-4xl mx-auto px-2">{renderSectionContent()}</div>
+          <div className="min-h-[400px] max-w-4xl mx-auto px-2">{renderAllSections()}</div>
         </div>
       </div>
 

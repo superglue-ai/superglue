@@ -2,8 +2,15 @@
 
 import { UploadedFileInfo } from "@/src/lib/file-utils";
 import { computeToolPayload } from "@/src/lib/general-utils";
-import { getPayload, addDraft } from "@/src/lib/storage";
-import { ExecutionStep, System, ResponseFilter, Tool } from "@superglue/shared";
+import { getPayload, setPayload, addDraft } from "@/src/lib/storage";
+import {
+  RequestStepConfig,
+  ToolStep,
+  System,
+  ResponseFilter,
+  Tool,
+  isRequestConfig,
+} from "@superglue/shared";
 import {
   createContext,
   ReactNode,
@@ -17,8 +24,8 @@ import {
 import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
 
 function checkPayloadKeysReferenced(
-  steps: ExecutionStep[],
-  finalTransform: string,
+  steps: ToolStep[],
+  outputTransform: string,
   payloadKeys: string[],
 ): boolean {
   if (payloadKeys.length === 0) return true;
@@ -29,7 +36,7 @@ function checkPayloadKeysReferenced(
     if (!pattern) {
       const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       pattern = new RegExp(
-        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]`,
+        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]|<<\\s*${escaped}\\s*>>`,
       );
       patternCache.set(key, pattern);
     }
@@ -41,22 +48,27 @@ function checkPayloadKeysReferenced(
     return payloadKeys.some((key) => buildPatternForKey(key).test(str));
   };
 
-  const checkObjectForAnyKey = (obj: Record<string, any> | undefined): boolean => {
-    if (!obj) return false;
-    return checkStringForAnyKey(JSON.stringify(obj));
+  const checkValueForAnyKey = (val: unknown): boolean => {
+    if (!val) return false;
+    const str = typeof val === "string" ? val : JSON.stringify(val);
+    return checkStringForAnyKey(str);
   };
 
   for (const step of steps) {
-    const { apiConfig, loopSelector } = step;
-    if (checkStringForAnyKey(apiConfig.urlPath)) return true;
-    if (checkStringForAnyKey(apiConfig.urlHost)) return true;
-    if (checkStringForAnyKey(apiConfig.body)) return true;
-    if (checkStringForAnyKey(loopSelector)) return true;
-    if (checkObjectForAnyKey(apiConfig.queryParams)) return true;
-    if (checkObjectForAnyKey(apiConfig.headers)) return true;
+    const { dataSelector } = step;
+    if (checkStringForAnyKey(dataSelector)) return true;
+
+    // Only check request step config fields
+    if (isRequestConfig(step.config)) {
+      const config = step.config as RequestStepConfig;
+      if (checkValueForAnyKey(config.url)) return true;
+      if (checkValueForAnyKey(config.body)) return true;
+      if (checkValueForAnyKey(config.queryParams)) return true;
+      if (checkValueForAnyKey(config.headers)) return true;
+    }
   }
 
-  if (checkStringForAnyKey(finalTransform)) return true;
+  if (checkStringForAnyKey(outputTransform)) return true;
 
   return false;
 }
@@ -94,15 +106,15 @@ export function ToolConfigProvider({
   children,
 }: ToolConfigProviderProps) {
   const [toolId, setToolId] = useState(initialTool?.id || "");
-  const [steps, setSteps] = useState<ExecutionStep[]>(initialTool?.steps || []);
+  const [steps, setSteps] = useState<ToolStep[]>(initialTool?.steps || []);
   const [instruction, setInstruction] = useState(
     initialInstruction || initialTool?.instruction || "",
   );
-  const [finalTransform, setFinalTransform] = useState(
-    initialTool?.finalTransform || "(sourceData) => { return {} }",
+  const [outputTransform, setOutputTransform] = useState(
+    initialTool?.outputTransform || "(sourceData) => { return {} }",
   );
-  const [responseSchema, setResponseSchema] = useState<string>(
-    initialTool?.responseSchema ? JSON.stringify(initialTool.responseSchema, null, 2) : "",
+  const [outputSchema, setOutputSchema] = useState<string>(
+    initialTool?.outputSchema ? JSON.stringify(initialTool.outputSchema, null, 2) : "",
   );
   const [inputSchema, setInputSchema] = useState<string | null>(
     initialTool?.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null,
@@ -129,12 +141,12 @@ export function ToolConfigProvider({
       const state = JSON.stringify({
         steps: initialTool.steps || [],
         instruction: initialInstruction || initialTool.instruction || "",
-        finalTransform: initialTool.finalTransform || "(sourceData) => { return {} }",
+        outputTransform: initialTool.outputTransform || "(sourceData) => { return {} }",
         inputSchema: initialTool.inputSchema
           ? JSON.stringify(initialTool.inputSchema, null, 2)
           : null,
-        responseSchema: initialTool.responseSchema
-          ? JSON.stringify(initialTool.responseSchema, null, 2)
+        outputSchema: initialTool.outputSchema
+          ? JSON.stringify(initialTool.outputSchema, null, 2)
           : "",
       });
       initialStateRef.current = state;
@@ -148,9 +160,9 @@ export function ToolConfigProvider({
       const state = JSON.stringify({
         steps,
         instruction,
-        finalTransform,
+        outputTransform,
         inputSchema,
-        responseSchema,
+        outputSchema,
       });
       initialStateRef.current = state;
       lastAttemptedSaveRef.current = state; // Don't save current state as draft
@@ -162,9 +174,9 @@ export function ToolConfigProvider({
     toolId,
     steps,
     instruction,
-    finalTransform,
+    outputTransform,
     inputSchema,
-    responseSchema,
+    outputSchema,
     initialStateReady,
   ]);
 
@@ -204,15 +216,80 @@ export function ToolConfigProvider({
     };
   }, [toolId, initialPayload]);
 
+  // Persist payload to IndexedDB whenever it changes (debounced)
+  const payloadSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingPayloadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!toolId || !toolId.trim()) return;
+
+    const MAX_PAYLOAD_SIZE = 1000 * 1024; // Only cache small payloads (1MB)
+    const DEBOUNCE_MS = 1000;
+
+    // Track pending payload for save on unmount
+    pendingPayloadRef.current = manualPayloadText;
+
+    if (payloadSaveTimeoutRef.current) {
+      clearTimeout(payloadSaveTimeoutRef.current);
+    }
+
+    payloadSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const trimmed = (manualPayloadText || "").trim();
+        if (trimmed === "" || trimmed === "{}") {
+          await setPayload(toolId, "");
+          pendingPayloadRef.current = null;
+          return;
+        }
+
+        const payloadSize = new Blob([manualPayloadText]).size;
+        if (payloadSize > MAX_PAYLOAD_SIZE) {
+          await setPayload(toolId, "");
+          pendingPayloadRef.current = null;
+          return;
+        }
+
+        await setPayload(toolId, manualPayloadText);
+        pendingPayloadRef.current = null;
+      } catch (error) {
+        console.error("Error saving payload:", error);
+      }
+    }, DEBOUNCE_MS);
+
+    return () => {
+      if (payloadSaveTimeoutRef.current) {
+        clearTimeout(payloadSaveTimeoutRef.current);
+      }
+    };
+  }, [toolId, manualPayloadText]);
+
+  // Save pending payload on unmount
+  useEffect(() => {
+    const toolIdCopy = toolId;
+    return () => {
+      if (pendingPayloadRef.current !== null && toolIdCopy) {
+        const payload = pendingPayloadRef.current;
+        const MAX_PAYLOAD_SIZE = 1000 * 1024;
+        const trimmed = (payload || "").trim();
+
+        if (trimmed === "" || trimmed === "{}" || new Blob([payload]).size > MAX_PAYLOAD_SIZE) {
+          setPayload(toolIdCopy, "").catch(console.error);
+        } else {
+          setPayload(toolIdCopy, payload).catch(console.error);
+        }
+      }
+    };
+  }, [toolId]);
+
   const lastAttemptedSaveRef = useRef<string | null>(null);
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingDraftRef = useRef<{
     toolId: string;
-    steps: ExecutionStep[];
+    steps: ToolStep[];
     instruction: string;
-    finalTransform: string;
+    outputTransform: string;
     inputSchema: string | null;
-    responseSchema: string;
+    outputSchema: string;
   } | null>(null);
 
   useEffect(() => {
@@ -225,9 +302,9 @@ export function ToolConfigProvider({
     const currentState = JSON.stringify({
       steps,
       instruction,
-      finalTransform,
+      outputTransform,
       inputSchema,
-      responseSchema,
+      outputSchema,
     });
 
     if (currentState === initialStateRef.current) {
@@ -245,9 +322,9 @@ export function ToolConfigProvider({
       toolId,
       steps,
       instruction,
-      finalTransform,
+      outputTransform,
       inputSchema,
-      responseSchema,
+      outputSchema,
     };
     pendingDraftRef.current = draftData;
 
@@ -269,7 +346,7 @@ export function ToolConfigProvider({
         clearTimeout(draftSaveTimeoutRef.current);
       }
     };
-  }, [toolId, steps, instruction, finalTransform, inputSchema, responseSchema, initialStateReady]);
+  }, [toolId, steps, instruction, outputTransform, inputSchema, outputSchema, initialStateReady]);
 
   // Save pending draft on unmount
   useEffect(() => {
@@ -327,23 +404,23 @@ export function ToolConfigProvider({
 
   const tool = useMemo<ToolDefinition>(() => {
     let parsedInputSchema = null;
-    let parsedResponseSchema = null;
+    let parsedOutputSchema = null;
     try {
       if (inputSchema) parsedInputSchema = JSON.parse(inputSchema);
     } catch {
       // Invalid JSON, keep as null
     }
     try {
-      if (responseSchema) parsedResponseSchema = JSON.parse(responseSchema);
+      if (outputSchema) parsedOutputSchema = JSON.parse(outputSchema);
     } catch {
       // Invalid JSON, keep as null
     }
     return {
       id: toolId,
       instruction,
-      finalTransform,
+      outputTransform,
       inputSchema: parsedInputSchema,
-      responseSchema: parsedResponseSchema,
+      outputSchema: parsedOutputSchema,
       folder,
       isArchived,
       responseFilters,
@@ -351,9 +428,9 @@ export function ToolConfigProvider({
   }, [
     toolId,
     instruction,
-    finalTransform,
+    outputTransform,
     inputSchema,
-    responseSchema,
+    outputSchema,
     folder,
     isArchived,
     responseFilters,
@@ -370,7 +447,7 @@ export function ToolConfigProvider({
     [manualPayloadText, uploadedFiles, filePayloads, computedPayload, hasUserEdited],
   );
 
-  const addStep = useCallback((step: ExecutionStep, afterIndex?: number) => {
+  const addStep = useCallback((step: ToolStep, afterIndex?: number) => {
     setSteps((prev) => {
       if (afterIndex !== undefined && afterIndex >= 0 && afterIndex < prev.length) {
         const next = [...prev];
@@ -385,7 +462,7 @@ export function ToolConfigProvider({
     setSteps((prev) => prev.filter((s) => s.id !== stepId));
   }, []);
 
-  const updateStep = useCallback((stepId: string, updates: Partial<ExecutionStep>) => {
+  const updateStep = useCallback((stepId: string, updates: Partial<ToolStep>) => {
     setSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, ...updates } : s)));
   }, []);
 
@@ -406,8 +483,10 @@ export function ToolConfigProvider({
   const getStepSystem = useCallback(
     (stepId: string) => {
       const step = steps.find((s) => s.id === stepId);
-      if (!step?.systemId) return undefined;
-      return systems.find((i) => i.id === step.systemId);
+      if (!step?.config || !isRequestConfig(step.config)) return undefined;
+      const systemId = (step.config as RequestStepConfig).systemId;
+      if (!systemId) return undefined;
+      return systems.find((i) => i.id === systemId);
     },
     [steps, systems],
   );
@@ -417,18 +496,18 @@ export function ToolConfigProvider({
     const currentState = JSON.stringify({
       steps,
       instruction,
-      finalTransform,
+      outputTransform,
       inputSchema,
-      responseSchema,
+      outputSchema,
     });
     initialStateRef.current = currentState;
     lastAttemptedSaveRef.current = currentState;
-  }, [steps, instruction, finalTransform, inputSchema, responseSchema]);
+  }, [steps, instruction, outputTransform, inputSchema, outputSchema]);
 
   const isPayloadReferenced = useMemo(() => {
     const payloadKeys = Object.keys(computedPayload || {});
-    return checkPayloadKeysReferenced(steps, finalTransform, payloadKeys);
-  }, [steps, finalTransform, computedPayload]);
+    return checkPayloadKeysReferenced(steps, outputTransform, payloadKeys);
+  }, [steps, outputTransform, computedPayload]);
 
   const value = useMemo<ToolConfigContextValue>(
     () => ({
@@ -438,15 +517,15 @@ export function ToolConfigProvider({
       systems,
 
       inputSchema,
-      responseSchema,
-      finalTransform,
+      outputSchema,
+      outputTransform,
       responseFilters,
 
       setToolId,
       setInstruction,
-      setFinalTransform,
+      setOutputTransform,
       setInputSchema,
-      setResponseSchema,
+      setOutputSchema,
       setFolder,
       setIsArchived,
       setResponseFilters,
@@ -475,8 +554,8 @@ export function ToolConfigProvider({
       payload,
       systems,
       inputSchema,
-      responseSchema,
-      finalTransform,
+      outputSchema,
+      outputTransform,
       responseFilters,
       addStep,
       removeStep,

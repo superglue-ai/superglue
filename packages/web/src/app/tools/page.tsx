@@ -17,7 +17,6 @@ import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/
 import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { ToolActionsMenu } from "@/src/components/tools/ToolActionsMenu";
-import { ToolCreateStepper } from "@/src/components/tools/ToolCreateStepper";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   Tooltip,
@@ -25,6 +24,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+import { useAgentModal } from "@/src/components/agent/AgentModalContext";
+import { getToolBuilderPrompts } from "@/src/lib/agent/agent-context";
+import { getToolSystemIds } from "@superglue/shared";
 import {
   ArrowDown,
   ArrowUp,
@@ -36,7 +38,7 @@ import {
   Search,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTools } from "../tools-context";
 
 type SortColumn = "id" | "folder" | "instruction" | "updatedAt";
@@ -46,15 +48,26 @@ const ToolsTable = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
-  const { systems } = useSystems();
+  const { systems, loading: systemsLoading } = useSystems();
+  const { openAgentModal, registerOnClose } = useAgentModal();
 
-  const systemFromUrl = searchParams.get("system");
+  const systemParam = searchParams.get("system");
+  const systemsParam = searchParams.get("systems");
+  const systemIdsFromUrl = useMemo(() => {
+    if (systemsParam) {
+      return systemsParam
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    }
+    if (systemParam) {
+      return [systemParam.trim()].filter(Boolean);
+    }
+    return [];
+  }, [systemParam, systemsParam]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [manuallyOpenedStepper, setManuallyOpenedStepper] = useState(!!systemFromUrl);
-
-  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -114,9 +127,17 @@ const ToolsTable = () => {
     refreshTools();
   }, [refreshTools]);
 
-  const handleTool = () => {
-    setManuallyOpenedStepper(true);
-  };
+  const openToolBuilderModal = useCallback(
+    (systemIds?: string[]) => {
+      const prompts = getToolBuilderPrompts({ systemIds, systems });
+      openAgentModal(prompts);
+    },
+    [openAgentModal, systems],
+  );
+
+  const handleTool = useCallback(() => {
+    openToolBuilderModal();
+  }, [openToolBuilderModal]);
 
   const handlePlayTool = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -142,34 +163,21 @@ const ToolsTable = () => {
     );
   };
 
+  const autoOpenedRef = useRef(false);
   useEffect(() => {
-    if (!isInitiallyLoading && !hasCompletedInitialLoad) {
-      setHasCompletedInitialLoad(true);
-    }
-  }, [isInitiallyLoading, hasCompletedInitialLoad]);
+    if (autoOpenedRef.current) return;
+    if (systemIdsFromUrl.length === 0) return;
+    if (systemsLoading) return;
 
-  const nonArchivedTools = tools.filter((t) => !t.archived);
-  const shouldShowStepper =
-    manuallyOpenedStepper || (hasCompletedInitialLoad && tools.length === 0);
+    autoOpenedRef.current = true;
+    openToolBuilderModal(systemIdsFromUrl);
 
-  if (shouldShowStepper) {
-    return (
-      <div className="max-w-none w-full min-h-full">
-        <ToolCreateStepper
-          onComplete={() => {
-            setManuallyOpenedStepper(false);
-            // Clear the system param from URL when closing
-            if (systemFromUrl) {
-              router.replace("/tools");
-            }
-            refreshConfigs();
-          }}
-          initialSystemIds={systemFromUrl ? [systemFromUrl] : []}
-          initialView={systemFromUrl ? "instructions" : "systems"}
-        />
-      </div>
-    );
-  }
+    const unregister = registerOnClose(() => {
+      router.replace("/tools");
+    });
+
+    return unregister;
+  }, [systemIdsFromUrl.join(","), systemsLoading, openToolBuilderModal, registerOnClose, router]);
 
   return (
     <div className="p-8 max-w-none w-full h-full flex flex-col overflow-hidden">
@@ -286,21 +294,7 @@ const ToolsTable = () => {
               </TableRow>
             ) : (
               currentConfigs.map((tool) => {
-                const allSystemIds = new Set<string>();
-
-                if (tool.systemIds) {
-                  tool.systemIds.forEach((id) => allSystemIds.add(id));
-                }
-
-                if (tool.steps) {
-                  tool.steps.forEach((step: any) => {
-                    if (step.systemId) {
-                      allSystemIds.add(step.systemId);
-                    }
-                  });
-                }
-
-                const systemIdsArray = Array.from(allSystemIds);
+                const systemIdsArray = getToolSystemIds(tool);
 
                 return (
                   <TableRow key={tool.id} className="hover:bg-secondary">
@@ -319,7 +313,7 @@ const ToolsTable = () => {
                                     </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{system.id}</p>
+                                    <p>{system.name || system.id}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>

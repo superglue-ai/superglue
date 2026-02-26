@@ -1,17 +1,12 @@
 "use client";
 
 import { resolveSystemIcon } from "@/src/lib/general-utils";
+import type { System } from "@superglue/shared";
 import { Blocks, icons, LucideIcon } from "lucide-react";
 import { memo } from "react";
 
 interface SystemIconProps {
-  system: {
-    id?: string;
-    name?: string;
-    urlHost?: string;
-    icon?: string | null;
-    templateName?: string;
-  };
+  system: Partial<System>;
   size?: number;
   className?: string;
   /** Additional classes for the fallback Blocks icon */
@@ -50,12 +45,7 @@ export const SystemIcon = memo(function SystemIcon({
   }
 
   if (resolved?.type === "lucide") {
-    const iconName = resolved.name
-      .split("-")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join("");
-
-    const LucideIconComponent = icons[iconName as keyof typeof icons] as LucideIcon | undefined;
+    const LucideIconComponent = getLucideIconComponent(resolved.name);
 
     if (LucideIconComponent) {
       return (
@@ -74,3 +64,41 @@ export const SystemIcon = memo(function SystemIcon({
     />
   );
 });
+
+let _lucideIconByNormalized: Record<string, LucideIcon> | null = null;
+
+function normalizeLucideName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function toPascalCase(name: string): string {
+  return name
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+function getLucideIconComponent(name: string): LucideIcon | undefined {
+  if (!name) return undefined;
+
+  // Fast path: try direct and basic pascal-case lookup.
+  const direct = icons[name as keyof typeof icons] as LucideIcon | undefined;
+  if (direct) return direct;
+
+  const pascal = toPascalCase(name);
+  const byPascal = icons[pascal as keyof typeof icons] as LucideIcon | undefined;
+  if (byPascal) return byPascal;
+
+  // Fallback: normalized lookup to handle cases like "grid-2x2" => "Grid2X2".
+  if (!_lucideIconByNormalized) {
+    _lucideIconByNormalized = {};
+    for (const [key, value] of Object.entries(icons)) {
+      const normalized = normalizeLucideName(key);
+      if (!_lucideIconByNormalized[normalized]) {
+        _lucideIconByNormalized[normalized] = value as LucideIcon;
+      }
+    }
+  }
+
+  return _lucideIconByNormalized[normalizeLucideName(name)];
+}

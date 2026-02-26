@@ -3,8 +3,6 @@ import fs from "node:fs";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { afterAll, beforeAll } from "vitest";
-import { FileStore } from "../datastore/filestore.js";
-import { MemoryStore } from "../datastore/memory.js";
 import type { DataStore } from "../datastore/types.js";
 
 /**
@@ -98,10 +96,7 @@ export class DataStoreFactory {
       fs.rmdirSync(this.testDir);
     }
 
-    this.dataStores = [
-      { name: "FileStore", instance: new FileStore(this.testDir) },
-      { name: "MemoryStore", instance: new MemoryStore() },
-    ];
+    this.dataStores = [];
 
     return this.dataStores;
   }
@@ -151,10 +146,6 @@ export class DataStoreFactory {
     afterAll(async () => {
       await this.cleanup();
     });
-  }
-
-  static createMemoryStore(): DataStore {
-    return new MemoryStore();
   }
 }
 

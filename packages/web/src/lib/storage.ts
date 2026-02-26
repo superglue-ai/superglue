@@ -1,5 +1,5 @@
 import { openDB, IDBPDatabase, DBSchema } from "idb";
-import { ExecutionStep } from "@superglue/shared";
+import { ToolStep } from "@superglue/shared";
 import { deepEqual } from "./general-utils";
 
 const DB_NAME = "superglue";
@@ -31,16 +31,13 @@ interface SuperglueDB extends DBSchema {
 export interface ToolDraft {
   id: string;
   toolId: string;
-  steps: ExecutionStep[];
+  steps: ToolStep[];
   instruction: string;
-  finalTransform: string;
+  outputTransform: string;
   inputSchema: string | null;
-  responseSchema: string;
+  outputSchema: string;
   createdAt: number;
 }
-
-// Max age for drafts before they're considered expired
-const MAX_DRAFT_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 let dbPromise: Promise<IDBPDatabase<SuperglueDB>> | null = null;
 
@@ -199,9 +196,9 @@ function getDraftContent(draft: Omit<ToolDraft, "id" | "createdAt">) {
   return {
     steps: draft.steps,
     instruction: draft.instruction,
-    finalTransform: draft.finalTransform,
+    outputTransform: draft.outputTransform,
     inputSchema: draft.inputSchema,
-    responseSchema: draft.responseSchema,
+    outputSchema: draft.outputSchema,
   };
 }
 

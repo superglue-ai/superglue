@@ -1,30 +1,19 @@
 "use client";
 import { Button } from "@/src/components/ui/button";
-import { FileChip } from "@/src/components/ui/FileChip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
-import { formatBytes } from "@/src/lib/file-utils";
 import { UserAction } from "@/src/lib/agent/agent-types";
-import { ALLOWED_FILE_EXTENSIONS, Message, ToolCall } from "@superglue/shared";
-import {
-  AlertTriangle,
-  BotMessageSquare,
-  ChevronUp,
-  Edit2,
-  Loader2,
-  Paperclip,
-  Plus,
-  Send,
-  Square,
-  User,
-  X,
-} from "lucide-react";
+import { Message, ToolCall } from "@superglue/shared";
+import { AlertTriangle, ChevronDown, ChevronUp, Pencil, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import { AgentCapabilities } from "./AgentCapabilities";
+import { AgentType } from "@/src/lib/agent/registry/agents";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
+import { AgentInputArea } from "./AgentInputArea";
 import { ConversationHistory } from "./ConversationHistory";
 import {
   ScrollToBottomButton,
@@ -37,6 +26,41 @@ import { BackgroundToolGroup, groupMessageParts } from "./tool-components";
 import { AgentWelcome } from "./welcome/AgentWelcome";
 
 const MAX_MESSAGE_LENGTH = 50000;
+
+function ErrorMessagePart({ content, errorDetails }: { content: string; errorDetails?: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg border border-zinc-200/50 dark:border-zinc-700/50 bg-zinc-50/50 dark:bg-zinc-800/20 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-zinc-500 dark:text-zinc-400 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-zinc-800 dark:text-zinc-200">{content}</p>
+          {errorDetails && (
+            <div className="mt-2">
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center gap-1 text-xs text-zinc-600/70 dark:text-zinc-400/70 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+                {isExpanded ? "Hide details" : "Show details"}
+              </button>
+              {isExpanded && (
+                <pre className="mt-2 p-2 text-xs font-mono bg-zinc-100/50 dark:bg-zinc-900/30 rounded border border-zinc-200/30 dark:border-zinc-700/30 overflow-x-auto whitespace-pre-wrap break-all text-zinc-700 dark:text-zinc-300">
+                  {errorDetails}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const MemoMessage = React.memo(
   ({
@@ -79,14 +103,22 @@ const MemoMessage = React.memo(
       <div key={message.id} className={cn("flex gap-4 p-2 pt-4 rounded-xl group min-h-16")}>
         <div
           className={cn(
-            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm hidden lg:flex",
+            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center hidden lg:flex",
             message.role === "user"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background border-2 text-muted-foreground",
+              ? "bg-neutral-100 dark:bg-neutral-900"
+              : "bg-white dark:bg-black",
           )}
         >
-          {message.role === "user" && <User size={18} />}
-          {message.role === "assistant" && <BotMessageSquare size={18} />}
+          {message.role === "user" && (
+            <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Y</span>
+          )}
+          {message.role === "assistant" && (
+            <img
+              src="/favicon.png"
+              alt="superglue"
+              className="w-5 h-5 object-contain dark:invert"
+            />
+          )}
         </div>
 
         <div className="flex-1 space-y-3 min-w-0 overflow-hidden">
@@ -100,23 +132,21 @@ const MemoMessage = React.memo(
             {(() => {
               const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
               const isStale = message.timestamp.getTime() < fiveMinutesAgo;
+              const hasContent =
+                message.content?.trim() ||
+                message.parts?.some((p) => p.type === "content" && p.content?.trim());
 
-              return message.isStreaming && !isStale ? (
-                <div className="flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Thinking...</span>
-                </div>
-              ) : null;
+              return message.isStreaming && !isStale && !hasContent ? <ThinkingIndicator /> : null;
             })()}
             {message.role === "user" && !isLoading && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 px-2"
+              <button
+                type="button"
                 onClick={() => handleEditMessage(message.id, message.content)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                title="Edit message"
               >
-                <Edit2 className="w-3 h-3" />
-              </Button>
+                <Pencil className="w-3 h-3 text-muted-foreground" />
+              </button>
             )}
           </div>
 
@@ -138,24 +168,31 @@ const MemoMessage = React.memo(
             )}
 
           {editingMessageId === message.id ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Textarea
                 value={editingContent}
                 onChange={(e) => setEditingContent(e.target.value)}
-                className="min-h-[48px] max-h-[120px] resize-none text-base leading-relaxed focus-visible:ring-0 focus-visible:border-ring"
+                className="min-h-[72px] max-h-[200px] resize-y text-[13px] bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20 backdrop-blur-sm border border-border/50 rounded-xl shadow-sm focus-visible:ring-0 px-3 py-2"
                 placeholder="Edit your message..."
                 autoFocus
               />
               <div className="flex gap-2">
                 <Button
+                  variant="glass"
                   size="sm"
                   onClick={() => handleSaveEdit(message.id)}
                   disabled={!editingContent.trim() || isLoading}
+                  className="rounded-xl"
                 >
                   Save & Restart
                 </Button>
-                <Button size="sm" variant="ghost" onClick={handleCancelEdit} disabled={isLoading}>
-                  <X className="w-2 h-2" />
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={handleCancelEdit}
+                  disabled={isLoading}
+                  className="rounded-xl"
+                >
                   Cancel
                 </Button>
               </div>
@@ -175,6 +212,14 @@ const MemoMessage = React.memo(
                       >
                         <Streamdown>{grouped.part.content || ""}</Streamdown>
                       </div>
+                    );
+                  } else if (grouped.type === "error") {
+                    return (
+                      <ErrorMessagePart
+                        key={grouped.part.id}
+                        content={grouped.part.content || "An error occurred"}
+                        errorDetails={grouped.part.errorDetails}
+                      />
                     );
                   } else if (grouped.type === "background_tools") {
                     return <BackgroundToolGroup key={`bg-${idx}`} tools={grouped.tools} />;
@@ -272,20 +317,10 @@ function AgentInterfaceContent({
     sendAgentRequest,
     bufferAction,
     abortStream,
-    pendingFiles,
-    sessionFiles,
     filePayloads,
-    isProcessingFiles,
-    isDragging,
-    fileInputRef,
-    handleFilesUpload,
-    handlePendingFileRemove,
-    handleSessionFileRemove,
-    handleDrop,
-    handleDragOver,
-    handleDragLeave,
     currentConversationId,
     setCurrentConversationId,
+    sessionId,
     loadConversation,
     startNewConversation,
     handleSendMessage,
@@ -325,7 +360,6 @@ function AgentInterfaceContent({
   const [input, setInput] = React.useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  const isResizingRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
   const isAnyMessageStreaming = useMemo(() => messages.some((m) => m.isStreaming), [messages]);
@@ -337,18 +371,6 @@ function AgentInterfaceContent({
       hour12: false,
     });
   }, []);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (inputRef.current) {
-      isResizingRef.current = true;
-      inputRef.current.style.height = "auto";
-      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`;
-      setTimeout(() => {
-        isResizingRef.current = false;
-      }, 50);
-    }
-  }, [input]);
 
   // Copy button functionality
   useEffect(() => {
@@ -432,18 +454,6 @@ function AgentInterfaceContent({
     await handleSendMessage(content);
   }, [input, handleSendMessage]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        if (input.trim() && input.length <= MAX_MESSAGE_LENGTH) {
-          onSendMessage();
-        }
-      }
-    },
-    [input, onSendMessage],
-  );
-
   const handleStopStreaming = useCallback(() => {
     stopStreaming();
   }, [stopStreaming]);
@@ -463,22 +473,19 @@ function AgentInterfaceContent({
         <ConversationHistory
           messages={messages}
           currentConversationId={currentConversationId}
+          sessionId={sessionId}
           onConversationLoad={handleConversationLoad}
-          onNewConversation={clearMessages}
           onCurrentConversationIdChange={setCurrentConversationId}
         />
 
         {(chatTitle || messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={clearMessages}
-            className="h-9 px-3 rounded-xl"
-          >
+          <Button variant="glass" size="sm" onClick={clearMessages} className="h-9 px-3 rounded-xl">
             <Plus className="w-4 h-4 mr-2" />
             New
           </Button>
         )}
+
+        <AgentCapabilities agentType={AgentType.MAIN} />
 
         {chatTitle && (
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-xl border border-border/50">
@@ -498,7 +505,7 @@ function AgentInterfaceContent({
       </div>
 
       <ScrollToBottomContainer
-        className="flex-1 mx-2 lg:mx-6 overflow-hidden relative"
+        className="flex-1 mx-0 sm:mx-2 lg:mx-6 overflow-hidden relative"
         scrollViewClassName="custom-scrollbar"
         followButtonClassName="hidden"
         debounce={50}
@@ -511,7 +518,7 @@ function AgentInterfaceContent({
           ) : (
             <>
               {messages
-                .filter((m) => !(m as any).isHidden)
+                .filter((m) => m.role !== "system" && !(m as any).isHidden)
                 .map((m) => (
                   <MemoMessage
                     key={m.id}
@@ -539,169 +546,19 @@ function AgentInterfaceContent({
         <ScrollToBottomButton />
       </ScrollToBottomContainer>
 
-      <div
-        ref={inputContainerRef}
-        className="sticky bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm"
-      >
-        <div className="mx-2 lg:mx-6 pb-4 px-4">
-          <div className="max-w-7xl mx-auto">
-            <div
-              className={cn(
-                "relative flex flex-col gap-2 rounded-2xl overflow-hidden transition-all duration-200",
-                "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20",
-                "backdrop-blur-sm border border-border/50",
-                "shadow-sm hover:shadow-md focus-within:shadow-md",
-                "hover:border-border/80 focus-within:border-border/80",
-              )}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              {isDragging && (
-                <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl z-10 flex items-center justify-center backdrop-blur-sm">
-                  <div className="text-primary font-medium">Drop files here</div>
-                </div>
-              )}
-
-              {pendingFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-4 pt-3">
-                  {pendingFiles.map((file) => (
-                    <FileChip
-                      key={file.key}
-                      file={file}
-                      onRemove={handlePendingFileRemove}
-                      size="compact"
-                      rounded="md"
-                      showOriginalName={true}
-                      maxWidth="300px"
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="relative flex items-end gap-2">
-                <input
-                  ref={fileInputRef as any}
-                  type="file"
-                  multiple
-                  accept={ALLOWED_FILE_EXTENSIONS.join(",")}
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      handleFilesUpload(Array.from(e.target.files));
-                      e.target.value = "";
-                    }
-                  }}
-                />
-
-                <Textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Message superglue..."
-                  className="flex-1 h-10 min-h-[40px] max-h-[200px] resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[15px] leading-[20px] py-[10px] px-4 pr-28"
-                />
-
-                <div className="absolute right-3 bottom-3 flex items-end gap-1.5">
-                  <div
-                    className={cn(
-                      "flex items-center rounded-xl overflow-hidden",
-                      sessionFiles.length > 0
-                        ? "border border-border/40"
-                        : "border border-border/50",
-                    )}
-                  >
-                    {sessionFiles.length > 0 && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button className="h-9 px-1.5 flex items-center justify-center hover:bg-muted/80 bg-muted/50 text-muted-foreground hover:text-foreground transition-colors border-r border-border/30 gap-1">
-                            <span className="min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
-                              {sessionFiles.length}
-                            </span>
-                            <ChevronUp className="w-3.5 h-3.5" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto min-w-[250px] max-w-[250px] p-2"
-                          align="end"
-                          side="top"
-                          sideOffset={8}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              Session Files ({sessionFiles.length})
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatBytes(sessionFiles.reduce((acc, f) => acc + (f.size || 0), 0))}
-                            </span>
-                          </div>
-                          <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5">
-                            {sessionFiles.map((file) => (
-                              <FileChip
-                                key={file.key}
-                                file={file}
-                                onRemove={handleSessionFileRemove}
-                                size="compact"
-                                rounded="md"
-                                showOriginalName={true}
-                                showSize={true}
-                                className="w-full"
-                              />
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 w-9 p-0 rounded-none hover:bg-muted/80 bg-muted/50 border-0"
-                      onClick={() => (fileInputRef.current as any)?.click()}
-                      disabled={isProcessingFiles}
-                    >
-                      <Paperclip className="w-5 h-5" />
-                    </Button>
-                  </div>
-
-                  <Button
-                    onClick={isLoading ? handleStopStreaming : onSendMessage}
-                    disabled={!isLoading && (!input.trim() || input.length > MAX_MESSAGE_LENGTH)}
-                    size="sm"
-                    className="h-9 w-9 p-0 rounded-xl bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground shadow-sm"
-                    variant="default"
-                  >
-                    {isLoading ? <Square className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center mt-2 px-2 gap-2">
-              <span
-                className={cn(
-                  "text-xs",
-                  input.length > MAX_MESSAGE_LENGTH
-                    ? "text-amber-600 dark:text-amber-500 font-medium"
-                    : "text-muted-foreground/60",
-                )}
-              >
-                {input.length > MAX_MESSAGE_LENGTH ? (
-                  <>
-                    <AlertTriangle className="w-3 h-3 inline mr-1" />
-                    {input.length.toLocaleString()}/{MAX_MESSAGE_LENGTH.toLocaleString()} chars
-                  </>
-                ) : input.length > MAX_MESSAGE_LENGTH * 0.8 ? (
-                  `${input.length.toLocaleString()}/${MAX_MESSAGE_LENGTH.toLocaleString()} chars`
-                ) : (
-                  ""
-                )}
-              </span>
-              <span className="text-xs text-muted-foreground/60">Press Enter to send</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AgentInputArea
+        value={input}
+        onChange={setInput}
+        onSend={onSendMessage}
+        onStop={handleStopStreaming}
+        isLoading={isLoading}
+        placeholder="Message superglue..."
+        maxLength={MAX_MESSAGE_LENGTH}
+        showCharCount
+        inputContainerRef={inputContainerRef}
+        inputRef={inputRef}
+        scrollToBottom={() => scrollTriggerRef.current?.scrollToBottom()}
+      />
     </div>
   );
 }

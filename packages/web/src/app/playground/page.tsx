@@ -12,10 +12,10 @@ export default function PlaygroundPage() {
 
   useEffect(() => {
     // Construct URL with auth token as query parameter
-    const url = new URL(config.superglueEndpoint);
+    const url = new URL(config.apiEndpoint);
     url.searchParams.set("token", tokenRegistry.getToken());
     setIframeUrl(url.toString());
-  }, [config.superglueEndpoint, token]);
+  }, [config.apiEndpoint, token]);
 
   return (
     <div className="w-full h-screen">

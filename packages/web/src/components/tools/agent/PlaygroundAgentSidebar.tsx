@@ -1,22 +1,33 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import {
-  formatPlaygroundRuntimeContext,
-  formatSystemRuntimeContext,
-  SystemPlaygroundContextData,
+  formatPlaygroundHiddenContext,
+  formatSystemHiddenContext,
 } from "@/src/lib/agent/agent-context";
 import { cn } from "@/src/lib/general-utils";
-import { Tool, ExecutionStep, ToolDiff } from "@superglue/shared";
-import { BotMessageSquare, Edit2, MessagesSquare, Send, Square, User, Plus, X } from "lucide-react";
+import {
+  Tool,
+  ToolStep,
+  ToolDiff,
+  RequestStepConfig,
+  isRequestConfig,
+  safeStringify,
+} from "@superglue/shared";
+import { MessagesSquare, Pencil, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextProvider";
+import { AgentInputArea } from "../../agent/AgentInputArea";
+import { AgentCapabilities } from "../../agent/AgentCapabilities";
 import { ConversationHistory } from "../../agent/ConversationHistory";
-import type { AgentConfig, PlaygroundToolContext } from "../../agent/hooks/types";
+import type { AgentConfig } from "../../agent/hooks/types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
+import { DraftLookup, PlaygroundToolContext } from "@/src/lib/agent/agent-types";
+import { useSystems } from "@/src/app/systems-context";
 import {
   ScrollToBottomButton,
   ScrollToBottomContainer,
@@ -44,59 +55,62 @@ interface PlaygroundAgentSidebarProps {
   systemConfig?: SystemContextForAgent;
 }
 
-function buildPlaygroundContext(
+function buildToolPlaygroundContext(
   toolConfig: ReturnType<typeof useToolConfig>,
   executionSummary: string,
   initialError?: string,
 ): PlaygroundToolContext {
-  const { tool, steps, finalTransform, inputSchema, responseSchema, payload } = toolConfig;
+  const { tool, steps, outputTransform, inputSchema, outputSchema, payload } = toolConfig;
   const systemIds = [
-    ...new Set(steps.map((s: ExecutionStep) => s.systemId).filter(Boolean)),
+    ...new Set(
+      steps
+        .map((s: ToolStep) =>
+          s.config && isRequestConfig(s.config)
+            ? (s.config as RequestStepConfig).systemId
+            : undefined,
+        )
+        .filter(Boolean),
+    ),
   ] as string[];
 
   return {
     toolId: tool.id,
     instruction: tool.instruction,
-    steps: steps.map((step: ExecutionStep) => ({
+    steps: steps.map((step: ToolStep) => ({
       ...step,
-      apiConfig: {
-        ...step.apiConfig,
-        id: step.apiConfig?.id || step.id,
-      },
     })),
-    finalTransform,
-    inputSchema,
-    responseSchema,
+    outputTransform,
+    inputSchema: inputSchema && inputSchema.trim() ? inputSchema : null,
+    outputSchema: outputSchema && outputSchema.trim() ? outputSchema : null,
     systemIds,
     executionSummary,
     initialError,
-    currentPayload: JSON.stringify(payload.computedPayload || {}, null, 2),
+    currentPayload: safeStringify(payload.computedPayload || {}, 2),
   };
 }
 
 interface PlaygroundAgentContentProps {
-  toolId?: string;
-  systemId?: string;
   hideHeader?: boolean;
-  initialError?: string;
   mode: PlaygroundMode;
+  agentType: AgentType;
   cacheKeyPrefix: string;
   onApplyChanges?: (newConfig: Tool, diffs?: ToolDiff[]) => void;
   onApplyPayload?: (newPayload: string) => void;
-  currentPayload?: string;
+  currentPlaygroundState?: Partial<PlaygroundToolContext>;
 }
 
 function PlaygroundAgentContent({
-  toolId,
-  systemId,
   hideHeader = false,
-  initialError,
   mode,
+  agentType,
   cacheKeyPrefix,
   onApplyChanges,
   onApplyPayload,
-  currentPayload,
+  currentPlaygroundState,
 }: PlaygroundAgentContentProps) {
+  const initialError = currentPlaygroundState?.initialError;
+  const currentPayload = currentPlaygroundState?.currentPayload;
+
   const {
     messages,
     isLoading,
@@ -106,8 +120,10 @@ function PlaygroundAgentContent({
     handleToolUpdate,
     sendAgentRequest,
     bufferAction,
+    filePayloads,
     currentConversationId,
     setCurrentConversationId,
+    sessionId,
     loadConversation,
     startNewConversation,
     editingMessageId,
@@ -121,7 +137,7 @@ function PlaygroundAgentContent({
   const { registerSetAgentInput, registerResetAgentChat } = useRightSidebar();
   const [inputValue, setInputValue] = useState("");
   const [isHighlighted, setIsHighlighted] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
 
@@ -131,10 +147,10 @@ function PlaygroundAgentContent({
       setInputValue(message);
       setIsHighlighted(true);
       setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.style.height = "auto";
-          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.style.height = "auto";
+          inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`;
         }
       }, 0);
     });
@@ -158,38 +174,19 @@ function PlaygroundAgentContent({
     }
   }, [initialError, isLoading, messages.length, handleSendMessage, mode]);
 
-  const handleSubmit = useCallback(
-    (e?: React.FormEvent) => {
-      e?.preventDefault();
-      if (inputValue.trim() && !isLoading) {
-        scrollTriggerRef.current?.scrollToBottom();
-        handleSendMessage(inputValue.trim());
-        setInputValue("");
-        setIsHighlighted(false);
-        // Reset textarea height
-        if (textareaRef.current) {
-          textareaRef.current.style.height = "auto";
-        }
-      }
-    },
-    [inputValue, isLoading, handleSendMessage],
-  );
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit],
-  );
+  const handleSend = useCallback(() => {
+    if (!inputValue.trim() || isLoading) return;
+    scrollTriggerRef.current?.scrollToBottom();
+    handleSendMessage(inputValue.trim());
+    setInputValue("");
+    setIsHighlighted(false);
+  }, [inputValue, isLoading, handleSendMessage]);
 
   const formatTimestamp = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const hasMessages = messages.length > 0;
+  const hasMessages = messages.some((m) => m.role !== "system" && !(m as any).isHidden);
   const emptyStateText =
     mode === "tool"
       ? {
@@ -216,16 +213,17 @@ function PlaygroundAgentContent({
           </div>
         )}
         <div className={cn("flex items-center gap-1 relative", hideHeader && "ml-auto")}>
+          <AgentCapabilities agentType={agentType} compact triggerClassName="h-7 w-7" />
           <ConversationHistory
             messages={messages}
             currentConversationId={currentConversationId}
+            sessionId={sessionId}
             onConversationLoad={loadConversation}
-            onNewConversation={startNewConversation}
             onCurrentConversationIdChange={setCurrentConversationId}
             cacheKeyPrefix={cacheKeyPrefix}
           />
           {(messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
-            <Button variant="ghost" size="sm" onClick={startNewConversation} className="h-8 px-2">
+            <Button variant="glass" size="sm" onClick={startNewConversation} className="h-8 px-2">
               <Plus className="w-3 h-3 mr-1" />
               New
             </Button>
@@ -242,7 +240,13 @@ function PlaygroundAgentContent({
         <div className="p-4 space-y-4">
           {!hasMessages && (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-              <BotMessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <div className="h-10 w-10 rounded-full bg-white dark:bg-black flex items-center justify-center mb-3">
+                <img
+                  src="/favicon.png"
+                  alt="superglue"
+                  className="w-5 h-5 object-contain dark:invert"
+                />
+              </div>
               <p className="text-sm text-muted-foreground">{emptyStateText.title}</p>
               <p className="text-xs text-muted-foreground/70 mt-2 max-w-[240px]">
                 {emptyStateText.hint}
@@ -251,7 +255,7 @@ function PlaygroundAgentContent({
           )}
 
           {messages
-            .filter((m) => !(m as any).isHidden)
+            .filter((m) => m.role !== "system" && !(m as any).isHidden)
             .map((message) => (
               <div key={message.id} className="p-2 pt-3 rounded-xl group min-h-12">
                 <div className="space-y-2 min-w-0 overflow-hidden">
@@ -289,47 +293,65 @@ function PlaygroundAgentContent({
                       return message.isStreaming && !hasContent ? <ThinkingIndicator /> : null;
                     })()}
                     {message.role === "user" && !isLoading && (
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
                         onClick={() => handleEditMessage(message.id, message.content)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 px-2 flex items-center justify-center rounded hover:bg-muted"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
                         title="Edit message"
                       >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
+                        <Pencil className="w-3 h-3 text-muted-foreground" />
+                      </button>
                     )}
                   </div>
+
+                  {message.role === "user" &&
+                    (message as any).attachedFiles &&
+                    (message as any).attachedFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {(message as any).attachedFiles.map((file: any) => (
+                          <FileChip
+                            key={file.key}
+                            file={file}
+                            size="compact"
+                            rounded="md"
+                            showOriginalName={true}
+                            maxWidth="200px"
+                          />
+                        ))}
+                      </div>
+                    )}
+
                   {editingMessageId === message.id ? (
                     <div className="space-y-2">
                       <Textarea
                         value={editingContent}
                         onChange={(e) => setEditingContent(e.target.value)}
-                        className="min-h-[60px] text-sm"
+                        className="min-h-[48px] max-h-[120px] resize-y text-sm bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20 backdrop-blur-sm border border-border/50 rounded-lg shadow-sm focus-visible:ring-0 px-3 py-2"
                         autoFocus
                       />
                       <div className="flex gap-2">
                         <Button
+                          variant="glass"
                           size="sm"
                           onClick={() => handleSaveEdit(message.id)}
-                          disabled={isLoading}
+                          disabled={!editingContent.trim() || isLoading}
+                          className="rounded-lg text-xs h-7"
                         >
                           Save & Restart
                         </Button>
                         <Button
+                          variant="glass"
                           size="sm"
-                          variant="ghost"
                           onClick={handleCancelEdit}
                           disabled={isLoading}
+                          className="rounded-lg text-xs h-7"
                         >
-                          <X className="w-3 h-3 mr-1" />
                           Cancel
                         </Button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 message-content-wrapper break-words">
                       {message.parts && message.parts.length > 0 ? (
                         groupMessageParts(message.parts).map((grouped, idx) => {
                           if (grouped.type === "content") {
@@ -360,6 +382,7 @@ function PlaygroundAgentContent({
                                 onApplyPayload={onApplyPayload}
                                 currentPayload={currentPayload}
                                 isPlayground={mode === "tool"}
+                                filePayloads={filePayloads}
                               />
                             );
                           }
@@ -385,40 +408,25 @@ function PlaygroundAgentContent({
       </ScrollToBottomContainer>
 
       <div className="p-3">
-        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-          <Textarea
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              setIsHighlighted(false);
-              e.target.style.height = "auto";
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Message superglue..."
-            className={cn(
-              "min-h-[36px] max-h-[200px] resize-none text-sm py-2 transition-all",
-              "bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30",
-              "backdrop-blur-sm border-border/50 dark:border-border/70 shadow-sm",
-              "focus:border-border/60 dark:focus:border-border/90",
-              isHighlighted &&
-                "ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30 focus-visible:ring-1 focus-visible:ring-amber-500",
-            )}
-            rows={1}
-            disabled={isLoading}
-            maxLength={MAX_MESSAGE_LENGTH}
-          />
-          <Button
-            type={isLoading ? "button" : "submit"}
-            size="icon"
-            disabled={!isLoading && !inputValue.trim()}
-            onClick={isLoading ? stopStreaming : undefined}
-            className="h-[36px] w-[36px] shrink-0"
-          >
-            {isLoading ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </form>
+        <AgentInputArea
+          value={inputValue}
+          onChange={(v) => {
+            setInputValue(v);
+            setIsHighlighted(false);
+          }}
+          onSend={handleSend}
+          onStop={stopStreaming}
+          isLoading={isLoading}
+          placeholder="Message superglue..."
+          maxLength={MAX_MESSAGE_LENGTH}
+          compact
+          inputRef={inputRef}
+          inputClassName={cn(
+            isHighlighted &&
+              "!ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30",
+          )}
+          scrollToBottom={() => scrollTriggerRef.current?.scrollToBottom()}
+        />
       </div>
     </div>
   );
@@ -437,13 +445,20 @@ function ToolPlaygroundAgentSidebar({
     (newConfig: Tool, _diffs?: ToolDiff[]) => {
       execution.skipNextHashInvalidation();
 
-      const stepsAreDifferent = (a: ExecutionStep, b: ExecutionStep): boolean => {
+      const stepsAreDifferent = (a: ToolStep, b: ToolStep): boolean => {
+        const aSystemId =
+          a.config && isRequestConfig(a.config)
+            ? (a.config as RequestStepConfig).systemId
+            : undefined;
+        const bSystemId =
+          b.config && isRequestConfig(b.config)
+            ? (b.config as RequestStepConfig).systemId
+            : undefined;
         return (
           a.id !== b.id ||
-          a.systemId !== b.systemId ||
-          a.executionMode !== b.executionMode ||
-          a.loopSelector !== b.loopSelector ||
-          JSON.stringify(a.apiConfig) !== JSON.stringify(b.apiConfig)
+          aSystemId !== bSystemId ||
+          a.dataSelector !== b.dataSelector ||
+          JSON.stringify(a.config) !== JSON.stringify(b.config)
         );
       };
 
@@ -465,26 +480,29 @@ function ToolPlaygroundAgentSidebar({
         toolConfig.setSteps(
           newSteps.map((step) => ({
             ...step,
-            apiConfig: { ...step.apiConfig, id: step.apiConfig?.id || step.id },
           })),
         );
       }
 
-      const finalTransformChanged =
-        newConfig.finalTransform !== undefined &&
-        newConfig.finalTransform !== toolConfig.finalTransform;
+      const outputTransformChanged =
+        newConfig.outputTransform !== undefined &&
+        newConfig.outputTransform !== toolConfig.outputTransform;
 
-      if (newConfig.finalTransform !== undefined) {
-        toolConfig.setFinalTransform(newConfig.finalTransform);
+      if (newConfig.outputTransform !== undefined) {
+        toolConfig.setOutputTransform(newConfig.outputTransform);
       }
 
-      if (newConfig.responseSchema !== undefined) {
-        const schemaValue = newConfig.responseSchema
-          ? typeof newConfig.responseSchema === "string"
-            ? newConfig.responseSchema
-            : JSON.stringify(newConfig.responseSchema, null, 2)
+      if (newConfig.instruction !== undefined) {
+        toolConfig.setInstruction(newConfig.instruction || "");
+      }
+
+      if (newConfig.outputSchema !== undefined) {
+        const schemaValue = newConfig.outputSchema
+          ? typeof newConfig.outputSchema === "string"
+            ? newConfig.outputSchema
+            : JSON.stringify(newConfig.outputSchema, null, 2)
           : "";
-        toolConfig.setResponseSchema(schemaValue);
+        toolConfig.setOutputSchema(schemaValue);
       }
 
       if (newConfig.inputSchema !== undefined) {
@@ -498,7 +516,7 @@ function ToolPlaygroundAgentSidebar({
 
       if (firstChangedStepIndex !== null) {
         execution.clearExecutionsFrom(firstChangedStepIndex);
-      } else if (finalTransformChanged) {
+      } else if (outputTransformChanged) {
         execution.clearFinalResult();
       }
     },
@@ -512,11 +530,15 @@ function ToolPlaygroundAgentSidebar({
     [toolConfig],
   );
 
-  const currentPayload = JSON.stringify(toolConfig.payload.computedPayload || {}, null, 2);
+  // Build current draft config that updates whenever toolConfig changes
+  const currentPlaygroundState = useMemo<PlaygroundToolContext>(
+    () => buildToolPlaygroundContext(toolConfig, "", initialError),
+    [toolConfig, initialError],
+  );
 
-  const hiddenContextBuilder = useCallback(() => {
-    const executionSummary = execution.getExecutionStateSummary();
-    const ctx = buildPlaygroundContext(toolConfig, executionSummary, initialError);
+  const hiddenContextBuilderRef = useRef<() => string>(() => "");
+  const prevStateHashRef = useRef<string | null>(null);
+  hiddenContextBuilderRef.current = () => {
     const { payload } = toolConfig;
     const uploadedFiles = payload.uploadedFiles.map((f) => ({
       name: f.name,
@@ -524,54 +546,145 @@ function ToolPlaygroundAgentSidebar({
       status: f.status,
     }));
     const mergedPayload =
-      uploadedFiles.length > 0 ? JSON.stringify(payload.computedPayload, null, 2) : undefined;
+      uploadedFiles.length > 0 ? safeStringify(payload.computedPayload, 2) : undefined;
 
-    return formatPlaygroundRuntimeContext({
-      toolId: ctx.toolId,
-      instruction: ctx.instruction,
-      stepsCount: ctx.steps.length,
-      currentPayload: ctx.currentPayload || "{}",
-      executionSummary: ctx.executionSummary,
+    const stepMeta = toolConfig.steps.map((step: ToolStep) => {
+      const reqConfig =
+        step.config && isRequestConfig(step.config)
+          ? (step.config as RequestStepConfig)
+          : undefined;
+      return {
+        id: step.id,
+        systemId: reqConfig?.systemId,
+        method: reqConfig?.method,
+        status: execution.getStepStatus(step.id),
+      };
+    });
+
+    let inputSchemaFields: string[] = [];
+    try {
+      const parsed =
+        typeof toolConfig.inputSchema === "string"
+          ? JSON.parse(toolConfig.inputSchema)
+          : toolConfig.inputSchema;
+      if (parsed?.properties?.payload?.properties) {
+        inputSchemaFields = Object.keys(parsed.properties.payload.properties);
+      } else if (parsed?.properties) {
+        inputSchemaFields = Object.keys(parsed.properties);
+      }
+    } catch {}
+
+    let outputSchemaFieldCount = 0;
+    try {
+      const parsed =
+        typeof toolConfig.outputSchema === "string"
+          ? JSON.parse(toolConfig.outputSchema)
+          : toolConfig.outputSchema;
+      if (parsed?.properties) {
+        outputSchemaFieldCount = Object.keys(parsed.properties).length;
+      }
+    } catch {}
+
+    const hashInput = safeStringify({
+      steps: stepMeta,
+      outputTransform: toolConfig.outputTransform,
+      inputSchema: toolConfig.inputSchema,
+      outputSchema: toolConfig.outputSchema,
+      instruction: toolConfig.tool.instruction,
+      responseFilters: toolConfig.responseFilters,
+      transformStatus: execution.transformStatus,
+      payload: toolConfig.payload.manualPayloadText,
+      uploadedFiles,
+      mergedPayload,
+    });
+
+    let hash = 0;
+    for (let i = 0; i < hashInput.length; i++) {
+      hash = ((hash << 5) - hash + hashInput.charCodeAt(i)) | 0;
+    }
+    const hashStr = String(hash);
+
+    if (prevStateHashRef.current !== null && prevStateHashRef.current === hashStr) {
+      return "";
+    }
+    prevStateHashRef.current = hashStr;
+
+    return formatPlaygroundHiddenContext({
+      toolId: toolConfig.tool.id,
+      instruction: toolConfig.tool.instruction,
+      steps: stepMeta,
+      hasOutputTransform: !!toolConfig.outputTransform,
+      hasResponseFilters: (toolConfig.responseFilters?.length ?? 0) > 0,
+      inputSchemaFields,
+      outputSchemaFieldCount,
+      transformStatus: execution.transformStatus,
+      currentPayload: safeStringify(payload.computedPayload || {}, 2),
       uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       mergedPayload,
     });
-  }, [toolConfig, execution, initialError]);
+  };
+
+  const playgroundDraftBuilderRef = useRef<() => DraftLookup | null>(() => null);
+  playgroundDraftBuilderRef.current = () => {
+    const ctx = buildToolPlaygroundContext(toolConfig, "", initialError);
+    if (!ctx.toolId || !ctx.steps || ctx.steps.length === 0) {
+      return null;
+    }
+
+    const executionResults: Record<string, { status: string; result?: string; error?: string }> =
+      {};
+    for (const step of ctx.steps) {
+      const stepStatus = execution.getStepStatus(step.id);
+      const stepResult = execution.getStepResult(step.id);
+      const stepError = execution.getStepError(step.id);
+      if (stepStatus !== "pending") {
+        const entry: { status: string; result?: string; error?: string } = { status: stepStatus };
+        if (stepResult !== null) {
+          const resultStr =
+            typeof stepResult === "string" ? stepResult : safeStringify(stepResult, 2);
+          entry.result = resultStr.length > 5000 ? resultStr.substring(0, 5000) + "..." : resultStr;
+        }
+        if (stepError) {
+          entry.error = stepError.length > 500 ? stepError.substring(0, 500) + "..." : stepError;
+        }
+        executionResults[step.id] = entry;
+      }
+    }
+
+    return {
+      config: {
+        id: ctx.toolId,
+        instruction: ctx.instruction,
+        steps: ctx.steps,
+        outputTransform: ctx.outputTransform,
+        inputSchema: ctx.inputSchema ?? undefined,
+        outputSchema: ctx.outputSchema ?? undefined,
+      },
+      systemIds: ctx.systemIds || [],
+      instruction: ctx.instruction || "",
+      executionResults: Object.keys(executionResults).length > 0 ? executionResults : undefined,
+    };
+  };
 
   const agentConfig = useMemo<AgentConfig>(() => {
-    const ctx = buildPlaygroundContext(
-      toolConfig,
-      execution.getExecutionStateSummary(),
-      initialError,
-    );
     return {
       agentId: AgentType.PLAYGROUND,
-      hiddenContextBuilder,
-      agentParams: {
-        playgroundToolConfig: {
-          toolId: ctx.toolId,
-          instruction: ctx.instruction,
-          steps: ctx.steps,
-          finalTransform: ctx.finalTransform,
-          inputSchema: ctx.inputSchema,
-          responseSchema: ctx.responseSchema,
-          systemIds: ctx.systemIds,
-        },
-      },
+      hiddenContextBuilder: () => hiddenContextBuilderRef.current(),
+      playgroundDraftBuilder: () => playgroundDraftBuilderRef.current?.() ?? null,
     };
-  }, [toolConfig, execution, initialError, hiddenContextBuilder]);
+  }, []);
 
   return (
     <div className={cn("h-full", className)}>
       <AgentContextProvider config={agentConfig}>
         <PlaygroundAgentContent
-          toolId={toolId}
           hideHeader={hideHeader}
-          initialError={initialError}
           mode="tool"
+          agentType={AgentType.PLAYGROUND}
           cacheKeyPrefix={`superglue-playground-${toolId}`}
           onApplyChanges={handleApplyChanges}
           onApplyPayload={handleApplyPayload}
-          currentPayload={currentPayload}
+          currentPlaygroundState={currentPlaygroundState}
         />
       </AgentContextProvider>
     </div>
@@ -584,34 +697,41 @@ function SystemPlaygroundAgentSidebar({
   initialError,
   systemConfig,
 }: Omit<PlaygroundAgentSidebarProps, "mode"> & { systemConfig: SystemContextForAgent }) {
-  const hiddenContextBuilder = useCallback(() => {
-    return formatSystemRuntimeContext(systemConfig);
-  }, [systemConfig]);
+  const { refreshSystems } = useSystems();
+
+  const hiddenContextBuilderRef = useRef<() => string>(() => "");
+  hiddenContextBuilderRef.current = () => {
+    return JSON.stringify({
+      display: formatSystemHiddenContext(systemConfig),
+    });
+  };
+
+  const onToolComplete = useCallback(
+    (toolName: string, _toolId: string, output: any) => {
+      if ((toolName === "edit_system" || toolName === "create_system") && output?.success) {
+        refreshSystems();
+      }
+    },
+    [refreshSystems],
+  );
 
   const agentConfig = useMemo<AgentConfig>(() => {
     return {
       agentId: AgentType.SYSTEM_PLAYGROUND,
-      hiddenContextBuilder,
-      agentParams: {
-        systemConfig: {
-          id: systemConfig.systemId,
-          urlHost: systemConfig.urlHost,
-          urlPath: systemConfig.urlPath,
-          templateName: systemConfig.templateName,
-        },
-      },
+      hiddenContextBuilder: () => hiddenContextBuilderRef.current(),
+      onToolComplete,
     };
-  }, [systemConfig, hiddenContextBuilder]);
+  }, [onToolComplete]);
 
   return (
     <div className={cn("h-full", className)}>
       <AgentContextProvider config={agentConfig}>
         <PlaygroundAgentContent
-          systemId={systemConfig.systemId}
           hideHeader={hideHeader}
-          initialError={initialError}
           mode="system"
+          agentType={AgentType.SYSTEM_PLAYGROUND}
           cacheKeyPrefix={`superglue-system-${systemConfig.systemId || "new"}`}
+          currentPlaygroundState={initialError ? { initialError } : undefined}
         />
       </AgentContextProvider>
     </div>

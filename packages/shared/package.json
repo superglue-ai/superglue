@@ -15,6 +15,10 @@
     "./utils": {
       "types": "./dist/utils.d.ts",
       "default": "./dist/utils.js"
+    },
+    "./utils/ai-model-init": {
+      "types": "./dist/utils/ai-model-init.d.ts",
+      "default": "./dist/utils/ai-model-init.js"
     }
   },
   "scripts": {
@@ -22,17 +26,17 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^3.0.61",
-    "@ai-sdk/anthropic": "^2.0.25",
-    "@ai-sdk/azure": "^2.0.52",
-    "@ai-sdk/google": "^2.0.20",
-    "@ai-sdk/openai": "^2.0.46",
+    "@ai-sdk/amazon-bedrock": "^4.0.61",
+    "@ai-sdk/anthropic": "^3.0.45",
+    "@ai-sdk/azure": "^3.0.31",
+    "@ai-sdk/google": "^3.0.29",
+    "@ai-sdk/google-vertex": "^4.0.59",
+    "@ai-sdk/openai": "^3.0.30",
     "@anthropic-ai/sdk": "^0.64.0",
-    "ai": "^5.0.76",
-    "axios": "^1.7.9",
+    "ai": "^6.0.91",
     "cron-parser": "^5.3.1",
-    "graphql-ws": "^6.0.4",
     "cron-validate": "^1.5.2",
+    "js-tiktoken": "^1.0.14",
     "json-schema": "^0.4.0",
     "lodash.keys": "^4.2.0",
     "lodash.merge": "^4.6.2",

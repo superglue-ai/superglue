@@ -31,10 +31,10 @@ function getTargetIcon(type: DiffTargetType) {
   switch (type) {
     case "newStep":
       return <Plus className="h-3.5 w-3.5 text-green-500" />;
-    case "finalTransform":
+    case "outputTransform":
       return <FilePlay className="h-3.5 w-3.5 text-primary" />;
     case "inputSchema":
-    case "responseSchema":
+    case "outputSchema":
       return <FileBracesCorner className="h-3.5 w-3.5 text-primary" />;
     case "toolInput":
       return <FileJson className="h-3.5 w-3.5 text-primary" />;
@@ -117,21 +117,23 @@ function DiffLineDisplay({ line, lineNumber }: { line: DiffLine; lineNumber?: nu
 /**
  * Display a single enriched diff item with header and code lines
  */
-function DiffItem({ enrichedDiff }: { enrichedDiff: EnrichedDiff }) {
+function DiffItem({ enrichedDiff, compact }: { enrichedDiff: EnrichedDiff; compact?: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFullContext, setShowFullContext] = useState(false);
   const { target, lines, contextNew } = enrichedDiff;
   const targetInfo = formatTargetLabel(target);
 
-  // Calculate line numbers for the diff
-  // Find the first changed line to determine starting line number
-  const firstChangeIndex = lines.findIndex((l) => l.type !== "context");
-  const startLineNum = Math.max(1, firstChangeIndex > 0 ? firstChangeIndex : 1);
-
-  // Show first 8 lines by default, expand for more
-  const previewLines = lines.slice(0, 8);
-  const remainingLines = lines.slice(8);
-  const hasMore = remainingLines.length > 0;
+  const previewSize = 9;
+  const firstChangeIndexRaw = lines.findIndex((l) => l.type !== "context");
+  const firstChangeIndex = firstChangeIndexRaw === -1 ? 0 : firstChangeIndexRaw;
+  const maxPreviewStart = Math.max(0, lines.length - previewSize);
+  const previewStart = Math.max(0, Math.min(firstChangeIndex - 1, maxPreviewStart));
+  const previewEnd = Math.min(lines.length, previewStart + previewSize);
+  const previewLines = lines.slice(previewStart, previewEnd);
+  const hiddenCount = Math.max(0, lines.length - previewLines.length);
+  const hasMore = hiddenCount > 0;
+  const displayLines = isExpanded ? lines : previewLines;
+  const displayStart = isExpanded ? 0 : previewStart;
 
   // Full context lines (for "Show full config" mode)
   const fullContextLines = useMemo(() => {
@@ -165,7 +167,7 @@ function DiffItem({ enrichedDiff }: { enrichedDiff: EnrichedDiff }) {
             <span className="text-muted-foreground text-[10px]">/{targetInfo.path}</span>
           )}
         </div>
-        {contextNew && (
+        {!compact && contextNew && (
           <button
             onClick={() => setShowFullContext(!showFullContext)}
             className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted/50"
@@ -201,15 +203,9 @@ function DiffItem({ enrichedDiff }: { enrichedDiff: EnrichedDiff }) {
       ) : lines.length > 0 ? (
         <div className="overflow-x-auto scrollbar-hidden">
           <div className="min-w-max">
-            {previewLines.map((line, i) => (
-              <DiffLineDisplay key={i} line={line} lineNumber={startLineNum + i} />
+            {displayLines.map((line, i) => (
+              <DiffLineDisplay key={i} line={line} lineNumber={displayStart + i + 1} />
             ))}
-
-            {/* Expanded lines */}
-            {isExpanded &&
-              remainingLines.map((line, i) => (
-                <DiffLineDisplay key={i + 8} line={line} lineNumber={startLineNum + 8 + i} />
-              ))}
           </div>
         </div>
       ) : (
@@ -223,7 +219,7 @@ function DiffItem({ enrichedDiff }: { enrichedDiff: EnrichedDiff }) {
           className="w-full px-2 py-1 text-center text-muted-foreground hover:bg-muted/50 border-t flex items-center justify-center gap-1 text-[10px]"
         >
           <ChevronDown className={cn("w-3 h-3 transition-transform", isExpanded && "rotate-180")} />
-          {isExpanded ? "Show less" : `${remainingLines.length} more lines`}
+          {isExpanded ? "Show less" : `${hiddenCount} more lines`}
         </button>
       )}
     </div>
@@ -233,7 +229,13 @@ function DiffItem({ enrichedDiff }: { enrichedDiff: EnrichedDiff }) {
 /**
  * Display a list of enriched diffs (read-only, no approval controls)
  */
-export function DiffDisplay({ enrichedDiffs }: { enrichedDiffs: EnrichedDiff[] }) {
+export function DiffDisplay({
+  enrichedDiffs,
+  compact,
+}: {
+  enrichedDiffs: EnrichedDiff[];
+  compact?: boolean;
+}) {
   if (!enrichedDiffs || enrichedDiffs.length === 0) {
     return null;
   }
@@ -241,7 +243,7 @@ export function DiffDisplay({ enrichedDiffs }: { enrichedDiffs: EnrichedDiff[] }
   return (
     <div className="space-y-2">
       {enrichedDiffs.map((enrichedDiff, index) => (
-        <DiffItem key={index} enrichedDiff={enrichedDiff} />
+        <DiffItem key={index} enrichedDiff={enrichedDiff} compact={compact} />
       ))}
     </div>
   );

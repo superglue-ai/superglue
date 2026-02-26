@@ -2,7 +2,7 @@
 
 import { useConfig } from "@/src/app/config-context";
 import { Button } from "@/src/components/ui/button";
-import { FileChip } from "@/src/components/ui/FileChip";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { OAuthConnectButton } from "@/src/components/ui/oauth-connect-button";
@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
-import { Switch } from "@/src/components/ui/switch";
 import { CredentialsManager } from "@/src/components/utils/CredentialManager";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { useToast } from "@/src/hooks/use-toast";
@@ -26,6 +25,59 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { useSystemConfig } from "../context";
 
+function MultiTenancyModeToggle({
+  value,
+  onChange,
+  variant = "default",
+}: {
+  value: string;
+  onChange: (mode: "disabled" | "enabled") => void;
+  variant?: "default" | "nested";
+}) {
+  const base =
+    variant === "nested"
+      ? "bg-muted/30 border-border/50 hover:bg-muted/40 hover:border-border/70"
+      : "bg-gradient-to-br from-muted/60 to-muted/30 border-border/50 hover:from-muted/70 hover:to-muted/40 hover:border-border/70";
+  const padding = variant === "nested" ? "p-3" : "p-4";
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <button
+        type="button"
+        onClick={() => onChange("disabled")}
+        className={cn(
+          "rounded-xl border text-left transition-colors",
+          padding,
+          base,
+          value === "disabled" && "ring-1 ring-primary/40",
+        )}
+      >
+        <div className="text-sm font-medium">Use system credentials</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          One shared connection for all users of this system.
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("enabled")}
+        className={cn(
+          "rounded-xl border text-left transition-colors",
+          padding,
+          base,
+          value === "enabled" && "ring-1 ring-primary/40",
+        )}
+      >
+        <div className="text-sm font-medium">Let users authenticate with their own credentials</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          {variant === "nested"
+            ? "Each end user connects their own account."
+            : "Each end user provides their own credentials."}
+        </div>
+      </button>
+    </div>
+  );
+}
+
 export function AuthenticationSection() {
   const config = useConfig();
   const { toast } = useToast();
@@ -36,6 +88,7 @@ export function AuthenticationSection() {
     setApiKeyCredentials,
     setOAuthFields,
     setUseSuperglueOAuth,
+    setMultiTenancyMode,
     saveSystem,
   } = useSystemConfig();
 
@@ -47,7 +100,8 @@ export function AuthenticationSection() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialCredentialsRef = useRef(auth.apiKeyCredentials);
 
-  const canAutoSave = system.id && system.urlHost;
+  const canAutoSave = system.id && system.url;
+  const isMultiTenancy = auth.multiTenancyMode === "enabled";
 
   const debouncedSave = useCallback(() => {
     if (!canAutoSave) return;
@@ -131,18 +185,19 @@ export function AuthenticationSection() {
   const getTemplateOAuth = useCallback(() => {
     const match = findTemplateForSystem(system);
     return (match?.template.oauth as any) || null;
-  }, [system.id, system.name, system.templateName, system.urlHost, system.urlPath]);
+  }, [system.id, system.name, system.templateName, system.url]);
 
   const getResolvedOAuthFields = useCallback(() => {
     const templateOAuth = getTemplateOAuth();
     if (auth.useSuperglueOAuth && templateOAuth) {
+      // Prefer stored values over template
       return {
         ...auth.oauthFields,
-        client_id: templateOAuth.client_id || auth.oauthFields.client_id,
-        auth_url: templateOAuth.authUrl || auth.oauthFields.auth_url,
-        token_url: templateOAuth.tokenUrl || auth.oauthFields.token_url,
-        scopes: templateOAuth.scopes || auth.oauthFields.scopes,
-        grant_type: templateOAuth.grant_type || auth.oauthFields.grant_type,
+        client_id: auth.oauthFields.client_id || templateOAuth.client_id,
+        auth_url: auth.oauthFields.auth_url || templateOAuth.authUrl,
+        token_url: auth.oauthFields.token_url || templateOAuth.tokenUrl,
+        scopes: auth.oauthFields.scopes || templateOAuth.scopes,
+        grant_type: auth.oauthFields.grant_type || templateOAuth.grant_type,
       };
     }
     return auth.oauthFields;
@@ -211,7 +266,7 @@ export function AuthenticationSection() {
           description: "Successfully authenticated",
         });
 
-        if (system.id && system.urlHost) {
+        if (system.id && system.url) {
           await saveSystem(tokenFields);
         }
       }
@@ -226,7 +281,7 @@ export function AuthenticationSection() {
       true,
       templateInfo,
       handleOAuthSuccess,
-      config.superglueEndpoint,
+      config.apiEndpoint,
       undefined,
       config.apiEndpoint,
     );
@@ -261,58 +316,139 @@ export function AuthenticationSection() {
         </Select>
       </div>
 
+      {/* Credential mode - only show for non-oauth auth types */}
+      {auth.authType !== "none" && auth.authType !== "oauth" && (
+        <div className="border-t border-border/40 pt-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Credential Mode</Label>
+            <HelpTooltip text="Choose whether credentials are system-wide or per end user." />
+          </div>
+          <MultiTenancyModeToggle value={auth.multiTenancyMode} onChange={setMultiTenancyMode} />
+        </div>
+      )}
+
       {auth.authType === "apikey" && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Label htmlFor="credentials" className="text-sm font-medium">
               API Credentials
             </Label>
-            <HelpTooltip text="Add API keys or tokens needed for this system. Common keys include: api_key, bearer_token, api_secret." />
+            <HelpTooltip
+              text={
+                isMultiTenancy
+                  ? "Define credential names that end users will provide in the portal (e.g., api_key, bearer_token, api_secret)."
+                  : "Add API keys or tokens needed for this system. Common keys include: api_key, bearer_token, api_secret."
+              }
+            />
           </div>
-          <div className="rounded-xl border border-border/60 bg-background/30 p-4">
+          {isMultiTenancy ? (
+            <div className="space-y-3">
+              <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-500/5 p-4 border border-amber-500/30">
+                <p className="text-sm text-muted-foreground">
+                  Define the credential field names below. End users can then enter their own
+                  credentials.
+                </p>
+              </div>
+              <div>
+                <CredentialsManager
+                  value={auth.apiKeyCredentials}
+                  onChange={setApiKeyCredentials}
+                  className="min-h-20"
+                  placeholder="Field name (e.g., api_key)"
+                  templateMode={true}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Add field names only. End users will enter their own values in the portal.
+                </p>
+              </div>
+            </div>
+          ) : (
             <CredentialsManager
               value={auth.apiKeyCredentials}
               onChange={setApiKeyCredentials}
               className="min-h-20"
             />
-          </div>
+          )}
         </div>
       )}
 
       {auth.authType === "oauth" && (
         <div className="space-y-5">
-          <OAuthConnectButton
-            system={system}
-            onClick={handleConnect}
-            disabled={isConnectDisabled()}
-            loading={connectLoading}
-          />
-
-          {hasTemplateClient && (
-            <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-muted/60 to-muted/30 p-4 border border-border/50">
-              <div>
-                <div className="font-medium text-sm">Use superglue OAuth</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  Preconfigured client for{" "}
-                  {systemOptions.find((o) => o.value === system.templateName)?.label}
-                </div>
+          <div className="flex flex-col gap-3">
+            <OAuthConnectButton
+              system={system}
+              onClick={handleConnect}
+              disabled={isConnectDisabled()}
+              loading={connectLoading}
+              className="w-full"
+            />
+            <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-muted/60 to-muted/30 p-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium">Connection Settings</Label>
+                <HelpTooltip text="Configure how users authenticate and which OAuth provider to use." />
               </div>
-              <Switch
-                checked={auth.useSuperglueOAuth}
-                onCheckedChange={(v) => setUseSuperglueOAuth(Boolean(v))}
-              />
+              <div className="mt-3">
+                <MultiTenancyModeToggle
+                  value={auth.multiTenancyMode}
+                  onChange={setMultiTenancyMode}
+                  variant="nested"
+                />
+              </div>
+              {isMultiTenancy ? (
+                <div className="text-xs text-muted-foreground mt-2">
+                  Template mode: each end user will authenticate using these settings.
+                </div>
+              ) : null}
+              {hasTemplateClient && (
+                <div className="mt-4 pt-4 border-t border-border/40">
+                  <div className="text-sm font-medium">OAuth Provider</div>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setUseSuperglueOAuth(true)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        "bg-muted/30 border-border/50",
+                        "hover:bg-muted/40 hover:border-border/70",
+                        auth.useSuperglueOAuth && "ring-1 ring-primary/40",
+                      )}
+                    >
+                      <div className="text-sm font-medium">Use superglue preconfigured OAuth</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Preconfigured client for{" "}
+                        {systemOptions.find((o) => o.value === system.templateName)?.label}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseSuperglueOAuth(false)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        "bg-muted/30 border-border/50",
+                        "hover:bg-muted/40 hover:border-border/70",
+                        !auth.useSuperglueOAuth && "ring-1 ring-primary/40",
+                      )}
+                    >
+                      <div className="text-sm font-medium">Use your own OAuth app</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Provide client ID, secret, and endpoints below.
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {!auth.useSuperglueOAuth && auth.oauthFields.grant_type === "authorization_code" && (
-            <div className="space-y-2">
+            <div className="rounded-xl border border-border/50 bg-gradient-to-br from-muted/60 to-muted/30 p-4">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-medium">Redirect URI</Label>
                 <span className="text-[10px] px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
-                  Must be registered with OAuth provider
+                  Register with OAuth provider
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mt-2">
                 <code className="text-xs bg-muted/60 px-3 py-2 rounded-lg flex-1 overflow-x-auto font-mono border border-border/40">
                   {getOAuthCallbackUrl()}
                 </code>
@@ -506,29 +642,33 @@ export function AuthenticationSection() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronRight
-              className={cn("h-3.5 w-3.5 transition-transform", showAdvanced && "rotate-90")}
-            />
-            Additional API Credentials
-          </button>
+          {!isMultiTenancy && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronRight
+                  className={cn("h-3.5 w-3.5 transition-transform", showAdvanced && "rotate-90")}
+                />
+                Additional API Credentials
+              </button>
 
-          {showAdvanced && (
-            <div className="rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 p-4">
-              <p className="text-xs text-muted-foreground mb-3">
-                Some APIs require additional credentials alongside OAuth (e.g., developer_token,
-                account_id).
-              </p>
-              <CredentialsManager
-                value={auth.apiKeyCredentials}
-                onChange={setApiKeyCredentials}
-                className="min-h-16"
-              />
-            </div>
+              {showAdvanced && (
+                <div className="rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 p-4">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Some APIs require additional credentials alongside OAuth (e.g., developer_token,
+                    account_id).
+                  </p>
+                  <CredentialsManager
+                    value={auth.apiKeyCredentials}
+                    onChange={setApiKeyCredentials}
+                    className="min-h-16"
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

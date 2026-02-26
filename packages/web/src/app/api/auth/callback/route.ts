@@ -334,7 +334,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const stateData = JSON.parse(atob(state)) as OAuthState & { token_url?: string };
+    const stateData = JSON.parse(atob(state)) as OAuthState & {
+      token_url?: string;
+      portalToken?: string;
+    };
     const {
       systemId,
       timestamp,
@@ -346,6 +349,7 @@ export async function GET(request: NextRequest) {
       oauth_cert,
       oauth_key,
       scopes,
+      portalToken,
     } = stateData;
 
     if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
@@ -354,7 +358,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const endpoint = process.env.GRAPHQL_ENDPOINT;
+    const endpoint = process.env.API_ENDPOINT || "http://localhost:3002";
 
     // Get OAuth session from cookie (set during OAuth init)
     const oauthSessionCookie = request.cookies.get("oauth_session")?.value;
@@ -379,18 +383,47 @@ export async function GET(request: NextRequest) {
       apiKey = legacyApiKey;
     }
 
-    if (!apiKey) {
+    if (!apiKey && !portalToken) {
       throw new Error(
         "[OAUTH_STAGE:AUTHENTICATION] No API key found. OAuth session may have expired or was not properly initialized.",
       );
     }
 
-    // skip backend resolution if its key/cert oauth
+    // skip backend resolution if its key/cert oauth or if portalToken is present (portal flow)
     let resolved: { client_id: string; client_secret: string } | undefined;
     if (oauth_cert && oauth_key) {
       resolved = {
         client_id: clientId,
         client_secret: "",
+      };
+    } else if (portalToken) {
+      // Portal flow - fetch credentials from backend using portal token
+      const apiEndpoint = process.env.API_ENDPOINT || "http://localhost:3002";
+      const oauthConfigResponse = await fetch(
+        `${apiEndpoint}/v1/portal/systems/${systemId}/oauth-config`,
+        {
+          headers: {
+            Authorization: `Bearer ${portalToken}`,
+          },
+        },
+      );
+
+      if (!oauthConfigResponse.ok) {
+        const errorData = await oauthConfigResponse.json().catch(() => ({}));
+        throw new Error(
+          `[OAUTH_STAGE:PORTAL_CREDENTIALS] Failed to fetch OAuth credentials: ${errorData.error || oauthConfigResponse.statusText}`,
+        );
+      }
+
+      const oauthConfig = await oauthConfigResponse.json();
+      if (!oauthConfig?.data?.clientId || !oauthConfig?.data?.clientSecret) {
+        throw new Error(
+          "[OAUTH_STAGE:PORTAL_CREDENTIALS] Invalid OAuth config response: missing clientId or clientSecret",
+        );
+      }
+      resolved = {
+        client_id: oauthConfig.data.clientId,
+        client_secret: oauthConfig.data.clientSecret,
       };
     } else {
       const client = new SuperglueClient({

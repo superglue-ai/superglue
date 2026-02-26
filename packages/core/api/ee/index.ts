@@ -8,9 +8,10 @@
  * The core code will continue to work with "allow all" behavior.
  */
 
-// Re-export the hook registry for use in core code
 export {
   checkGraphQLAccess,
-  checkToolExecutionPermission,
-  filterToolsByPermission,
+  checkToolExecutionPermissionAsync,
+  filterToolsByPermissionAsync,
+  type ScopeContext,
+  type AsyncScopeContext,
 } from "./scope-hooks.js";

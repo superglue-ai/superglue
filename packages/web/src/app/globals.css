@@ -2,21 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tippy.js base styles for suggestions dropdown */
-.tippy-box {
-  background-color: transparent;
-  border: none;
-  padding: 0;
-}
-
-.tippy-content {
-  padding: 0;
-}
+@source "../../../node_modules/streamdown/dist/index.js";
 
 body {
   overflow: hidden;
   font-family: var(--font-jetbrains-sans);
   scrollbar-gutter: stable both-edges;
+}
+
+/* Allow scrolling for embedded pages */
+body:has([data-embedded-page]) {
+  overflow: auto;
 }
 
 /* Stable scrollbars for scrollable sections to prevent horizontal layout shift */
@@ -498,7 +494,15 @@ html.dark {
   border-radius: 10px;
 }
 
-/* Hide Monaco editor read-only message overlay */
-.monaco-editor-overlaymessage {
-  display: none !important;
+/* Tool call pending shimmer animation */
+@keyframes shimmer-bar {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.animate-shimmer-bar {
+  animation: shimmer-bar 2.5s ease-in-out infinite;
 }

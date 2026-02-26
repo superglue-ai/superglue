@@ -1,15 +1,11 @@
-import {
-  HttpMethod,
-  RequestOptions,
-  ServiceMetadata,
-  ApiConfig as StepConfig,
-} from "@superglue/shared";
+import { HttpMethod, RequestOptions, ServiceMetadata, RequestStepConfig } from "@superglue/shared";
 import { Pool, PoolConfig } from "pg";
 import { server_defaults } from "../../../default.js";
 import { parseJSON } from "../../../files/index.js";
-import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
+import { replaceVariables } from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
 import {
+  ResolvedStepContext,
   StepExecutionInput,
   StepExecutionStrategy,
   StepStrategyExecutionResult,
@@ -18,14 +14,17 @@ import {
 export class PostgresStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = "1.0.0";
 
-  shouldExecute(resolvedUrlHost: string): boolean {
-    return resolvedUrlHost.startsWith("postgres://") || resolvedUrlHost.startsWith("postgresql://");
+  shouldExecute(_input: StepExecutionInput, resolved: ResolvedStepContext): boolean {
+    return (
+      resolved.resolvedUrl.startsWith("postgres://") ||
+      resolved.resolvedUrl.startsWith("postgresql://")
+    );
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
     const rows = await callPostgres({
-      endpoint: stepConfig,
+      endpoint: stepConfig as RequestStepConfig,
       payload: stepInputData,
       credentials,
       options: requestOptions,
@@ -119,17 +118,14 @@ export async function callPostgres({
   options,
   metadata,
 }: {
-  endpoint: StepConfig;
+  endpoint: RequestStepConfig;
   payload: Record<string, any>;
   credentials: Record<string, any>;
   options: RequestOptions;
   metadata: ServiceMetadata;
 }): Promise<any> {
   const requestVars = { ...payload, ...credentials };
-  let connectionString = await replaceVariables(
-    composeUrl(endpoint.urlHost, endpoint.urlPath),
-    requestVars,
-  );
+  let connectionString = await replaceVariables(endpoint.url, requestVars);
   connectionString = connectionString.replace(/\/+(\?)/, "$1").replace(/\/+$/, "");
 
   let bodyParsed: any;

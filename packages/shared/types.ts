@@ -1,6 +1,8 @@
 export type ServiceMetadata = {
   traceId?: string;
   orgId?: string;
+  userId?: string;
+  isRestricted?: boolean; // true if userId is from a restricted API key
 };
 
 export interface Log {
@@ -13,8 +15,9 @@ export interface Log {
 }
 
 export interface MessagePart {
-  type: "content" | "tool";
+  type: "content" | "tool" | "error";
   content?: string;
+  errorDetails?: string;
   tool?: ToolCall;
   id: string;
 }
@@ -67,6 +70,12 @@ export interface ToolCall {
 export enum UserRole {
   ADMIN = "admin",
   MEMBER = "member",
+}
+
+// User info for lookup by user ID
+export interface UserInfo {
+  id: string;
+  email: string | null;
 }
 
 export enum SupportedFileType {
@@ -223,60 +232,89 @@ export interface BaseResult {
   completedAt: Date;
 }
 
+// Pagination type values (camelCase for OpenAPI compatibility)
+export type PaginationTypeValue = "offsetBased" | "pageBased" | "cursorBased" | "disabled";
+
 export interface Pagination {
-  type: PaginationType;
+  type: PaginationTypeValue;
   pageSize?: string;
   cursorPath?: string;
   stopCondition?: string;
 }
 
-export interface ApiConfig extends BaseConfig {
-  urlHost?: string;
-  urlPath?: string;
-  instruction: string;
-  method?: HttpMethod;
+// Step config type discriminator
+// "request" = all URL-based steps (HTTP, SFTP, Postgres, etc.)
+// "transform" = JavaScript transformation step (to be re-added later)
+// Future: may split "request" into "http" | "sftp" | "postgres" | "graphql" etc.
+export type StepConfigType = "request" | "transform";
+
+// RequestStepConfig - for HTTP, SFTP, Postgres, etc. (use step.id for identification)
+export interface RequestStepConfig {
+  type?: "request"; // Set to "request" by normalize on read, not stored in DB for URL-based steps
+  url: string;
+  method?: HttpMethod | string;
   queryParams?: Record<string, any>;
   headers?: Record<string, any>;
   body?: string;
   pagination?: Pagination;
+  systemId?: string; // System to use for stored credentials and documentation
 }
 
-export interface ExtractConfig extends BaseConfig {
-  urlHost?: string;
-  urlPath?: string;
-  instruction: string;
-  queryParams?: Record<string, any>;
-  method?: HttpMethod;
-  headers?: Record<string, any>;
-  body?: string;
-  documentationUrl?: string;
-  decompressionMethod?: DecompressionMethod;
-  authentication?: AuthType;
-  fileType?: FileType;
-  dataPath?: string;
+// TransformStepConfig - for JavaScript transformation steps (no API calls)
+export interface TransformStepConfig {
+  type: "transform";
+  transformCode: string; // JavaScript function: (sourceData) => transformedData
 }
 
-export interface ExecutionStep {
+// Union type for step config
+export type StepConfig = RequestStepConfig | TransformStepConfig;
+
+// Type guard for request step config
+export function isRequestConfig(config: StepConfig): config is RequestStepConfig {
+  // "request" type covers HTTP, SFTP, Postgres - all URL-based steps
+  // Fallback to true if no type (safety for edge cases)
+  return config?.type === "request" || !config?.type;
+}
+
+// Type guard for transform step config
+export function isTransformConfig(config: StepConfig): config is TransformStepConfig {
+  return config?.type === "transform";
+}
+
+// Failure behavior values (lowercase for OpenAPI compatibility)
+export type FailureBehavior = "fail" | "continue";
+
+export interface ToolStep {
   id: string;
+  config: StepConfig;
+  instruction?: string; // Human-readable instruction describing what this step does
   modify?: boolean;
-  apiConfig: ApiConfig;
-  systemId?: string;
-  executionMode?: "DIRECT" | "LOOP";
-  loopSelector?: string;
-  failureBehavior?: "FAIL" | "CONTINUE";
+  dataSelector?: string; // JavaScript function to select data for loop execution
+  failureBehavior?: FailureBehavior;
 }
 
 export interface Tool extends BaseConfig {
-  steps: ExecutionStep[];
-  systemIds?: string[];
-  finalTransform?: JSONata;
+  name?: string;
+  steps: ToolStep[];
+  outputTransform?: string; // JavaScript function for final output transformation
   inputSchema?: JSONSchema;
-  responseSchema?: JSONSchema;
+  outputSchema?: JSONSchema; // JSON Schema for tool outputs (after transformations applied)
   instruction?: string;
-  originalResponseSchema?: JSONSchema;
   folder?: string;
   archived?: boolean;
   responseFilters?: ResponseFilter[];
+}
+
+// Helper function to compute systemIds from steps
+export function getToolSystemIds(tool: Tool): string[] {
+  if (!tool.steps) return [];
+  const ids = new Set<string>();
+  for (const step of tool.steps) {
+    if (step.config && isRequestConfig(step.config) && step.config.systemId) {
+      ids.add(step.config.systemId);
+    }
+  }
+  return Array.from(ids);
 }
 
 export interface ToolStepResult {
@@ -286,8 +324,11 @@ export interface ToolStepResult {
   error?: string;
 }
 
-export interface ToolResult extends BaseResult {
-  config: Tool;
+export interface ToolResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  tool: Tool;
   stepResults: ToolStepResult[];
 }
 
@@ -297,17 +338,29 @@ export interface DocumentationFiles {
   openApiFileIds?: string[];
 }
 
-export interface DocumentationFiles {
-  uploadFileIds?: string[];
-  scrapeFileIds?: string[];
-  openApiFileIds?: string[];
+// Tunnel types for on-prem agent connections
+export interface TunnelTarget {
+  name: string; // e.g., "mysql_db"
+  protocol: string; // "http" | "postgres" | "smb" | "sftp"
+  description?: string; // Human-readable description
+}
+
+export interface TunnelConnection {
+  id: string; // tunnel identifier (e.g., "acme-corp")
+  orgId: string;
+  connectedAt: string;
+  targets: TunnelTarget[];
+}
+
+export interface TunnelConfig {
+  tunnelId: string; // which tunnel connection to use
+  targetName: string; // which target on that tunnel
 }
 
 export interface System extends BaseConfig {
   name?: string;
   type?: string;
-  urlHost?: string;
-  urlPath?: string;
+  url?: string;
   credentials?: Record<string, any>;
   documentationUrl?: string;
   documentation?: string;
@@ -320,13 +373,14 @@ export interface System extends BaseConfig {
   metadata?: Record<string, any>;
   templateName?: string;
   documentationFiles?: DocumentationFiles;
+  multiTenancyMode?: MultiTenancyMode; // EE: When 'enabled', end users must authenticate themselves
+  tunnel?: TunnelConfig; // EE: On-prem agent tunnel configuration
 }
 
 export interface SystemInput {
   id: string;
   name?: string;
-  urlHost?: string;
-  urlPath?: string;
+  url?: string;
   documentationUrl?: string;
   documentation?: string;
   documentationPending?: boolean;
@@ -342,7 +396,7 @@ export interface SuggestedTool {
   id: string;
   instruction?: string;
   inputSchema?: JSONSchema;
-  responseSchema?: JSONSchema;
+  outputSchema?: JSONSchema;
   steps: Array<{
     systemId?: string;
     instruction?: string;
@@ -350,34 +404,16 @@ export interface SuggestedTool {
   reason: string;
 }
 
-export type RunResult = ApiResult | ToolResult;
-
-export type ExtractResult = BaseResult & {
-  config: ExtractConfig;
-};
-
-export type ApiResult = BaseResult & {
-  config: ApiConfig;
-};
-
-export type ApiInputRequest = {
-  id?: string;
-  endpoint?: ApiConfig;
-};
+export type ExtractResult = BaseResult;
 
 export type ExtractInputRequest = {
-  id?: string;
-  endpoint?: ExtractConfig;
-  file?: Upload;
+  file: Upload;
 };
 
 export type ToolInputRequest = {
   id?: string;
   workflow?: Tool;
 };
-
-// Legacy alias
-export type WorkflowInputRequest = ToolInputRequest;
 
 export type RequestOptions = {
   cacheMode?: CacheMode;
@@ -406,23 +442,31 @@ export interface Run {
   requestSource?: RequestSource;
   traceId?: string;
   metadata: RunMetadata;
+  resultStorageUri?: string; // FileService URI where full results are stored (EE feature)
+  userId?: string; // User or end user who triggered this run
+}
+
+// Stored run results in FileService (EE feature)
+export interface StoredRunResults {
+  runId: string;
+  success: boolean;
+  data: any;
+  stepResults: ToolStepResult[];
+  toolPayload: Record<string, any>;
+  error?: string;
+  storedAt: Date;
 }
 
 export interface ApiCallArgs {
   id?: string;
-  endpoint?: ApiConfig;
+  endpoint?: RequestStepConfig;
   payload?: Record<string, any>;
   credentials?: Record<string, string>;
   options?: RequestOptions;
 }
 
 export interface ExtractArgs {
-  id?: string;
-  endpoint?: ExtractConfig;
-  file?: Upload;
-  options?: RequestOptions;
-  payload?: Record<string, any>;
-  credentials?: Record<string, string>;
+  file: Upload;
 }
 
 export interface ToolArgs {
@@ -436,40 +480,11 @@ export interface ToolArgs {
   traceId?: string;
 }
 
-// Legacy alias
-export type WorkflowArgs = ToolArgs;
-
-export interface BuildToolArgs {
-  instruction: string;
-  payload?: Record<string, any>;
-  systemIds?: string[];
-  responseSchema?: JSONSchema;
-  save?: boolean;
-  verbose?: boolean;
-  traceId?: string;
-}
-
-// Legacy alias
-export type BuildWorkflowArgs = BuildToolArgs;
-
 export interface ToolDiff {
   op: "add" | "remove" | "replace" | "move" | "copy" | "test";
   path: string;
   value?: any;
   from?: string;
-}
-
-export interface FixToolArgs {
-  tool: Tool;
-  fixInstructions: string;
-  lastError?: string;
-  stepResults?: ToolStepResult[];
-  systemIds?: string[];
-}
-
-export interface FixToolResult {
-  tool: Tool;
-  diffs: ToolDiff[];
 }
 
 export type SystemList = {
@@ -594,51 +609,16 @@ export enum ConfirmationAction {
   CONFIRMED = "confirmed",
   DECLINED = "declined",
   PARTIAL = "partial",
+  OAUTH_SUCCESS = "oauth_success",
+  OAUTH_FAILURE = "oauth_failure",
 }
 
 export interface AgentRequest {
   agentId: string;
   messages: Message[];
-  runtimeContext?: string;
+  hiddenContext?: string;
   agentParams?: Record<string, any>;
   filePayloads?: Record<string, any>;
-}
-
-// OpenAPI format types for API responses
-export interface OpenAPIPagination {
-  type: string;
-  pageSize?: string;
-  cursorPath?: string;
-  stopCondition?: string;
-}
-
-export interface OpenAPIToolStep {
-  id: string;
-  url: string;
-  method: string;
-  queryParams?: Record<string, unknown>;
-  headers?: Record<string, unknown>;
-  body?: string;
-  pagination?: OpenAPIPagination;
-  systemId?: string;
-  instruction?: string;
-  modify?: boolean;
-  dataSelector?: string;
-  failureBehavior?: "fail" | "continue";
-}
-
-export interface OpenAPITool {
-  id: string;
-  name: string;
-  version?: string;
-  instruction?: string;
-  inputSchema?: Record<string, unknown>;
-  outputSchema?: Record<string, unknown>;
-  steps: OpenAPIToolStep[];
-  outputTransform?: string;
-  archived?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 // ============================================
@@ -717,8 +697,8 @@ export interface NotificationRateLimit {
 }
 
 export interface NotificationSettings {
-  channels: NotificationChannels;
-  rateLimit: NotificationRateLimit;
+  channels?: NotificationChannels;
+  rateLimit?: NotificationRateLimit;
 }
 
 export interface OrgSettings {
@@ -727,4 +707,57 @@ export interface OrgSettings {
   preferences: Record<string, any>;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+// ============================================
+// MULTI-TENANCY TYPES (EE)
+// ============================================
+
+export type MultiTenancyMode = "disabled" | "enabled";
+
+export interface EndUser {
+  id: string;
+  orgId: string;
+  externalId: string;
+  email?: string;
+  name?: string;
+  allowedSystems?: string[] | null; // ['*'] = all access, specific IDs = restricted, null/[] = no access
+  metadata?: Record<string, any>;
+  credentials?: EndUserCredentialStatus[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface EndUserInput {
+  externalId?: string; // Optional - same as id if not provided
+  email?: string;
+  name?: string;
+  allowedSystems?: string[] | null; // ['*'] = all access, specific IDs = restricted, null/[] = no access
+  metadata?: Record<string, any>;
+}
+
+export interface EndUserCredentialStatus {
+  systemId: string;
+  systemName?: string;
+  hasCredentials: boolean;
+  authType?: string;
+  connectedAt?: Date;
+}
+
+export interface PortalToken {
+  token: string;
+  expiresAt: Date;
+}
+
+export interface PatchSystemBody {
+  name?: string;
+  url?: string;
+  specificInstructions?: string;
+  icon?: string;
+  credentials?: Record<string, any>;
+  metadata?: Record<string, any>;
+  templateName?: string;
+  multiTenancyMode?: MultiTenancyMode;
+  documentationFiles?: DocumentationFiles;
+  tunnel?: TunnelConfig;
 }

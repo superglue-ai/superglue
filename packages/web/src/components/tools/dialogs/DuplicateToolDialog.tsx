@@ -69,7 +69,7 @@ export function DuplicateToolDialog({
     try {
       setIsDuplicating(true);
       const superglueClient = new SuperglueClient({
-        endpoint: config.superglueEndpoint,
+        endpoint: config.apiEndpoint,
         apiKey: tokenRegistry.getToken(),
         apiEndpoint: config.apiEndpoint,
       });

@@ -85,53 +85,29 @@ export async function executeTemplateCode(code: string, data: any): Promise<any>
   }
 }
 
-const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
-
-function escapeForBracket(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-}
-
-function buildAccessor(segments: string[]): string {
-  return segments
-    .map((seg) => (VALID_IDENTIFIER.test(seg) ? `.${seg}` : `["${escapeForBracket(seg)}"]`))
-    .join("");
-}
-
-export function normalizeTemplateExpression(expr: string): string {
-  const trimmed = expr.trim();
-  if (!trimmed) {
-    throw new Error("Empty template expression");
-  }
-  if (isArrowFunction(trimmed)) {
-    return trimmed;
-  }
-  if (
-    trimmed.startsWith("sourceData.") ||
-    trimmed.startsWith("sourceData[") ||
-    trimmed === "sourceData"
-  ) {
-    return `(sourceData) => ${trimmed}`;
-  }
-  if (trimmed.includes("[") && /^[a-zA-Z_$]/.test(trimmed)) {
-    return `(sourceData) => sourceData.${trimmed}`;
-  }
-  if (trimmed.includes(".") && !trimmed.includes(" ")) {
-    const segments = trimmed.split(".");
-    const accessor = buildAccessor(segments);
-    return `(sourceData) => sourceData${accessor}`;
-  }
-  if (VALID_IDENTIFIER.test(trimmed)) {
-    return `(sourceData) => sourceData.${trimmed}`;
-  }
-  return `(sourceData) => sourceData["${escapeForBracket(trimmed)}"]`;
-}
-
 export async function evaluateTemplate(expr: string, sourceData: any): Promise<EvaluationResult> {
   try {
-    const normalizedExpr = normalizeTemplateExpression(expr);
-    const result = await executeTemplateCode(normalizedExpr, sourceData);
-    const sanitized = sanitizeEvaluationResult(result);
-    return { success: true, value: sanitized };
+    const trimmed = expr.trim();
+    if (
+      Object.prototype.hasOwnProperty.call(sourceData, trimmed) &&
+      sourceData[trimmed] !== undefined
+    ) {
+      return { success: true, value: sanitizeEvaluationResult(sourceData[trimmed]) };
+    }
+    if (isArrowFunction(trimmed)) {
+      const result = await executeTemplateCode(trimmed, sourceData);
+      return { success: true, value: sanitizeEvaluationResult(result) };
+    }
+    const availableKeys = Object.keys(sourceData).slice(0, 10).join(", ");
+    const keyPreview =
+      Object.keys(sourceData).length > 10
+        ? `${availableKeys}... (${Object.keys(sourceData).length} total)`
+        : availableKeys;
+    return {
+      success: false,
+      value: undefined,
+      error: `Direct variable reference '${trimmed}' failed to resolve. Available top level keys: ${keyPreview}`,
+    };
   } catch (error) {
     return {
       success: false,

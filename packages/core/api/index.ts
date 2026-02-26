@@ -1,6 +1,11 @@
 // Import API endpoint modules
+import "./extract.js";
+import "./logs.js";
+import "./oauth.js";
 import "./runs.js";
 import "./systems.js";
+import "./systems-documentation.js";
+import "./tenant.js";
 import "./tools.js";
 import "./tool-internal.js";
 

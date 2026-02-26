@@ -23,7 +23,14 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ className }: RightSidebarProps) {
-  const { showAgent, setAgentPortalRef, registerSetSidebarExpanded } = useRightSidebar();
+  const {
+    showAgent,
+    setAgentPortalRef,
+    registerSetSidebarExpanded,
+    savedTool,
+    playgroundTool,
+    onRestoreDraft,
+  } = useRightSidebar();
   const agentContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       setAgentPortalRef(node);
@@ -55,10 +62,10 @@ export function RightSidebar({ className }: RightSidebarProps) {
     const storageKey = showAgent ? "playground-sidebar" : "global-sidebar";
     const savedExpanded = localStorage.getItem(`${storageKey}-expanded`) === "true";
     const savedPanel = localStorage.getItem(`${storageKey}-panel`) as ActivePanel;
-    // When agent mode activates, always expand the sidebar
     setIsExpanded(showAgent ? true : savedExpanded);
     if (showAgent) {
-      setActivePanel(savedPanel === "logs" || savedPanel === "agent" ? savedPanel : "agent");
+      const validPanels: ActivePanel[] = ["logs", "agent"];
+      setActivePanel(savedPanel && validPanels.includes(savedPanel) ? savedPanel : "agent");
     }
     setIsHydrated(true);
     requestAnimationFrame(() => setTransitionDuration(0.3));
@@ -88,11 +95,11 @@ export function RightSidebar({ className }: RightSidebarProps) {
 
   const client = useMemo(() => {
     return new SuperglueClient({
-      endpoint: config.superglueEndpoint,
+      endpoint: config.apiEndpoint,
       apiKey: tokenRegistry.getToken(),
       apiEndpoint: config.apiEndpoint,
     });
-  }, [config.superglueEndpoint, config.apiEndpoint]);
+  }, [config.apiEndpoint]);
 
   const filteredLogs = useMemo(
     () => (showDebug ? logs : logs.filter((log) => log.level !== "DEBUG")),
@@ -100,7 +107,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
   );
 
   useEffect(() => {
-    const subscription = client.subscribeToLogs({
+    const subscription = client.subscribeToLogsSSE({
       onLog: (log) => {
         setLogs((prev) => [...prev, log].slice(-1000));
         if (!isExpandedRef.current || activePanelRef.current !== "logs") {
@@ -209,17 +216,11 @@ export function RightSidebar({ className }: RightSidebarProps) {
           onClick={() => handlePanelSelect("logs")}
           className={cn(
             "h-10 w-10 relative",
-            (!showAgent || activePanel === "logs") && "bg-primary/10 text-primary",
+            activePanel === "logs" && "bg-primary/10 text-primary",
           )}
           title="Logs"
         >
           <ScrollText className="h-5 w-5" />
-          {hasNewLogs && (
-            <span className="absolute top-1 right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-            </span>
-          )}
         </Button>
       </div>
 
@@ -255,12 +256,6 @@ export function RightSidebar({ className }: RightSidebarProps) {
             >
               <ScrollText className="h-3.5 w-3.5" />
               Logs
-              {hasNewLogs && activePanel !== "logs" && (
-                <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                </span>
-              )}
             </button>
           </div>
           <Button

@@ -396,6 +396,7 @@ export function SystemTemplatePicker({
         openApiUrl: config.openApiUrl,
         preferredAuthType: config.preferredAuthType,
         hasOAuth: !!config.oauth,
+        systemSpecificInstructions: config.systemSpecificInstructions,
       },
     };
     return JSON.stringify(context);
@@ -511,11 +512,11 @@ export function SystemTemplatePicker({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-visible">
         {debouncedSearch.trim() && filteredOptions.length > 0 && (
           <h3 className="text-xs font-medium text-muted-foreground mb-3 px-1">Popular Systems</h3>
         )}
-        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(200px,1fr))] pb-4 px-1">
+        <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(200px,1fr))] pb-4 px-1 mt-1">
           {newSystemFormExpanded ? (
             <NewSystemForm
               onSubmit={handleNewSystemSubmit}

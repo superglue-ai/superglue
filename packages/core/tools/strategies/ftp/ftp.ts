@@ -2,7 +2,7 @@ import {
   HttpMethod,
   RequestOptions,
   ServiceMetadata,
-  ApiConfig as StepConfig,
+  RequestStepConfig,
   SupportedFileType,
 } from "@superglue/shared";
 import { Client as FTPClient } from "basic-ftp";
@@ -11,9 +11,10 @@ import SFTPClient from "ssh2-sftp-client";
 import { URL } from "url";
 import { server_defaults } from "../../../default.js";
 import { parseFile, parseJSON } from "../../../files/index.js";
-import { composeUrl, replaceVariables } from "../../../utils/helpers.js";
+import { replaceVariables } from "../../../utils/helpers.js";
 import { logMessage } from "../../../utils/logs.js";
 import {
+  ResolvedStepContext,
   StepExecutionInput,
   StepExecutionStrategy,
   StepStrategyExecutionResult,
@@ -22,18 +23,18 @@ import {
 export class FTPStepExecutionStrategy implements StepExecutionStrategy {
   readonly version = "1.0.0";
 
-  shouldExecute(resolvedUrlHost: string): boolean {
+  shouldExecute(_input: StepExecutionInput, resolved: ResolvedStepContext): boolean {
     return (
-      resolvedUrlHost.startsWith("ftp://") ||
-      resolvedUrlHost.startsWith("ftps://") ||
-      resolvedUrlHost.startsWith("sftp://")
+      resolved.resolvedUrl.startsWith("ftp://") ||
+      resolved.resolvedUrl.startsWith("ftps://") ||
+      resolved.resolvedUrl.startsWith("sftp://")
     );
   }
 
   async executeStep(input: StepExecutionInput): Promise<StepStrategyExecutionResult> {
     const { stepConfig, stepInputData, credentials, requestOptions, metadata } = input;
     const ftpResult = await callFTP({
-      endpoint: stepConfig,
+      endpoint: stepConfig as RequestStepConfig,
       stepInputData,
       credentials,
       options: requestOptions,
@@ -64,6 +65,17 @@ interface FTPOperation {
   content?: string | Buffer;
   newPath?: string;
   recursive?: boolean;
+}
+
+function resolveOperationPaths(operations: FTPOperation[], basePath?: string): FTPOperation[] {
+  if (!basePath) return operations;
+  const resolve = (p: string) =>
+    p.startsWith(basePath + "/") || p === basePath ? p : `${basePath}/${p.replace(/^\//, "")}`;
+  return operations.map((op) => ({
+    ...op,
+    path: op.path ? resolve(op.path) : basePath,
+    ...(op.newPath ? { newPath: resolve(op.newPath) } : {}),
+  }));
 }
 
 function safeDecodeURIComponent(str: string): string {
@@ -147,11 +159,11 @@ export function parseConnectionUrl(urlString: string): {
 async function executeFTPOperation(client: FTPClient, operation: FTPOperation): Promise<any> {
   switch (operation.operation) {
     case "list": {
-      const files = await client.list(operation.path || "/");
-      // Return as JSON-friendly format
+      const listPath = operation.path || "/";
+      const files = await client.list(listPath);
       return files.map((file) => ({
         name: file.name,
-        path: operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
+        path: listPath + (listPath.endsWith("/") ? "" : "/") + file.name,
         size: file.size,
         type: file.isDirectory
           ? "directory"
@@ -272,11 +284,11 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
 async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation): Promise<any> {
   switch (operation.operation) {
     case "list": {
-      const files = await client.list(operation.path || "/");
-      // Return as JSON-friendly format
+      const listPath = operation.path || "/";
+      const files = await client.list(listPath);
       return files.map((file) => ({
         name: file.name,
-        path: operation.path + (operation.path?.endsWith("/") ? "" : "/") + file.name,
+        path: listPath + (listPath.endsWith("/") ? "" : "/") + file.name,
         size: file.size,
         type:
           file.type === "d"
@@ -394,7 +406,7 @@ export async function callFTP({
   options,
   metadata,
 }: {
-  endpoint: StepConfig;
+  endpoint: RequestStepConfig;
   stepInputData?: Record<string, any>;
   credentials: Record<string, any>;
   options: RequestOptions;
@@ -402,9 +414,7 @@ export async function callFTP({
 }): Promise<any> {
   const allVars = { ...stepInputData, ...credentials };
 
-  const resolvedUrlHost = await replaceVariables(endpoint.urlHost, allVars);
-  const resolvedUrlPath = await replaceVariables(endpoint.urlPath, allVars);
-  let connectionString = composeUrl(resolvedUrlHost, resolvedUrlPath);
+  const connectionString = await replaceVariables(endpoint.url || "", allVars);
   const connectionInfo = parseConnectionUrl(connectionString);
 
   let operations: FTPOperation[] = [];
@@ -473,7 +483,8 @@ export async function callFTP({
             timeout: timeout,
           });
 
-          for (const operation of operations) {
+          const resolvedOps = resolveOperationPaths(operations, connectionInfo.basePath);
+          for (const operation of resolvedOps) {
             logMessage("debug", `Executing SFTP operation: ${operation.operation}`, metadata);
             const result = await executeSFTPOperation(sftp, operation);
             results.push(result);
@@ -501,12 +512,8 @@ export async function callFTP({
                 : undefined,
           });
 
-          // Change to base path if specified
-          if (connectionInfo.basePath) {
-            await ftp.cd(connectionInfo.basePath);
-          }
-
-          for (const operation of operations) {
+          const resolvedOps = resolveOperationPaths(operations, connectionInfo.basePath);
+          for (const operation of resolvedOps) {
             logMessage("debug", `Executing FTP operation: ${operation.operation}`, metadata);
             const result = await executeFTPOperation(ftp, operation);
             results.push(result);

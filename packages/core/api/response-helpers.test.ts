@@ -42,7 +42,7 @@ describe("response-helpers", () => {
 
   describe("parsePaginationParams", () => {
     it("should use defaults when no params provided", () => {
-      expect(parsePaginationParams({})).toEqual({ page: 1, limit: 50, offset: 0 });
+      expect(parsePaginationParams({})).toEqual({ page: 1, limit: 1000, offset: 0 });
     });
 
     it("should parse valid page and limit", () => {
@@ -56,23 +56,23 @@ describe("response-helpers", () => {
     it("should handle NaN values gracefully", () => {
       expect(parsePaginationParams({ page: "abc", limit: "xyz" })).toEqual({
         page: 1,
-        limit: 50,
+        limit: 1000,
         offset: 0,
       });
     });
 
     it("should clamp page to minimum of 1", () => {
-      expect(parsePaginationParams({ page: "0" })).toEqual({ page: 1, limit: 50, offset: 0 });
-      expect(parsePaginationParams({ page: "-5" })).toEqual({ page: 1, limit: 50, offset: 0 });
+      expect(parsePaginationParams({ page: "0" })).toEqual({ page: 1, limit: 1000, offset: 0 });
+      expect(parsePaginationParams({ page: "-5" })).toEqual({ page: 1, limit: 1000, offset: 0 });
     });
 
     it("should clamp limit between 1 and 100", () => {
       expect(parsePaginationParams({ limit: "1" })).toEqual({ page: 1, limit: 1, offset: 0 });
-      expect(parsePaginationParams({ limit: "200" })).toEqual({ page: 1, limit: 100, offset: 0 });
+      expect(parsePaginationParams({ limit: "2000" })).toEqual({ page: 1, limit: 1000, offset: 0 });
     });
 
     it("should treat 0 as default (falsy fallback)", () => {
-      expect(parsePaginationParams({ limit: "0" })).toEqual({ page: 1, limit: 50, offset: 0 });
+      expect(parsePaginationParams({ limit: "0" })).toEqual({ page: 1, limit: 1000, offset: 0 });
     });
 
     it("should clamp negative limits to 1", () => {

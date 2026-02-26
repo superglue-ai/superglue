@@ -1,10 +1,11 @@
 "use client";
 
 import { Badge } from "@/src/components/ui/badge";
+import { ErrorMessage } from "@/src/components/ui/error-message";
 import { cn } from "@/src/lib/general-utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { ToolCall } from "@superglue/shared";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 
 interface ToolCallWrapperProps {
@@ -104,15 +105,15 @@ export function ToolCallWrapper({
       case "completed":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case "error":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+        return "bg-muted text-muted-foreground";
       case "running":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
+        return "bg-muted text-muted-foreground";
       case "stopped":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
       case "declined":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
       case "awaiting_confirmation":
-        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
+        return "bg-[#ffa500]/15 text-amber-800 dark:bg-[#ffa500]/20 dark:text-[#ffa500]";
       case "pending":
         return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
       default:
@@ -125,7 +126,7 @@ export function ToolCallWrapper({
       case "completed":
         return "Completed";
       case "error":
-        return "Error";
+        return "Found Issue";
       case "running":
         return "Running";
       case "stopped":
@@ -248,32 +249,10 @@ export function ToolCallWrapper({
                   if (parsed && parsed.success === false && !hideStatusIcon) {
                     return (
                       <div className="space-y-4 mb-4">
-                        <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0">
-                              <svg
-                                className="w-5 h-5 text-gray-600 dark:text-gray-400"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">
-                                Task failed
-                              </div>
-                              <div className="text-sm text-gray-700 dark:text-gray-300">
-                                Error:{" "}
-                                {parsed.message || parsed.error || "An unknown error occurred"}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <ErrorMessage
+                          title="Task returned an error"
+                          message={parsed.message || parsed.error || "An unknown error occurred"}
+                        />
                       </div>
                     );
                   }
@@ -314,11 +293,11 @@ export function ToolCallWrapper({
                   <div>
                     <Collapsible open={isInputExpanded} onOpenChange={setIsInputExpanded}>
                       <CollapsibleTrigger asChild>
-                        <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                        <button className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">
                           {isInputExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
+                            <ChevronDown className="w-3 h-3" />
                           ) : (
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-3 h-3" />
                           )}
                           Input used
                         </button>
@@ -336,63 +315,65 @@ export function ToolCallWrapper({
               </div>
             )}
 
-            {/* Show warning message for stale/incomplete tool calls (not for execution failures with statusOverride) */}
-            {displayStatus === "error" && !statusOverride && (
-              <div className="space-y-4 mb-4">
-                <div className="bg-muted/50 border border-border rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="w-4 h-4 text-muted-foreground"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
+            {/* Show warning message for stale/incomplete tool calls (not for execution failures with statusOverride or tools with custom error display that have actual errors) */}
+            {displayStatus === "error" &&
+              !statusOverride &&
+              !(
+                ["run_tool", "build_tool", "edit_tool"].includes(tool.name) &&
+                tool.status === "error"
+              ) && (
+                <div className="space-y-4 mb-4">
+                  <ErrorMessage
+                    message={(() => {
+                      let errorMessage = tool.error;
+                      if (errorMessage) {
+                        try {
+                          const parsed = JSON.parse(errorMessage);
+                          errorMessage = parsed.error || parsed.message || errorMessage;
+                        } catch {}
+                      }
+                      if (errorMessage) {
+                        return <span>{errorMessage}</span>;
+                      }
+                      return (
+                        <>
+                          Tool call{" "}
+                          <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
+                            {tool.id}
+                          </code>{" "}
+                          did not complete.
+                          <span className="text-xs ml-1">(connection issue or tab closed)</span>
+                        </>
+                      );
+                    })()}
+                  />
+
+                  {/* Show collapsible input when tool fails */}
+                  {tool.input && (
+                    <div>
+                      <Collapsible open={isInputExpanded} onOpenChange={setIsInputExpanded}>
+                        <CollapsibleTrigger asChild>
+                          <button className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                            {isInputExpanded ? (
+                              <ChevronDown className="w-3 h-3" />
+                            ) : (
+                              <ChevronRight className="w-3 h-3" />
+                            )}
+                            Input used
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="mt-2 bg-muted/50 border border-border p-3 rounded-md">
+                            <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                              {JSON.stringify(tool.input, null, 2)}
+                            </pre>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
-                    <div className="flex-1">
-                      <div className="text-sm text-muted-foreground">
-                        Tool call{" "}
-                        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
-                          {tool.id}
-                        </code>{" "}
-                        did not complete.
-                        <span className="text-xs ml-1">(connection issue or tab closed)</span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Show collapsible input when tool fails */}
-                {tool.input && (
-                  <div>
-                    <Collapsible open={isInputExpanded} onOpenChange={setIsInputExpanded}>
-                      <CollapsibleTrigger asChild>
-                        <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                          {isInputExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                          Input used
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="mt-2 bg-muted/50 border border-border p-3 rounded-md">
-                          <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
-                            {JSON.stringify(tool.input, null, 2)}
-                          </pre>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
 
             {/* Show children only if not failed, stopped, error, or stale */}
             {(() => {
@@ -401,8 +382,15 @@ export function ToolCallWrapper({
                 return null;
               }
 
-              // Don't show children for error tools (unless it's a statusOverride - manual run errors should still show children)
-              if (displayStatus === "error" && !statusOverride) {
+              // Tools that handle their own error display
+              const toolsWithCustomErrorDisplay = ["run_tool", "build_tool", "edit_tool"];
+
+              // Don't show children for error tools (unless it's a statusOverride or tool handles its own error display)
+              if (
+                displayStatus === "error" &&
+                !statusOverride &&
+                !toolsWithCustomErrorDisplay.includes(tool.name)
+              ) {
                 return null;
               }
 

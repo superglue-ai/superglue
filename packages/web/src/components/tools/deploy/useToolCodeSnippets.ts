@@ -1,6 +1,6 @@
 import { useConfig } from "@/src/app/config-context";
 import { useMemo } from "react";
-import { safeStringify } from "@/src/lib/general-utils";
+import { safeStringify } from "@superglue/shared";
 
 export interface ToolCodeSnippets {
   webhookUrl: string;
@@ -85,7 +85,7 @@ await runTool("${toolId}", {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "${config.apiEndpoint.includes("https://api.superglue") ? "https://mcp.superglue.ai" : `${config.superglueEndpoint}/mcp`}",
+        "${config.apiEndpoint.includes("https://api.superglue") ? "https://mcp.superglue.ai" : `${config.apiEndpoint}/mcp`}",
         "--header",
         "Authorization:\${AUTH_HEADER}"
       ],
@@ -105,5 +105,5 @@ await runTool("${toolId}", {
       outgoingWebhookExample,
       mcpConfig,
     };
-  }, [config.apiEndpoint, config.superglueEndpoint, toolId, payload]);
+  }, [config.apiEndpoint, config.apiEndpoint, toolId, payload]);
 }

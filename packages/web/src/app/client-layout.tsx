@@ -26,6 +26,7 @@ export function ClientWrapper({ children, config }: Props) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
   const isEmbeddedPage = pathname?.startsWith("/embedded");
+  const isPortalPage = pathname?.startsWith("/portal");
   const token = useToken();
 
   return (
@@ -36,7 +37,7 @@ export function ClientWrapper({ children, config }: Props) {
             <AgentModalProvider>
               <SystemPickerModalProvider>
                 <div className={`${jetbrainsSans.variable} ${jetbrainsMono.variable} antialiased`}>
-                  {isAuthPage || isEmbeddedPage ? (
+                  {isAuthPage || isEmbeddedPage || isPortalPage ? (
                     children
                   ) : (
                     <div className="flex h-screen overflow-hidden">

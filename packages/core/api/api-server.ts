@@ -2,12 +2,13 @@ import { ServiceMetadata } from "@superglue/shared";
 import Fastify, { FastifyRequest } from "fastify";
 import { registerAllRoutes } from "../api/index.js";
 import { extractTokenFromFastifyRequest, validateToken } from "../auth/auth.js";
-import { DataStore } from "../datastore/types.js";
+import { mcpHandler } from "../mcp/mcp-server.js";
 import { logMessage } from "../utils/logs.js";
 import { generateTraceId } from "../utils/trace-id.js";
 import type { WorkerPools } from "../worker/types.js";
 import { getRoutePermission } from "./registry.js";
 import { AuthenticatedFastifyRequest } from "./types.js";
+import type { DataStore } from "../datastore/types.js";
 
 // Check if restricted API key can access this route (uses route permissions from registry)
 export function checkRestrictedAccess(
@@ -30,35 +31,15 @@ export function checkRestrictedAccess(
     return { allowed: false, error: "This API key cannot access this endpoint" };
   }
 
-  // Check resource-level permission (e.g., toolId must be in allowedTools)
-  if (permissions.checkResourceId) {
-    const params = request.params as Record<string, string>;
-    const resourceId = params[permissions.checkResourceId];
-    // ['*'] means ALL tools are allowed for this restricted key
-    const isAllToolsAllowed =
-      authInfo.allowedTools?.length === 1 && authInfo.allowedTools[0] === "*";
-    if (resourceId && !isAllToolsAllowed && !authInfo.allowedTools?.includes(resourceId)) {
-      return { allowed: false, error: "This API key is not authorized for this tool" };
-    }
-  }
+  // Resource-level permission is now handled by allowedSystems in the async check
+  // The sync check here just validates the route is accessible to restricted keys
 
   return { allowed: true };
 }
 
 export async function startApiServer(datastore: DataStore, workerPools: WorkerPools) {
-  // Get REST API port
   const DEFAULT_API_PORT = 3002;
-  let port = process.env.API_PORT ? parseInt(process.env.API_PORT) : DEFAULT_API_PORT;
-  const graphqlPort = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : undefined;
-
-  if (graphqlPort !== undefined && port === graphqlPort) {
-    logMessage(
-      "warn",
-      `API_PORT cannot be the same as GRAPHQL_PORT. Switching REST API port to ${port + 1}.`,
-    );
-    port = port + 1;
-  }
-  const PORT = port;
+  const PORT = process.env.API_PORT ? parseInt(process.env.API_PORT) : DEFAULT_API_PORT;
 
   const fastify = Fastify({
     logger: false,
@@ -68,6 +49,14 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
   // Register CORS
   await fastify.register(import("@fastify/cors"), {
     origin: true,
+  });
+
+  // Register form body parser for application/x-www-form-urlencoded (used by webhooks)
+  await fastify.register(import("@fastify/formbody"));
+
+  // Register multipart for file uploads (used by /v1/extract)
+  await fastify.register(import("@fastify/multipart"), {
+    limits: { fileSize: 1000000000 },
   });
 
   // Error handler to log errors with traceId
@@ -91,9 +80,12 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
-    const traceId = generateTraceId();
+    // Use client-provided trace ID if available, otherwise generate one
+    const clientTraceId = request.headers["x-trace-id"];
+    const traceId =
+      typeof clientTraceId === "string" && clientTraceId ? clientTraceId : generateTraceId();
 
-    // Skip authentication for health check and public endpoints
+    // Skip authentication for health check
     if (request.url === "/v1/health") {
       const metadata: ServiceMetadata = { traceId };
       logMessage("debug", `(REST API) ${request.method} ${request.url}`, metadata);
@@ -121,16 +113,16 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
 
     const authenticatedRequest = request as AuthenticatedFastifyRequest;
 
+    let allowedSystems: string[] | null | undefined = undefined;
+
     // Add auth info including orgId to request context
     authenticatedRequest.authInfo = {
       orgId: authResult.orgId,
       userId: authResult.userId,
-      userEmail: authResult.userEmail,
-      userName: authResult.userName,
       orgName: authResult.orgName,
       orgRole: authResult.orgRole,
+      allowedSystems,
       isRestricted: authResult.isRestricted,
-      allowedTools: authResult.allowedTools,
     };
 
     // Add datastore, workerPools and traceId to request context
@@ -140,7 +132,12 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
 
     // Add helper method to extract metadata
     authenticatedRequest.toMetadata = function () {
-      return { orgId: this.authInfo.orgId, traceId: this.traceId };
+      return {
+        orgId: this.authInfo.orgId,
+        traceId: this.traceId,
+        userId: this.authInfo.userId,
+        isRestricted: this.authInfo.isRestricted,
+      };
     };
 
     // Check restricted API key access (uses route permissions from registry)
@@ -171,6 +168,17 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
   fastify.get("/v1/health", async (request, reply) => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  // MCP routes - use raw Node request/response with parsed body and auth context
+  const mcpRouteHandler = async (request: any, reply: any) => {
+    const raw = request.raw as any;
+    raw.body = request.body;
+    raw.authInfo = { ...request.authInfo, token: extractTokenFromFastifyRequest(request) };
+    await mcpHandler(raw, reply.raw);
+  };
+  fastify.post("/mcp", mcpRouteHandler);
+  fastify.get("/mcp", mcpRouteHandler);
+  fastify.delete("/mcp", mcpRouteHandler);
 
   // Start server
   try {

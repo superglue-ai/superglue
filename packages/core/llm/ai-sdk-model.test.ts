@@ -1,7 +1,8 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
-import { getDateMessage, getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
+import { getDateMessage, getModelContextLength } from "@superglue/shared/utils";
+import { initializeAIModel } from "@superglue/shared/utils/ai-model-init";
 import { generateText, jsonSchema, tool } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AiSdkModel } from "./ai-sdk-model.js";
@@ -12,12 +13,22 @@ vi.mock("@ai-sdk/openai");
 vi.mock("@ai-sdk/anthropic");
 vi.mock("@ai-sdk/google");
 vi.mock("@superglue/shared/utils");
+vi.mock("@superglue/shared/utils/ai-model-init");
 
 describe("AiSdkModel", () => {
   const mockGenerateText = vi.mocked(generateText);
   const mockTool = vi.mocked(tool);
   const mockJsonSchema = vi.mocked(jsonSchema);
   const MOCK_DATE = "2024-01-01T00:00:00.000Z";
+
+  const mockLLMResponse = (overrides: any = {}) => ({
+    text: "",
+    toolCalls: [],
+    toolResults: [],
+    finishReason: "stop",
+    response: { messages: [{ role: "assistant", content: overrides.text || "" }] },
+    ...overrides,
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,6 +44,7 @@ describe("AiSdkModel", () => {
 
     mockTool.mockImplementation((config: any) => ({ type: "tool", config }) as any);
     mockJsonSchema.mockImplementation((schema: any) => schema as any);
+    mockGenerateText.mockResolvedValue(mockLLMResponse() as any);
 
     vi.mocked(openai.tools.webSearch).mockReturnValue({ type: "web_search_openai" } as any);
     vi.mocked(anthropic.tools.webSearch_20250305).mockReturnValue({
@@ -67,11 +79,12 @@ describe("AiSdkModel", () => {
   describe("generateText", () => {
     it("should generate text response", async () => {
       const model = new AiSdkModel();
-      mockGenerateText.mockResolvedValue({
-        text: "test response",
-        toolCalls: [],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          text: "test response",
+          response: { messages: [{ role: "assistant", content: "test response" }] },
+        }) as any,
+      );
 
       const messages = [
         { role: "system", content: "system prompt" },
@@ -102,11 +115,7 @@ describe("AiSdkModel", () => {
 
     it("should use custom temperature", async () => {
       const model = new AiSdkModel();
-      mockGenerateText.mockResolvedValue({
-        text: "test response",
-        toolCalls: [],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(mockLLMResponse({ text: "test response" }) as any);
 
       await model.generateText([{ role: "user", content: "test" }], 0.7);
 
@@ -123,32 +132,16 @@ describe("AiSdkModel", () => {
       const model = new AiSdkModel();
       const responseObj = { key: "value" };
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: responseObj,
-          },
-        ],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: responseObj }],
+        }) as any,
+      );
 
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
-
+      const schema = { type: "object", properties: { key: { type: "string" } } };
       const messages = [{ role: "user", content: "test" }] as LLMMessage[];
 
-      const result = await model.generateObject({
-        messages: messages,
-        schema: schema,
-        temperature: 0,
-      });
+      const result = await model.generateObject({ messages, schema, temperature: 0 });
 
       expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
@@ -171,28 +164,17 @@ describe("AiSdkModel", () => {
       const model = new AiSdkModel();
       const responseObj = { key: "value" };
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { result: responseObj },
-          },
-        ],
-        toolResults: [],
-      } as any);
-
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [
+            { toolCallId: "call_123", toolName: "submit", input: { result: responseObj } },
+          ],
+        }) as any,
+      );
 
       const result = await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
       });
 
       expect(result.response).toEqual(responseObj);
@@ -201,28 +183,21 @@ describe("AiSdkModel", () => {
     it("should handle abort tool call", async () => {
       const model = new AiSdkModel();
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "abort",
-            input: { reason: "Cannot complete request" },
-          },
-        ],
-        toolResults: [],
-      } as any);
-
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [
+            {
+              toolCallId: "call_123",
+              toolName: "abort",
+              input: { reason: "Cannot complete request" },
+            },
+          ],
+        }) as any,
+      );
 
       const result = await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
       });
 
       expect(result.success).toBe(false);
@@ -232,68 +207,39 @@ describe("AiSdkModel", () => {
     it("should handle o-model temperature", async () => {
       const model = new AiSdkModel("o1-preview");
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { key: "value" },
-          },
-        ],
-        toolResults: [],
-      } as any);
-
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
+        }) as any,
+      );
 
       await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
         temperature: 0.5,
       });
 
       expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          temperature: undefined,
-        }),
+        expect.objectContaining({ temperature: undefined }),
       );
     });
 
     it("should handle custom tools with context", async () => {
       const model = new AiSdkModel();
-      const customToolExecute = vi
-        .fn()
-        .mockResolvedValue({ success: true, data: "custom tool result" });
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { key: "value" },
-          },
-        ],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
+        }) as any,
+      );
 
       const customTools = [
         {
           toolDefinition: {
             name: "custom_tool",
             description: "A custom tool",
-            arguments: {
-              type: "object" as const,
-              properties: {
-                param: { type: "string" },
-              },
-            },
-            execute: customToolExecute,
+            arguments: { type: "object" as const, properties: { param: { type: "string" } } },
+            execute: vi.fn().mockResolvedValue({ success: true, data: "custom tool result" }),
           },
           toolContext: { contextData: "test" },
         },
@@ -305,41 +251,26 @@ describe("AiSdkModel", () => {
         tools: customTools,
       });
 
-      expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
       expect(lastCall.tools).toHaveProperty("custom_tool");
     });
 
     it("should handle custom tools without context", async () => {
       const model = new AiSdkModel();
-      const customToolExecute = vi
-        .fn()
-        .mockResolvedValue({ success: true, data: "custom tool result" });
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { key: "value" },
-          },
-        ],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
+        }) as any,
+      );
 
       const customTools = [
         {
           toolDefinition: {
             name: "custom_tool",
             description: "A custom tool",
-            arguments: {
-              type: "object" as const,
-              properties: {
-                param: { type: "string" },
-              },
-            },
-            execute: customToolExecute,
+            arguments: { type: "object" as const, properties: { param: { type: "string" } } },
+            execute: vi.fn().mockResolvedValue({ success: true, data: "custom tool result" }),
           },
           toolContext: undefined,
         },
@@ -351,7 +282,6 @@ describe("AiSdkModel", () => {
         tools: customTools,
       });
 
-      expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
       expect(lastCall.tools).toHaveProperty("custom_tool");
     });
@@ -359,17 +289,11 @@ describe("AiSdkModel", () => {
     it("should handle web search tool as Record<string, Tool>", async () => {
       const model = new AiSdkModel();
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { key: "value" },
-          },
-        ],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
+        }) as any,
+      );
 
       const webSearchTools = [
         {
@@ -384,7 +308,6 @@ describe("AiSdkModel", () => {
         tools: webSearchTools,
       });
 
-      expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
       expect(lastCall.tools).toHaveProperty("web_search");
     });
@@ -393,45 +316,26 @@ describe("AiSdkModel", () => {
       const model = new AiSdkModel();
 
       mockGenerateText
-        .mockResolvedValueOnce({
-          text: "thinking",
-          toolCalls: [
-            {
-              toolCallId: "call_web",
-              toolName: "web_search",
-              input: { query: "test" },
-            },
-          ],
-          toolResults: [
-            {
-              toolCallId: "call_web",
-              toolName: "web_search",
-              output: "search results",
-            },
-          ],
-        } as any)
-        .mockResolvedValueOnce({
-          text: "",
-          toolCalls: [
-            {
-              toolCallId: "call_submit",
-              toolName: "submit",
-              input: { key: "value" },
-            },
-          ],
-          toolResults: [],
-        } as any);
-
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
+        .mockResolvedValueOnce(
+          mockLLMResponse({
+            text: "thinking",
+            toolCalls: [
+              { toolCallId: "call_web", toolName: "web_search", input: { query: "test" } },
+            ],
+            toolResults: [
+              { toolCallId: "call_web", toolName: "web_search", output: "search results" },
+            ],
+          }) as any,
+        )
+        .mockResolvedValueOnce(
+          mockLLMResponse({
+            toolCalls: [{ toolCallId: "call_submit", toolName: "submit", input: { key: "value" } }],
+          }) as any,
+        );
 
       const result = await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
       });
 
       expect(mockGenerateText).toHaveBeenCalledTimes(2);
@@ -442,29 +346,19 @@ describe("AiSdkModel", () => {
     it("should clean schema by removing patternProperties and setting strict mode", async () => {
       const model = new AiSdkModel();
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { key: "value" },
-          },
-        ],
-        toolResults: [],
-      } as any);
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
+        }) as any,
+      );
 
       const schema = {
         type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-        patternProperties: {
-          "^[a-z]+$": { type: "string" },
-        },
+        properties: { key: { type: "string" } },
+        patternProperties: { "^[a-z]+$": { type: "string" } },
       };
 
-      await model.generateObject({ messages: [{ role: "user", content: "test" }], schema: schema });
+      await model.generateObject({ messages: [{ role: "user", content: "test" }], schema });
 
       // Schema should be cleaned - we can't directly verify this but can check it doesn't throw
       expect(mockGenerateText).toHaveBeenCalled();
@@ -473,31 +367,20 @@ describe("AiSdkModel", () => {
     it("should wrap array schema in object at root level", async () => {
       const model = new AiSdkModel();
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { result: [{ key: "value" }] },
-          },
-        ],
-        toolResults: [],
-      } as any);
-
-      const schema = {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            key: { type: "string" },
-          },
-        },
-      };
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [
+            { toolCallId: "call_123", toolName: "submit", input: { result: [{ key: "value" }] } },
+          ],
+        }) as any,
+      );
 
       const result = await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: {
+          type: "array",
+          items: { type: "object", properties: { key: { type: "string" } } },
+        },
       });
 
       expect(result.response).toEqual([{ key: "value" }]);
@@ -508,16 +391,9 @@ describe("AiSdkModel", () => {
 
       mockGenerateText.mockRejectedValue(new Error("API Error"));
 
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
-
       const result = await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
       });
 
       expect(result.response).toContain("Error: Vercel AI API Error");
@@ -529,57 +405,36 @@ describe("AiSdkModel", () => {
     it("should use custom toolChoice", async () => {
       const model = new AiSdkModel();
 
-      mockGenerateText.mockResolvedValue({
-        text: "",
-        toolCalls: [
-          {
-            toolCallId: "call_123",
-            toolName: "submit",
-            input: { key: "value" },
-          },
-        ],
-        toolResults: [],
-      } as any);
-
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
+        }) as any,
+      );
 
       await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
         toolChoice: "auto",
       });
 
       expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          toolChoice: "auto",
-        }),
+        expect.objectContaining({ toolChoice: "auto" }),
       );
     });
 
     it("should throw error if no tool calls received", async () => {
       const model = new AiSdkModel();
 
-      mockGenerateText.mockResolvedValue({
-        text: "just text",
-        toolCalls: [],
-        toolResults: [],
-      } as any);
-
-      const schema = {
-        type: "object",
-        properties: {
-          key: { type: "string" },
-        },
-      };
+      mockGenerateText.mockResolvedValue(
+        mockLLMResponse({
+          text: "just text",
+          toolCalls: [],
+        }) as any,
+      );
 
       const result = await model.generateObject({
         messages: [{ role: "user", content: "test" }],
-        schema: schema,
+        schema: { type: "object", properties: { key: { type: "string" } } },
       });
 
       expect(result.response).toContain("Error: Vercel AI API Error");
@@ -588,38 +443,23 @@ describe("AiSdkModel", () => {
     describe("maxUses", () => {
       it("should exclude tool after maxUses reached", async () => {
         const model = new AiSdkModel();
-        const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: "result" });
 
-        // First call: tool is used, second call: tool should be excluded, submit is called
         mockGenerateText
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [
-              {
-                toolCallId: "call_1",
-                toolName: "limited_tool",
-                input: { param: "first" },
-              },
-            ],
-            toolResults: [
-              {
-                toolCallId: "call_1",
-                toolName: "limited_tool",
-                output: "first result",
-              },
-            ],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [
-              {
-                toolCallId: "call_2",
-                toolName: "submit",
-                input: { key: "done" },
-              },
-            ],
-            toolResults: [],
-          } as any);
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [
+                { toolCallId: "call_1", toolName: "limited_tool", input: { param: "first" } },
+              ],
+              toolResults: [
+                { toolCallId: "call_1", toolName: "limited_tool", output: "first result" },
+              ],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "call_2", toolName: "submit", input: { key: "done" } }],
+            }) as any,
+          );
 
         const customTools = [
           {
@@ -627,7 +467,7 @@ describe("AiSdkModel", () => {
               name: "limited_tool",
               description: "A tool with limited uses",
               arguments: { type: "object" as const, properties: { param: { type: "string" } } },
-              execute: customToolExecute,
+              execute: vi.fn().mockResolvedValue({ success: true, data: "result" }),
             },
             toolContext: {},
             maxUses: 1,
@@ -641,58 +481,38 @@ describe("AiSdkModel", () => {
         });
 
         expect(mockGenerateText).toHaveBeenCalledTimes(2);
-
-        // First call should have the limited_tool available
-        const firstCallTools = mockGenerateText.mock.calls[0][0].tools;
-        expect(firstCallTools).toHaveProperty("limited_tool");
-
-        // Second call should NOT have the limited_tool (maxUses: 1 reached)
-        const secondCallTools = mockGenerateText.mock.calls[1][0].tools;
-        expect(secondCallTools).not.toHaveProperty("limited_tool");
-        expect(secondCallTools).toHaveProperty("submit");
-        expect(secondCallTools).toHaveProperty("abort");
-
+        expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty("limited_tool");
+        expect(mockGenerateText.mock.calls[1][0].tools).not.toHaveProperty("limited_tool");
+        expect(mockGenerateText.mock.calls[1][0].tools).toHaveProperty("submit");
+        expect(mockGenerateText.mock.calls[1][0].tools).toHaveProperty("abort");
         expect(result.response).toEqual({ key: "done" });
       });
 
       it("should allow tool usage up to maxUses limit", async () => {
         const model = new AiSdkModel();
-        const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: "result" });
 
         mockGenerateText
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [
-              {
-                toolCallId: "call_1",
-                toolName: "limited_tool",
-                input: { param: "first" },
-              },
-            ],
-            toolResults: [{ toolCallId: "call_1", toolName: "limited_tool", output: "r1" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [
-              {
-                toolCallId: "call_2",
-                toolName: "limited_tool",
-                input: { param: "second" },
-              },
-            ],
-            toolResults: [{ toolCallId: "call_2", toolName: "limited_tool", output: "r2" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [
-              {
-                toolCallId: "call_3",
-                toolName: "submit",
-                input: { key: "done" },
-              },
-            ],
-            toolResults: [],
-          } as any);
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [
+                { toolCallId: "call_1", toolName: "limited_tool", input: { param: "first" } },
+              ],
+              toolResults: [{ toolCallId: "call_1", toolName: "limited_tool", output: "r1" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [
+                { toolCallId: "call_2", toolName: "limited_tool", input: { param: "second" } },
+              ],
+              toolResults: [{ toolCallId: "call_2", toolName: "limited_tool", output: "r2" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "call_3", toolName: "submit", input: { key: "done" } }],
+            }) as any,
+          );
 
         const customTools = [
           {
@@ -700,7 +520,7 @@ describe("AiSdkModel", () => {
               name: "limited_tool",
               description: "A tool with limited uses",
               arguments: { type: "object" as const, properties: { param: { type: "string" } } },
-              execute: customToolExecute,
+              execute: vi.fn().mockResolvedValue({ success: true, data: "result" }),
             },
             toolContext: {},
             maxUses: 2,
@@ -714,40 +534,38 @@ describe("AiSdkModel", () => {
         });
 
         expect(mockGenerateText).toHaveBeenCalledTimes(3);
-
-        // First and second calls should have limited_tool
         expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty("limited_tool");
         expect(mockGenerateText.mock.calls[1][0].tools).toHaveProperty("limited_tool");
-
-        // Third call should NOT have limited_tool (used 2 times already)
         expect(mockGenerateText.mock.calls[2][0].tools).not.toHaveProperty("limited_tool");
       });
 
       it("should not limit tools without maxUses", async () => {
         const model = new AiSdkModel();
-        const customToolExecute = vi.fn().mockResolvedValue({ success: true, data: "result" });
 
         mockGenerateText
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c1", toolName: "unlimited_tool", input: {} }],
-            toolResults: [{ toolCallId: "c1", toolName: "unlimited_tool", output: "r" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c2", toolName: "unlimited_tool", input: {} }],
-            toolResults: [{ toolCallId: "c2", toolName: "unlimited_tool", output: "r" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c3", toolName: "unlimited_tool", input: {} }],
-            toolResults: [{ toolCallId: "c3", toolName: "unlimited_tool", output: "r" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c4", toolName: "submit", input: { key: "done" } }],
-            toolResults: [],
-          } as any);
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c1", toolName: "unlimited_tool", input: {} }],
+              toolResults: [{ toolCallId: "c1", toolName: "unlimited_tool", output: "r" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c2", toolName: "unlimited_tool", input: {} }],
+              toolResults: [{ toolCallId: "c2", toolName: "unlimited_tool", output: "r" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c3", toolName: "unlimited_tool", input: {} }],
+              toolResults: [{ toolCallId: "c3", toolName: "unlimited_tool", output: "r" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c4", toolName: "submit", input: { key: "done" } }],
+            }) as any,
+          );
 
         const customTools = [
           {
@@ -755,10 +573,9 @@ describe("AiSdkModel", () => {
               name: "unlimited_tool",
               description: "No limit",
               arguments: { type: "object" as const, properties: {} },
-              execute: customToolExecute,
+              execute: vi.fn().mockResolvedValue({ success: true, data: "result" }),
             },
             toolContext: {},
-            // No maxUses specified
           },
         ];
 
@@ -768,7 +585,6 @@ describe("AiSdkModel", () => {
           tools: customTools,
         });
 
-        // All 4 calls should have unlimited_tool available
         for (let i = 0; i < 3; i++) {
           expect(mockGenerateText.mock.calls[i][0].tools).toHaveProperty("unlimited_tool");
         }
@@ -778,21 +594,23 @@ describe("AiSdkModel", () => {
         const model = new AiSdkModel();
 
         mockGenerateText
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c1", toolName: "tool_a", input: {} }],
-            toolResults: [{ toolCallId: "c1", toolName: "tool_a", output: "r" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c2", toolName: "tool_b", input: {} }],
-            toolResults: [{ toolCallId: "c2", toolName: "tool_b", output: "r" }],
-          } as any)
-          .mockResolvedValueOnce({
-            text: "",
-            toolCalls: [{ toolCallId: "c3", toolName: "submit", input: { key: "done" } }],
-            toolResults: [],
-          } as any);
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c1", toolName: "tool_a", input: {} }],
+              toolResults: [{ toolCallId: "c1", toolName: "tool_a", output: "r" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c2", toolName: "tool_b", input: {} }],
+              toolResults: [{ toolCallId: "c2", toolName: "tool_b", output: "r" }],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            mockLLMResponse({
+              toolCalls: [{ toolCallId: "c3", toolName: "submit", input: { key: "done" } }],
+            }) as any,
+          );
 
         const customTools = [
           {
@@ -823,15 +641,10 @@ describe("AiSdkModel", () => {
           tools: customTools,
         });
 
-        // First call: both tools available
         expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty("tool_a");
         expect(mockGenerateText.mock.calls[0][0].tools).toHaveProperty("tool_b");
-
-        // Second call: tool_a used, so excluded; tool_b still available
         expect(mockGenerateText.mock.calls[1][0].tools).not.toHaveProperty("tool_a");
         expect(mockGenerateText.mock.calls[1][0].tools).toHaveProperty("tool_b");
-
-        // Third call: both excluded
         expect(mockGenerateText.mock.calls[2][0].tools).not.toHaveProperty("tool_a");
         expect(mockGenerateText.mock.calls[2][0].tools).not.toHaveProperty("tool_b");
       });

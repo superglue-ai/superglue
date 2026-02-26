@@ -31,7 +31,7 @@ export interface ToolExecutionResult {
   data?: any;
   error?: string;
   stepResults: ToolStepResult[];
-  config?: Tool;
+  tool?: Tool;
   startedAt: Date;
   completedAt: Date;
 }

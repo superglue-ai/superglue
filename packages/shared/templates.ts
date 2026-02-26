@@ -21,6 +21,7 @@ export interface SystemConfig {
     usePKCE?: boolean;
   };
   keywords?: string[];
+  systemSpecificInstructions?: string;
 }
 
 export const systems: Record<string, SystemConfig> = {
@@ -1144,6 +1145,8 @@ export const systems: Record<string, SystemConfig> = {
         "read:jira-work write:jira-work read:jira-user write:jira-user read:jira-work-management write:jira-work-management read:servicedesk-request write:servicedesk-request manage:jira-project manage:jira-configuration manage:jira-data-provider offline_access",
       client_id: "Az7iTb4uWYSv5N4p295PulP8oO2B3PjK",
     },
+    systemSpecificInstructions:
+      "You need a cloud id in the url to connect to the Jira instance. Fetch it from available-resources and store it in the system. The /rest/api/3/search endpoint has been deprecated - Use GET /rest/api/3/search/jql with query parameter 'jql' for searching issues. MUST specify a project in the JQL query. Example: GET /rest/api/3/search/jql?jql=project=KAN&maxResults=100. The jql parameter accepts JQL queries like 'project=KEY', 'assignee=currentUser()', 'order by created DESC'. Always URL-encode the jql parameter value.",
     keywords: [
       "issues",
       "projects",
@@ -2242,6 +2245,25 @@ export const systems: Record<string, SystemConfig> = {
       "usage",
       "api key",
     ],
+    systemSpecificInstructions: `As of February 2026, these are the available OpenAI API models:
+
+    FLAGSHIP MODELS:
+    - gpt-5.2 - Latest and most capable model (recommended for most use cases)
+    - gpt-5 - Previous flagship model
+    - o4-mini - Optimized reasoning model
+
+    LEGACY MODELS (still available via API):
+    - gpt-4o - Being retired from ChatGPT but still available via API
+    - gpt-4.1 / gpt-4.1-mini - Previous generation models
+    - gpt-4-turbo - Older turbo variant
+    - gpt-3.5-turbo - Legacy model for cost-sensitive applications
+
+    SPECIALIZED MODELS:
+    - text-embedding-3-large / text-embedding-3-small - For embeddings
+    - dall-e-3 - Image generation
+    - whisper-1 - Audio transcription
+    - tts-1 / tts-1-hd - Text-to-speech
+    `,
   },
   anthropic: {
     name: "anthropic",
@@ -2261,6 +2283,30 @@ export const systems: Record<string, SystemConfig> = {
       "streaming",
       "api key",
     ],
+    systemSpecificInstructions: `As of February 2026, these are the available Anthropic Claude API models:
+
+    LATEST MODELS:
+    - claude-opus-4-6 - Most intelligent model for agents and coding (200K / 1M beta context, 128K output)
+    - claude-sonnet-4-6 - Best speed/intelligence balance (200K / 1M beta context, 64K output)
+    - claude-haiku-4-5-20251001 (alias: claude-haiku-4-5) - Fastest model (200K context, 64K output)
+
+    OLDER CLAUDE 4 VERSIONS (still active):
+    - claude-sonnet-4-5-20250929 (alias: claude-sonnet-4-5) - Previous Sonnet version
+    - claude-opus-4-5-20251101 (alias: claude-opus-4-5) - Previous Opus version
+    - claude-opus-4-1-20250805 (alias: claude-opus-4-1) - Earlier Opus version
+    - claude-sonnet-4-20250514 (alias: claude-sonnet-4-0) - Original Claude 4 Sonnet
+    - claude-opus-4-20250514 (alias: claude-opus-4-0) - Original Claude 4 Opus
+
+    DEPRECATED (retiring Apr 19, 2026):
+    - claude-3-haiku-20240307 - Claude 3 Haiku (use claude-haiku-4-5 instead)
+
+    RETIRED (no longer available):
+    - claude-3-7-sonnet-20250219 (retired Feb 2026)
+    - claude-3-5-haiku-20241022 (retired Feb 2026)
+    - claude-3-5-sonnet-* (retired Oct 2025)
+    - claude-3-opus-20240229 (retired Jan 2026)
+    - claude-2.*, claude-3-sonnet-* (retired Jul 2025)
+`,
   },
   pinecone: {
     name: "pinecone",
@@ -2320,8 +2366,8 @@ export const systems: Record<string, SystemConfig> = {
   microsoft: {
     name: "microsoft",
     apiUrl: "https://graph.microsoft.com",
-    regex: "^.*(microsoft|graph\\.microsoft|office|outlook|live\\.com).*$",
-    icon: "microsoft",
+    regex: "^.*(microsoft|graph\\.microsoft|office|outlook|live\\.com|sharepoint).*$",
+    icon: "default",
     docsUrl: "https://learn.microsoft.com/en-us/graph/api/overview",
     preferredAuthType: "oauth",
     oauth: {
@@ -2348,6 +2394,12 @@ export const systems: Record<string, SystemConfig> = {
       "graph",
       "oauth",
     ],
+    systemSpecificInstructions: `Azure App Registration Required: Create an app in Azure Portal → App registrations with redirect URI: https://app.superglue.cloud/api/auth/callback
+    Tenant-Specific Endpoints: Multi-tenant apps need tenant ID in OAuth URLs (/04a63d67.../oauth2/v2.0/authorize) instead of /common endpoint
+    Credentials Needed: Application (client) ID + Client Secret (generated under Certificates & secrets - copy the Value immediately, not the Secret ID)
+    API Permissions: Add Microsoft Graph permissions (e.g., Sites.ReadWrite.All) under API permissions, then grant admin consent if you have admin rights
+    Scopes Must Include: Always add offline_access scope to get refresh tokens for long-term access without re-authentication 
+    `,
   },
   redis: {
     name: "redis",
@@ -2710,6 +2762,42 @@ export const systems: Record<string, SystemConfig> = {
       "api key",
     ],
   },
+  alphavantage: {
+    name: "alphavantage",
+    apiUrl: "https://www.alphavantage.co",
+    regex: "^.*alphavantage.*$",
+    icon: "chart-line",
+    docsUrl: "https://www.alphavantage.co/documentation/",
+    preferredAuthType: "apikey",
+    keywords: [
+      "stocks",
+      "quote",
+      "time series",
+      "intraday",
+      "daily",
+      "weekly",
+      "monthly",
+      "crypto",
+      "forex",
+      "commodities",
+      "technical indicators",
+      "fundamental data",
+      "earnings",
+      "company overview",
+      "market data",
+      "financial markets",
+      "api key",
+    ],
+  },
+  superglueEmail: {
+    name: "superglueEmail",
+    apiUrl: "https://api.superglue.cloud/v1/notify/email",
+    regex: "^.*api\\.superglue\\.cloud.*$",
+    icon: "lucide:mail",
+    docsUrl: "https://docs.superglue.cloud/guides/email-service",
+    preferredAuthType: "apikey",
+    keywords: ["email", "send", "notification", "transactional", "demo", "superglue", "api key"],
+  },
   googleAds: {
     name: "googleAds",
     apiUrl: "https://googleads.googleapis.com/v20",
@@ -2814,6 +2902,49 @@ export const systems: Record<string, SystemConfig> = {
     preferredAuthType: "apikey",
     keywords: ["crawl", "scrape", "extract", "search", "pdf", "web", "html", "markdown", "api key"],
   },
+  procore: {
+    name: "procore",
+    apiUrl: "https://api.procore.com/rest/",
+    regex: "^.*procore.*$",
+    icon: "procore",
+    docsUrl: "https://developers.procore.com/reference/rest/docs/rest-api-overview",
+    openApiUrl:
+      "https://raw.githubusercontent.com/procore/open-api-spec/refs/heads/master/pub-api.swagger.json",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://login.procore.com/oauth/authorize",
+      tokenUrl: "https://login.procore.com/oauth/token",
+      scopes: "",
+    },
+    systemSpecificInstructions: `Setup: 1) Create app at developers.procore.com → My Apps → Create New App. 2) Add a "Data Connector Component" with User-level Authentication, then create a version. 3) Under OAuth Credentials, set the Redirect URI to the superglue callback URL (e.g. https://app.superglue.cloud/api/auth/callback). 4) Copy the Client ID and Client Secret — these are the only credentials superglue needs. For sandbox testing, use login-sandbox.procore.com for auth and sandbox.procore.com for API calls instead of the production URLs. The app must be installed on the target company before API calls will work (via the Developer Portal for sandbox, or the App Marketplace for production). Procore does not use granular OAuth scopes — access is controlled by the app's component permissions in the Developer Portal.
+
+IMPORTANT: Sandbox and production use completely separate credentials and base URLs — never mix them. Sandbox: login-sandbox.procore.com (auth) + sandbox.procore.com (API). Production: login.procore.com (auth) + api.procore.com (API). OAuth scopes must be left empty — Procore does not accept standard OAuth scope strings and will return an "invalid scope" error. All API requests require a Procore-Company-Id header with the numeric company ID (visible in the browser URL when logged into Procore, e.g. {domain}/{company_id}/...), and the app must be explicitly installed/connected to that company before any API calls will succeed. The REST API base path is /rest/v1.0/ and most resources are nested under /companies/{company_id}/ or /projects/{project_id}/. Procore has both v1.0 (/rest/v1.0/) and v2.0 (/rest/v2.0/) APIs. Most resources exist in both, but new resources (e.g. RFIs) are v2-only. Check the API reference for which version applies to each endpoint. To get started, call /rest/v1.0/me to verify authentication and /rest/v1.0/companies/{company_id}/projects to list available projects.`,
+    keywords: [
+      "projects",
+      "rfis",
+      "submittals",
+      "drawings",
+      "documents",
+      "punch items",
+      "observations",
+      "inspections",
+      "incidents",
+      "daily logs",
+      "budgets",
+      "commitments",
+      "change orders",
+      "prime contracts",
+      "purchase orders",
+      "schedule",
+      "directory",
+      "photos",
+      "specifications",
+      "meetings",
+      "tasks",
+      "timesheets",
+      "oauth",
+    ],
+  },
   gemini: {
     name: "gemini",
     apiUrl:
@@ -2841,16 +2972,12 @@ export const systemOptions = [
 /**
  * Find matching template for a System object.
  * Priority order: templateName > id > id with numeric suffix stripped > name > urlHost regex match
- * @param system - System object with templateName, id, name, and/or urlHost/urlPath
+ * @param system - System object with templateName, id, name, and/or url
  * @returns The matching template key and config, or null if no match found
  */
-export function findTemplateForSystem(system: {
-  templateName?: string;
-  id?: string;
-  name?: string;
-  urlHost?: string;
-  urlPath?: string;
-}): { key: string; template: SystemConfig } | null {
+export function findTemplateForSystem(
+  system: Partial<System>,
+): { key: string; template: SystemConfig } | null {
   // 1. Direct lookup via stored templateName (highest priority)
   if (system.templateName && systems[system.templateName]) {
     return { key: system.templateName, template: systems[system.templateName] };
@@ -2874,15 +3001,13 @@ export function findTemplateForSystem(system: {
     return { key: system.name, template: systems[system.name] };
   }
 
-  // 5. URL regex matching (lowest priority) - compose urlHost + urlPath for matching
-  if (system.urlHost) {
-    const url = system.urlPath
-      ? `${system.urlHost.replace(/\/$/, "")}/${system.urlPath.replace(/^\//, "")}`
-      : system.urlHost;
-
+  // 5. URL regex matching (lowest priority)
+  if (system.url) {
     // Ensure URL has a scheme for proper matching
     const urlForMatching =
-      url.startsWith("http") || url.startsWith("postgres") ? url : `https://${url}`;
+      system.url.startsWith("http") || system.url.startsWith("postgres")
+        ? system.url
+        : `https://${system.url}`;
 
     const matches: { key: string; template: SystemConfig; specificity: number }[] = [];
 
@@ -2906,6 +3031,36 @@ export function findTemplateForSystem(system: {
   }
 
   return null;
+}
+
+export function uniqueKeywords(keywords: string[] | undefined): string[] {
+  if (!keywords || keywords.length === 0) return [];
+  return [...new Set(keywords)];
+}
+
+export function enrichWithTemplate(input: System): System {
+  const match = findTemplateForSystem(input);
+
+  if (!match) {
+    return input;
+  }
+
+  const { key: templateKey, template: matchingTemplate } = match;
+
+  const mergedUniqueKeywords = uniqueKeywords([
+    ...(input.documentationKeywords || []),
+    ...(matchingTemplate.keywords || []),
+  ]);
+
+  input.openApiUrl = input.openApiUrl || matchingTemplate.openApiUrl;
+  input.openApiSchema = input.openApiSchema || matchingTemplate.openApiSchema;
+  input.documentationUrl = input.documentationUrl || matchingTemplate.docsUrl;
+  input.url = input.url || matchingTemplate.apiUrl;
+  input.documentationKeywords = mergedUniqueKeywords;
+  if (!input.templateName) {
+    input.templateName = templateKey;
+  }
+  return input;
 }
 
 /**
@@ -2978,12 +3133,19 @@ export function getOAuthTokenUrl(system: System): string {
   }
 
   // Fallback: Default OAuth token endpoint
-  if (!system.urlHost) {
+  if (!system.url) {
     throw new Error(
-      `Cannot determine OAuth token URL for system ${system.id}: no urlHost or token_url provided`,
+      `Cannot determine OAuth token URL for system ${system.id}: no url or token_url provided`,
     );
   }
-  return `${system.urlHost}/oauth/token`;
+
+  // Extract host from url
+  try {
+    const urlObj = new URL(system.url.startsWith("http") ? system.url : `https://${system.url}`);
+    return `${urlObj.origin}/oauth/token`;
+  } catch {
+    return `${system.url}/oauth/token`;
+  }
 }
 
 export interface SdkCodegenOptions {
@@ -3016,8 +3178,8 @@ const client = new SuperglueClient({
 });
 
 async function main() {
-  const result = await client.executeWorkflow({
-      id: "${workflowId}",
+  const result = await client.runTool({
+      toolId: "${workflowId}",
       payload: ${JSON.stringify(payload, null, 2)}
   });
   console.log(result);

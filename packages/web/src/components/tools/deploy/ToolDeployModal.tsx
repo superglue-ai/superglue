@@ -15,19 +15,42 @@ interface ToolDeployModalProps {
   onClose: () => void;
 }
 
+function EnterpriseBanner({ feature }: { feature: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
+      <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+      <div>
+        <p className="text-sm font-medium">{feature} is an Enterprise feature</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Upgrade to superglue Enterprise to use {feature.toLowerCase()}s. Visit{" "}
+          <a
+            href="https://superglue.cloud"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            superglue.ai
+          </a>{" "}
+          to learn more.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ToolDeployModal({
   currentTool,
   payload,
   isOpen,
   onClose = () => {},
 }: ToolDeployModalProps) {
-  const [activeTab, setActiveTab] = useState("schedule");
+  const [activeTab, setActiveTab] = useState("sdk");
 
   const snippets = useToolCodeSnippets(currentTool.id, payload);
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab("schedule");
+      setActiveTab("sdk");
     }
   }, [isOpen]);
 
@@ -44,14 +67,12 @@ export function ToolDeployModal({
         </DialogHeader>
 
         <div className="flex-1 flex flex-col overflow-hidden gap-4">
-          {/* Tool ID section */}
           <div className="space-y-3 flex-shrink-0">
             <p className="text-muted-foreground">
               Your tool is ready to use in production. Choose how you want to deploy it:
             </p>
           </div>
 
-          {/* Tabs */}
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
@@ -76,55 +97,15 @@ export function ToolDeployModal({
               </TabsTrigger>
             </TabsList>
 
-            {/* Schedule Tab */}
             {activeTab === "schedule" && (
               <TabsContent
                 value="schedule"
                 className="flex flex-col gap-6 mt-4 overflow-y-auto flex-1"
               >
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">
-                    Automate your workflow by scheduling it to run at specific times or intervals.
-                  </p>
-                </div>
-
-                <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-4">
-                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100">
-                      Enterprise Feature
-                    </p>
-                    <p className="text-blue-700 dark:text-blue-300 mt-1">
-                      Scheduled execution is available on our Enterprise plan.{" "}
-                      <a
-                        href="https://cal.com/superglue/superglue-demo"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-blue-900 dark:hover:text-blue-100 inline-flex items-center gap-1"
-                      >
-                        Book a demo
-                        <ExternalLink className="h-3 w-3" />
-                      </a>{" "}
-                      to learn more.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-sm text-muted-foreground ">
-                  <a
-                    href="https://docs.superglue.cloud/guides/deploying-a-tool#scheduled-execution"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    Learn more about scheduling tools
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
+                <EnterpriseBanner feature="Scheduling" />
               </TabsContent>
             )}
 
-            {/* SDK/API Tab */}
             {activeTab === "sdk" && (
               <TabsContent value="sdk" className="mt-4 overflow-y-auto overflow-x-hidden flex-1">
                 <div className="space-y-2 mb-4">
@@ -145,32 +126,51 @@ export function ToolDeployModal({
               </TabsContent>
             )}
 
-            {/* Webhooks Tab */}
             {activeTab === "webhook" && (
               <TabsContent
                 value="webhook"
                 className="flex flex-col gap-6 mt-4 overflow-y-auto flex-1"
               >
-                <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-4">
-                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100">
-                      Enterprise Feature
-                    </p>
-                    <p className="text-blue-700 dark:text-blue-300 mt-1">
-                      Webhooks are available on our Enterprise plan.{" "}
-                      <a
-                        href="https://cal.com/superglue/superglue-demo"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-blue-900 dark:hover:text-blue-100 inline-flex items-center gap-1"
-                      >
-                        Book a demo
-                        <ExternalLink className="h-3 w-3" />
-                      </a>{" "}
-                      to learn more.
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-medium mb-1">Trigger via Webhook</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Trigger this tool from external services like Stripe, GitHub, or any system
+                      that can send HTTP POST requests. The request body becomes the tool's input.
                     </p>
                   </div>
+
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Webhook URL</div>
+                    <CodeSnippet code={snippets.webhookUrl} language="bash" />
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Example</div>
+                    <CodeSnippet code={snippets.webhookCurl} language="bash" />
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Create an API key at{" "}
+                    <a href="/api-keys" className="underline hover:text-foreground">
+                      API Keys
+                    </a>{" "}
+                    and configure this URL in your external service's webhook settings.
+                  </p>
+                </div>
+
+                <hr className="border-border" />
+
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-medium mb-1">Notify on Completion</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Get notified when your tool execution completes. Specify a webhook URL when
+                      executing the tool, and superglue will POST the results to that endpoint.
+                    </p>
+                  </div>
+
+                  <CodeSnippet code={snippets.outgoingWebhookExample} language="javascript" />
                 </div>
 
                 <div className="text-sm text-muted-foreground">
@@ -187,7 +187,6 @@ export function ToolDeployModal({
               </TabsContent>
             )}
 
-            {/* MCP Tab */}
             {activeTab === "mcp" && (
               <TabsContent value="mcp" className="flex flex-col gap-4 mt-4 overflow-y-auto flex-1">
                 <div className="space-y-2">

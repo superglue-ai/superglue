@@ -13,9 +13,16 @@ type JsonCodeEditorProps = {
   readOnly?: boolean;
   minHeight?: string;
   maxHeight?: string;
+  height?: string;
+  resizeHandleProps?: {
+    className: string;
+    style: React.CSSProperties;
+    onMouseDown: (e: React.MouseEvent) => void;
+  };
   placeholder?: string;
   overlay?: React.ReactNode;
   bottomRightOverlay?: React.ReactNode;
+  overlayPlacement?: "default" | "corner";
   resizable?: boolean;
   showValidation?: boolean;
 };
@@ -26,14 +33,17 @@ export const JsonCodeEditor = ({
   readOnly = false,
   minHeight = "150px",
   maxHeight = "300px",
+  height,
+  resizeHandleProps,
   placeholder = "{}",
   overlay,
   bottomRightOverlay,
+  overlayPlacement = "default",
   resizable = false,
   showValidation = false,
 }: JsonCodeEditorProps) => {
   const { theme, onMount } = useMonacoTheme();
-  const { height: resizableHeight, resizeHandleProps } = useResizable({
+  const { height: resizableHeight, resizeHandleProps: internalResizeHandleProps } = useResizable({
     minHeight: 100,
     maxHeight: 1000,
     initialHeight: parseInt(maxHeight),
@@ -47,24 +57,43 @@ export const JsonCodeEditor = ({
     return base;
   }, [value, placeholder, readOnly]);
 
-  const effectiveHeight = resizable ? resizableHeight : maxHeight;
+  const effectiveHeight = height ?? (resizable ? resizableHeight : maxHeight);
+  const effectiveResizeHandleProps =
+    resizeHandleProps ?? (resizable ? internalResizeHandleProps : null);
 
   return (
     <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")}>
       {overlay && (
-        <div className="absolute top-1 right-1 z-10 mr-5 flex items-center gap-1">{overlay}</div>
+        <div
+          className={cn(
+            "absolute z-10 flex items-center gap-1",
+            overlayPlacement === "corner" ? "top-2 right-2" : "top-1 right-1 mr-5",
+          )}
+        >
+          {overlay}
+        </div>
       )}
       {bottomRightOverlay && (
-        <div className="absolute bottom-1 right-1 z-10 mr-5 flex items-center gap-1">
+        <div
+          className={cn(
+            "absolute z-10 flex items-center gap-1",
+            overlayPlacement === "corner" ? "bottom-2 right-2" : "bottom-1 right-1 mr-5",
+          )}
+        >
           {bottomRightOverlay}
         </div>
       )}
       {!overlay && (
-        <div className="absolute top-1 right-1 z-10 mr-5">
+        <div
+          className={cn(
+            "absolute z-10",
+            overlayPlacement === "corner" ? "top-2 right-2" : "top-1 right-1 mr-5",
+          )}
+        >
           <CopyButton text={value || placeholder} />
         </div>
       )}
-      {resizable && <div {...resizeHandleProps} />}
+      {effectiveResizeHandleProps && <div {...effectiveResizeHandleProps} />}
       <div
         className={cn("overflow-hidden px-3", readOnly ? "cursor-not-allowed" : "cursor-text")}
         style={{ height: effectiveHeight }}

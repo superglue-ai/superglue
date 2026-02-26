@@ -2,6 +2,8 @@ import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createVertex } from "@ai-sdk/google-vertex";
+import { createVertexAnthropic } from "@ai-sdk/google-vertex/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 
 /**
@@ -104,9 +106,45 @@ export function initializeAIModel(options?: {
       modelId = process.env.BEDROCK_MODEL || defaultModel;
       break;
     }
+    case "vertex": {
+      modelId = process.env.VERTEX_MODEL || defaultModel;
+      const isAnthropicModel = modelId.startsWith("claude");
+      if (isAnthropicModel) {
+        const anthropicVertexOptions: any = {};
+        if (process.env.VERTEX_PROJECT) {
+          anthropicVertexOptions.project = process.env.VERTEX_PROJECT;
+        }
+        if (process.env.VERTEX_LOCATION) {
+          anthropicVertexOptions.location = process.env.VERTEX_LOCATION;
+        }
+        if (process.env.VERTEX_CLIENT_EMAIL && process.env.VERTEX_PRIVATE_KEY) {
+          anthropicVertexOptions.googleAuthOptions = {
+            credentials: {
+              client_email: process.env.VERTEX_CLIENT_EMAIL,
+              private_key: process.env.VERTEX_PRIVATE_KEY,
+            },
+          };
+        } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          anthropicVertexOptions.googleAuthOptions = {
+            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+          };
+        }
+        provider = createVertexAnthropic(anthropicVertexOptions);
+      } else {
+        const vertexOptions: any = { apiKey: process.env.VERTEX_API_KEY };
+        if (process.env.VERTEX_PROJECT) {
+          vertexOptions.project = process.env.VERTEX_PROJECT;
+        }
+        if (process.env.VERTEX_LOCATION) {
+          vertexOptions.location = process.env.VERTEX_LOCATION;
+        }
+        provider = createVertex(vertexOptions);
+      }
+      break;
+    }
     default:
       throw new Error(
-        `Invalid provider: ${providerType} for variable ${providerEnvVar}. Must be one of: anthropic, openai, gemini, azure, bedrock`,
+        `Invalid provider: ${providerType}. Must be one of: anthropic, openai, gemini, azure, bedrock, vertex`,
       );
   }
 

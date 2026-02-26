@@ -1,31 +1,23 @@
 "use client";
-
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, ReactNode, useEffect, useRef } from "react";
 import { tokenRegistry } from "../lib/token-registry";
 
 interface Config {
-  superglueEndpoint: string;
   superglueApiKey: string;
   apiEndpoint: string;
   postHogKey: string;
   postHogHost: string;
 }
 
-interface ConfigWithoutKey extends Omit<Config, "superglueApiKey"> {}
+interface ConfigWithoutApiKey extends Omit<Config, "superglueApiKey"> {}
 
-const ConfigContext = createContext<ConfigWithoutKey | null>(null);
+const ConfigContext = createContext<ConfigWithoutApiKey | null>(null);
 
-export function ConfigProvider({
-  children,
-  config,
-}: {
-  children: React.ReactNode;
-  config: Config;
-}) {
-  const initialTokenSetRef = useRef(false);
-  if (!initialTokenSetRef.current) {
-    initialTokenSetRef.current = true;
+export function ConfigProvider({ children, config }: { children: ReactNode; config: Config }) {
+  const isInitialTokenSetRef = useRef<boolean>(false);
+  if (!isInitialTokenSetRef.current) {
     tokenRegistry.setToken(config.superglueApiKey);
+    isInitialTokenSetRef.current = true;
   }
 
   useEffect(() => {
@@ -34,7 +26,6 @@ export function ConfigProvider({
     }
   }, [config.superglueApiKey]);
 
-  // remove it to make sure it won't be used
   const { superglueApiKey, ...lightConfig } = config;
 
   return <ConfigContext.Provider value={lightConfig}>{children}</ConfigContext.Provider>;
@@ -46,4 +37,8 @@ export function useConfig() {
     throw new Error("useConfig must be used within a ConfigProvider");
   }
   return config;
+}
+
+export function useSupabaseClient(): any {
+  return null;
 }

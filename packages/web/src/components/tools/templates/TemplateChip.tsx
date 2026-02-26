@@ -1,7 +1,7 @@
 import { cn } from "@/src/lib/general-utils";
 import { truncateTemplateValue } from "@/src/lib/templating-utils";
 import { maskCredentials } from "@superglue/shared";
-import { Code2, X } from "lucide-react";
+import { Code2, FileJson, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { TemplateEditPopover } from "./TemplateEditPopover";
 import { useExecution } from "../context/tool-execution-context";
@@ -12,6 +12,8 @@ interface TemplateChipProps {
   error?: string;
   hasResult?: boolean;
   isEvaluating?: boolean;
+  maxPreviewLength?: number;
+  maxWidthPx?: number;
   onUpdate: (newTemplate: string) => void;
   onDelete: () => void;
   stepId: string;
@@ -23,6 +25,7 @@ interface TemplateChipProps {
   hideDelete?: boolean;
   popoverTitle?: string;
   popoverHelpText?: string;
+  isPayloadRef?: boolean;
 }
 
 export function TemplateChip({
@@ -31,6 +34,8 @@ export function TemplateChip({
   error,
   hasResult = true,
   isEvaluating = false,
+  maxPreviewLength,
+  maxWidthPx,
   onUpdate,
   onDelete,
   stepId,
@@ -42,6 +47,7 @@ export function TemplateChip({
   hideDelete = false,
   popoverTitle,
   popoverHelpText,
+  isPayloadRef = false,
 }: TemplateChipProps) {
   const { getStepTemplateData } = useExecution();
   const { credentials, canExecute } = getStepTemplateData(stepId);
@@ -63,6 +69,7 @@ export function TemplateChip({
   let displayText: string;
   let isTruncated = false;
   let originalSize = 0;
+  const previewMaxLength = maxPreviewLength ?? 150;
 
   if (hasError) {
     displayText = `Error: ${error.slice(0, 50)}${error.length > 50 ? "..." : ""}`;
@@ -88,7 +95,7 @@ export function TemplateChip({
 
     originalSize = fullDisplayText.length;
     const masked = maskCredentials(fullDisplayText, credentials);
-    const truncated = truncateTemplateValue(masked, 150);
+    const truncated = truncateTemplateValue(masked, previewMaxLength);
     displayText = truncated.display;
     isTruncated = truncated.truncated;
     originalSize = truncated.originalSize;
@@ -194,7 +201,17 @@ export function TemplateChip({
           <Code2 className="h-3 w-3" />
         )}
       </span>
-      <span className="max-w-[200px] truncate">{displayText}</span>
+      <span
+        className="max-w-[200px] truncate"
+        style={maxWidthPx ? { maxWidth: `${maxWidthPx}px` } : undefined}
+      >
+        {displayText}
+      </span>
+      {isPayloadRef && (
+        <span className="shrink-0" title="Sourced from tool input">
+          <FileJson className="h-3 w-3 opacity-80" strokeWidth={3} />
+        </span>
+      )}
     </span>
   );
 

@@ -11,7 +11,7 @@ export const server_defaults = {
   MAX_PAGINATION_REQUESTS: 1_000,
   WORKER_POOLS: {
     EXECUTE_TOOL_WORKER_POOL: {
-      SIZE: 6,
+      SIZE: 12,
       MEMORY_MB: 4096,
     },
   },
@@ -67,6 +67,11 @@ export const server_defaults = {
     OAUTH_SECRET_TTL_MS: 5 * 60 * 1000, // 5 minutes
   },
   FTP: {
+    DEFAULT_TIMEOUT: 600000, // 10 minutes
+    DEFAULT_RETRIES: 0,
+    DEFAULT_RETRY_DELAY: 1000, // 1 second
+  },
+  SMB: {
     DEFAULT_TIMEOUT: 600000, // 10 minutes
     DEFAULT_RETRIES: 0,
     DEFAULT_RETRY_DELAY: 1000, // 1 second

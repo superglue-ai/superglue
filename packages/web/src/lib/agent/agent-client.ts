@@ -1,38 +1,52 @@
-import { Message, SuperglueClient } from "@superglue/shared";
-import { initializeAIModel } from "@superglue/shared/utils";
+import { Message } from "@superglue/shared";
+import { initializeAIModel } from "@superglue/shared/utils/ai-model-init";
 import { LanguageModel, stepCountIs, streamText } from "ai";
-import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
+import { SSESubscriptionClient } from "../sse-subscriptions";
 import {
   AgentRequest,
+  ExecutionMode,
   ToolExecutionContext,
-  ToolRegistryEntry,
   ValidatedAgentRequest,
+  TextDeltaPart,
+  ToolCallPart,
+  ToolInputStartPart,
+  ToolResultPart,
+  ToolErrorPart,
+  ErrorPart,
 } from "./agent-types";
 import {
-  processConfirmation,
   validateAgentRequest,
   prepareMessages,
   buildToolsForAISDK,
+  processConfirmations,
 } from "./agent-request";
-import { TOOL_REGISTRY } from "./registry/tools";
-import { processToolPolicy } from "./registry/tool-policies";
-import type { ToolConfirmationMetadata } from "@/src/components/agent/hooks/types";
+import { TOOL_REGISTRY } from "./registry/tool-definitions";
+import { getEffectiveMode, getPendingOutput } from "./registry/tool-policies";
+import { EESuperglueClient } from "../ee-superglue-client";
+import { getErrorMessage } from "./agent-helpers";
 
 export interface StreamChunk {
   type:
     | "content"
+    | "system_message"
     | "tool_call_start"
     | "tool_call_complete"
-    | "tool_call_error"
     | "tool_call_update"
-    | "done";
+    | "done"
+    | "paused"
+    | "error";
   content?: string;
+  errorDetails?: string; // Technical error details for collapsible display
+  systemMessage?: {
+    id: string;
+    content: string;
+  };
   toolCall?: {
     id: string;
     name: string;
     input?: any;
     output?: any;
-    status?: "completed" | "declined";
+    status?: "completed" | "declined" | "awaiting_confirmation";
     error?: string;
     logs?: Array<{
       id: string;
@@ -43,21 +57,22 @@ export interface StreamChunk {
       orgId?: string;
     }>;
   };
-  confirmation?: ToolConfirmationMetadata;
+  executionMode?: ExecutionMode;
+  awaitingConfirmation?: boolean;
+  pauseReason?: "awaiting_confirmation";
 }
 
 export interface AgentClientConfig {
   token: string;
-  graphqlEndpoint: string;
-  apiEndpoint?: string;
+  apiEndpoint: string;
   abortSignal?: AbortSignal;
 }
 
 export class AgentClient {
   private config: AgentClientConfig;
   private model: LanguageModel;
-  private subscriptionClient: GraphQLSubscriptionClient | null = null;
-  private superglueClient: SuperglueClient;
+  private subscriptionClient: SSESubscriptionClient;
+  private superglueClient: EESuperglueClient;
 
   constructor(config: AgentClientConfig) {
     this.config = config;
@@ -67,17 +82,16 @@ export class AgentClient {
       defaultModel: "claude-sonnet-4-5",
     });
 
-    this.superglueClient = new SuperglueClient({
-      endpoint: config.graphqlEndpoint,
+    this.superglueClient = new EESuperglueClient({
       apiKey: config.token,
       apiEndpoint: config.apiEndpoint,
     });
 
-    this.subscriptionClient = new GraphQLSubscriptionClient(config.graphqlEndpoint, config.token);
+    this.subscriptionClient = new SSESubscriptionClient(config.apiEndpoint, config.token);
   }
 
   disconnect(): void {
-    this.subscriptionClient?.disconnect();
+    this.subscriptionClient.disconnect();
   }
 
   private checkAborted(): void {
@@ -109,51 +123,6 @@ export class AgentClient {
     });
   }
 
-  private async *preprocessConfirmations(
-    messages: Message[],
-    toolRegistry: Record<string, ToolRegistryEntry>,
-    ctx: ToolExecutionContext,
-  ): AsyncGenerator<StreamChunk> {
-    for (const message of messages) {
-      if (message.role !== "assistant" || !message.parts) continue;
-
-      for (const part of message.parts) {
-        if (part.type !== "tool" || !part.tool) continue;
-
-        const tool = part.tool;
-        const toolEntry = toolRegistry[tool.name];
-        if (!toolEntry?.confirmation) continue;
-        if (!tool.output) continue;
-
-        let parsedOutput: any;
-        try {
-          parsedOutput = typeof tool.output === "string" ? JSON.parse(tool.output) : tool.output;
-        } catch {
-          continue;
-        }
-
-        if (!parsedOutput.confirmationState) continue;
-
-        const result = await processConfirmation(tool.name, tool.input, tool.output, ctx);
-
-        if (result) {
-          tool.output = result.output;
-          tool.status = result.status;
-
-          yield {
-            type: "tool_call_complete",
-            toolCall: {
-              id: tool.id,
-              name: tool.name,
-              output: result.output,
-              status: result.status,
-            },
-          };
-        }
-      }
-    }
-  }
-
   private convertToAIMessages(messages: Array<Message>): any[] {
     const aiMessages: any[] = [];
 
@@ -166,9 +135,19 @@ export class AgentClient {
         if (msg.parts) {
           for (const part of msg.parts) {
             if (part.type === "content") {
+              if (!part.content?.trim()) continue;
               aiMessages.push({
                 role: "assistant",
                 content: [{ type: "text", text: part.content }],
+              });
+            } else if (part.type === "error") {
+              // Include error messages in the conversation so the LLM knows what happened
+              const errorText = part.errorDetails
+                ? `[Error: ${part.content}]\nDetails: ${part.errorDetails}`
+                : `[Error: ${part.content}]`;
+              aiMessages.push({
+                role: "assistant",
+                content: [{ type: "text", text: errorText }],
               });
             } else if (part.type === "tool") {
               if (part.tool?.status === "awaiting_confirmation") {
@@ -176,7 +155,7 @@ export class AgentClient {
               }
 
               if (part.tool?.id && part.tool?.name) {
-                let output: { type: "error-text" | "json" | "text"; value: any };
+                let output: { type: "error-text" | "json"; value: any };
 
                 switch (part.tool.status) {
                   case "pending":
@@ -189,6 +168,7 @@ export class AgentClient {
                     output = { type: "error-text", value: "Tool running" };
                     break;
                   case "completed":
+                  case "error": {
                     let outputObj = part.tool.output ?? {};
                     if (typeof outputObj === "string") {
                       try {
@@ -204,12 +184,7 @@ export class AgentClient {
                     }
                     output = { type: "json", value: outputObj };
                     break;
-                  case "error":
-                    output = {
-                      type: "error-text",
-                      value: part.tool.error || "Unknown error",
-                    };
-                    break;
+                  }
                   default:
                     output = { type: "error-text", value: "Unknown tool status" };
                 }
@@ -256,9 +231,7 @@ export class AgentClient {
     return validateAgentRequest(body);
   }
 
-  async *streamResponse(request: AgentRequest): AsyncGenerator<StreamChunk> {
-    const validated = validateAgentRequest(request);
-
+  async *streamResponse(validated: ValidatedAgentRequest): AsyncGenerator<StreamChunk> {
     const unwrappedFilePayloads = validated.filePayloads
       ? Object.fromEntries(
           Object.entries(validated.filePayloads).map(([key, { content }]) => [key, content]),
@@ -269,29 +242,54 @@ export class AgentClient {
       superglueClient: this.superglueClient,
       filePayloads: unwrappedFilePayloads,
       messages: [],
-      orgId: "",
-      subscriptionClient: this.subscriptionClient ?? undefined,
+      subscriptionClient: this.subscriptionClient,
       abortSignal: this.config.abortSignal,
       toolExecutionPolicies: validated.toolExecutionPolicies,
+      playgroundDraft: validated.playgroundDraft,
     };
 
-    const preparedMessages = await prepareMessages(validated, executionContext);
+    const { messages: preparedMessages, systemMessage } = await prepareMessages(
+      validated,
+      executionContext,
+    );
     executionContext.messages = preparedMessages;
+
+    if (systemMessage) {
+      yield {
+        type: "system_message",
+        systemMessage,
+      };
+    }
+
+    const confirmationResults = await processConfirmations(preparedMessages, executionContext);
+
+    for (const result of confirmationResults) {
+      yield {
+        type: "tool_call_complete",
+        toolCall: {
+          id: result.toolId,
+          name: result.toolName,
+          output: result.output,
+          status: result.status,
+        },
+      };
+    }
 
     const tools = buildToolsForAISDK(validated.agent.toolSet, TOOL_REGISTRY, executionContext);
 
-    yield* this.streamLLMResponse(preparedMessages, tools, TOOL_REGISTRY, executionContext);
+    yield* this.streamLLMResponse(preparedMessages, tools, executionContext, validated.agentId);
   }
 
   private async *streamLLMResponse(
     messages: Array<Message>,
     tools: Record<string, any>,
-    toolRegistry: Record<string, ToolRegistryEntry>,
     ctx: ToolExecutionContext,
+    agentId?: string,
   ): AsyncGenerator<StreamChunk> {
     try {
       const toolInputQueues = new Map<string, string[]>();
       const toolCallIdMap = new Map<string, string>();
+      const toolInputMap = new Map<string, any>();
 
       if (Object.keys(tools).length === 0) {
         yield {
@@ -302,8 +300,6 @@ export class AgentClient {
         return;
       }
 
-      yield* this.preprocessConfirmations(messages, toolRegistry, ctx);
-
       const aiMessages = this.convertToAIMessages(messages);
 
       const result = streamText({
@@ -311,6 +307,14 @@ export class AgentClient {
         messages: aiMessages,
         tools,
         stopWhen: stepCountIs(10),
+        abortSignal: ctx.abortSignal,
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "superglue-agent-chat",
+          metadata: {
+            agentId: agentId ?? "unknown",
+          },
+        },
       });
 
       for await (const part of result.fullStream) {
@@ -318,89 +322,190 @@ export class AgentClient {
 
         switch (part.type) {
           case "text-delta": {
-            yield { type: "content", content: part.text };
+            const p = part as TextDeltaPart;
+            yield { type: "content", content: p.text };
             break;
           }
 
           case "tool-call": {
-            const queue = toolInputQueues.get(part.toolName);
+            const p = part as ToolCallPart;
+            const queue = toolInputQueues.get(p.toolName);
             const generatedId = queue?.shift();
 
-            const toolEntry = toolRegistry[part.toolName];
-            const policyResult = processToolPolicy(
-              part.toolName,
-              part.input,
-              ctx.toolExecutionPolicies,
-            );
-            const confirmationMetadata: ToolConfirmationMetadata | undefined =
-              toolEntry?.confirmation
-                ? {
-                    timing: toolEntry.confirmation.timing,
-                    validActions: toolEntry.confirmation.validActions,
-                    shouldAutoExecute: policyResult.shouldAutoExecute,
-                  }
-                : undefined;
+            const effectiveMode = getEffectiveMode(p.toolName, ctx.toolExecutionPolicies, p.input);
 
-            if (generatedId) {
-              toolCallIdMap.set(part.toolCallId, generatedId);
+            const toolId = generatedId || part.toolCallId;
+            toolCallIdMap.set(part.toolCallId, toolId);
+            toolInputMap.set(part.toolCallId, part.input);
+
+            yield {
+              type: "tool_call_start",
+              toolCall: { id: toolId, name: p.toolName, input: p.input },
+              executionMode: effectiveMode,
+            };
+
+            const hasExecuteFunction = !!tools[p.toolName]?.execute;
+            if (effectiveMode === "confirm_before_execution" && !hasExecuteFunction) {
+              const pendingOutput = getPendingOutput(p.toolName, p.input);
               yield {
-                type: "tool_call_start",
-                toolCall: { id: generatedId, name: part.toolName, input: part.input },
-                confirmation: confirmationMetadata,
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  input: p.input,
+                  output: pendingOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
               };
-            } else {
-              toolCallIdMap.set(part.toolCallId, part.toolCallId);
-              yield {
-                type: "tool_call_start",
-                toolCall: { id: part.toolCallId, name: part.toolName, input: part.input },
-                confirmation: confirmationMetadata,
-              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
             }
             break;
           }
 
           case "tool-input-start": {
+            const p = part as ToolInputStartPart;
             const generatedId = crypto.randomUUID();
             yield {
               type: "tool_call_start",
-              toolCall: { id: generatedId, name: part.toolName, input: undefined },
+              toolCall: { id: generatedId, name: p.toolName, input: undefined },
             };
 
-            const queue = toolInputQueues.get(part.toolName) || [];
+            const queue = toolInputQueues.get(p.toolName) || [];
             queue.push(generatedId);
-            toolInputQueues.set(part.toolName, queue);
+            toolInputQueues.set(p.toolName, queue);
             break;
           }
 
           case "tool-result": {
-            const toolId = toolCallIdMap.get(part.toolCallId) || part.toolCallId;
+            const p = part as ToolResultPart;
+            const toolId = toolCallIdMap.get(p.toolCallId) || p.toolCallId;
+            const toolInput = toolInputMap.get(p.toolCallId);
+            const outputObj = p.output as any;
 
             if (part.toolName === "web_search") {
               yield {
                 type: "tool_call_complete",
                 toolCall: {
                   id: toolId,
-                  name: part.toolName,
+                  name: p.toolName,
                   output: { message: "Web search completed" },
                 },
               };
               break;
             }
 
+            const effectiveMode = getEffectiveMode(
+              p.toolName,
+              ctx.toolExecutionPolicies,
+              toolInput,
+            );
+            const shouldAwaitConfirmation = effectiveMode === "confirm_after_execution";
+
+            if (effectiveMode === "confirm_before_execution" && p.output === undefined) {
+              const pendingOutput = getPendingOutput(p.toolName, toolInput);
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  input: toolInput,
+                  output: pendingOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
+              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
+            }
+
+            if (outputObj?.type === "tool_call_update") {
+              yield {
+                type: "tool_call_update",
+                toolCall: { id: toolId, name: p.toolName, logs: outputObj.toolCall?.logs },
+              };
+              break;
+            }
+
+            if (outputObj?.type === "tool_call_complete") {
+              // Don't await confirmation if the tool execution failed
+              const toolOutput = outputObj.toolCall?.output;
+              let executionFailed = false;
+              try {
+                const parsedToolOutput =
+                  typeof toolOutput === "string" ? JSON.parse(toolOutput) : toolOutput;
+                executionFailed = parsedToolOutput?.success === false;
+              } catch {
+                // If parsing fails, assume it's not a failure
+              }
+              const shouldPause = shouldAwaitConfirmation && !executionFailed;
+
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  input: outputObj.toolCall?.input,
+                  output: outputObj.toolCall?.output,
+                  ...(shouldPause && { status: "awaiting_confirmation" as const }),
+                },
+                ...(shouldPause && { awaitingConfirmation: true }),
+              };
+              if (shouldPause) {
+                yield { type: "paused", pauseReason: "awaiting_confirmation" };
+                return;
+              }
+              break;
+            }
+
+            const finalOutput = outputObj?.toolCall?.output ?? p.output;
+
+            // Don't await confirmation if the tool execution failed
+            let executionFailed = false;
+            try {
+              const parsedFinalOutput =
+                typeof finalOutput === "string" ? JSON.parse(finalOutput) : finalOutput;
+              executionFailed = parsedFinalOutput?.success === false;
+            } catch {
+              // If parsing fails, assume it's not a failure
+            }
+            const shouldPause = shouldAwaitConfirmation && !executionFailed;
+
+            if (shouldPause) {
+              yield {
+                type: "tool_call_complete",
+                toolCall: {
+                  id: toolId,
+                  name: p.toolName,
+                  output: finalOutput,
+                  status: "awaiting_confirmation",
+                },
+                awaitingConfirmation: true,
+              };
+              yield { type: "paused", pauseReason: "awaiting_confirmation" };
+              return;
+            }
+
             yield {
-              ...(part.output as any),
-              toolCall: { ...((part.output as any).toolCall ?? {}), id: toolId },
+              type: "tool_call_complete",
+              toolCall: { id: toolId, name: p.toolName, output: finalOutput },
             };
             break;
           }
 
           case "tool-error": {
-            console.warn("[Vercel AI] Tool error:", part.error);
-            const toolId = toolCallIdMap.get(part.toolCallId) || part.toolCallId;
+            const p = part as ToolErrorPart;
+            console.warn("[Vercel AI] Tool error:", p.error);
+            const toolId = toolCallIdMap.get(p.toolCallId) || p.toolCallId;
 
             yield {
-              type: "tool_call_error",
-              toolCall: { id: toolId, name: part.toolName, error: String(part.error) },
+              type: "tool_call_complete",
+              toolCall: {
+                id: toolId,
+                name: p.toolName,
+                output: JSON.stringify({ success: false, error: String(p.error) }),
+              },
             };
             break;
           }
@@ -411,19 +516,25 @@ export class AgentClient {
           }
 
           case "error": {
-            console.error("[Vercel AI] Stream error:", part.error);
-            const errorMessage =
-              part.error instanceof Error ? part.error.message : String(part.error);
+            const p = part as ErrorPart;
+            console.error("[Vercel AI] Stream error:", p.error);
+            const errorMessage = getErrorMessage(p.error);
             const isPromptTooLong =
-              errorMessage.includes("prompt is too long") || errorMessage.includes("tokens > ");
+              errorMessage.includes("prompt is too long") ||
+              errorMessage.includes("tokens > ") ||
+              errorMessage.includes("Input is too long");
 
             if (isPromptTooLong) {
               yield {
                 type: "content",
-                content: `🔄 **Your conversation has gotten too long!**\n\nThe conversation history has exceeded the model's maximum context length. Please start a new chat to continue.\n\nYou can create a new chat by clicking the **"New"** button.`,
+                content: `**Conversation limit reached**\n\nThis conversation has become too long for me to process. Please start a new chat to continue working together.`,
               };
             } else {
-              yield { type: "content", content: `Error: ${part.error}` };
+              yield {
+                type: "error",
+                content: "Something went wrong while processing your request. Please try again.",
+                errorDetails: errorMessage,
+              };
             }
             yield { type: "done" };
             return;
@@ -433,10 +544,16 @@ export class AgentClient {
 
       yield { type: "done" };
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        yield { type: "done" };
+        return;
+      }
       console.error("Vercel AI SDK streaming error:", error);
+      const errorMessage = getErrorMessage(error);
       yield {
-        type: "content",
-        content: "Sorry, I encountered an error. Please try again.",
+        type: "error",
+        content: "Something went wrong while processing your request. Please try again.",
+        errorDetails: errorMessage,
       };
       yield { type: "done" };
     }

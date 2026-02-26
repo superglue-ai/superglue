@@ -1,27 +1,14 @@
-// Notifications are available in the enterprise version of superglue
-import type { RequestSource, RunStatus, Tool, ToolStepResult } from "@superglue/shared";
 import type { DataStore } from "../datastore/types.js";
-
-export interface RunCompletionParams {
-  run: {
-    runId: string;
-    toolId: string;
-    tool?: Tool;
-    status: RunStatus;
-    error?: string;
-    stepResults?: ToolStepResult[];
-    metadata: {
-      startedAt: string;
-      completedAt: string;
-      durationMs: number;
-    };
-  };
-  orgId: string;
-  requestSource: RequestSource;
-}
+import { logMessage } from "../utils/logs.js";
 
 export class NotificationService {
   constructor(_datastore: DataStore) {}
 
-  async processRunCompletion(_params: RunCompletionParams): Promise<void> {}
+  async processRunCompletion(_params: {
+    run: any;
+    orgId: string;
+    requestSource: any;
+  }): Promise<void> {
+    logMessage("debug", "Notifications are an enterprise feature");
+  }
 }

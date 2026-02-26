@@ -67,7 +67,7 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
 
     try {
       setIsRenaming(true);
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
 
       const result = await client.renameWorkflow(tool.id, trimmedName);
 

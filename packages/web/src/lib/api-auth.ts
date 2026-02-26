@@ -1,15 +1,10 @@
 import { NextRequest } from "next/server";
 
-/**
- * Authenticates API requests using Bearer token
- * Validates against AUTH_TOKEN env var
- */
 export async function authenticateNextJSApiRequest(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!token) return null;
 
-  if (!token || !process.env.AUTH_TOKEN) {
-    return null;
-  }
-  return token === process.env.AUTH_TOKEN ? token : null;
+  const authToken = process.env.AUTH_TOKEN || process.env.NEXT_PUBLIC_SUPERGLUE_API_KEY;
+  return token === authToken ? token : null;
 }

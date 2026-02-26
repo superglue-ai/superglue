@@ -1,4 +1,10 @@
-import { assertValidArrowFunction, findTemplateForSystem } from "@superglue/shared";
+import {
+  assertValidArrowFunction,
+  findTemplateForSystem,
+  sampleResultObject,
+  safeStringify,
+  System,
+} from "@superglue/shared";
 import { clsx, type ClassValue } from "clsx";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
@@ -47,41 +53,6 @@ export function getThemeScript(): string {
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-/**
- * Safe JSON.stringify that handles circular references, BigInt, and other edge cases.
- * Falls back to String(obj) on error.
- */
-export function safeStringify(obj: any, indent?: number): string {
-  try {
-    return JSON.stringify(
-      obj,
-      (_, value) => {
-        if (typeof value === "bigint") return value.toString();
-        if (typeof value === "function") return "[Function]";
-        return value;
-      },
-      indent,
-    );
-  } catch {
-    return String(obj);
-  }
-}
-
-export function composeUrl(host: string, path: string | undefined) {
-  if (!host && !path) return "";
-  if (!host) host = "";
-  if (!path) path = "";
-
-  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
-  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-
-  if (!cleanPath) {
-    return cleanHost;
-  }
-
-  return `${cleanHost}/${cleanPath}`;
 }
 
 export const isEmptyData = (value: any): boolean => {
@@ -317,6 +288,43 @@ export type ResolvedIcon =
   | { type: "lucide"; name: string }
   | null;
 
+function resolveIconString(icon: string | null | undefined): ResolvedIcon {
+  if (!icon) return null;
+
+  const colonIndex = icon.indexOf(":");
+  if (colonIndex !== -1) {
+    const source = icon.substring(0, colonIndex);
+    const name = icon.substring(colonIndex + 1);
+
+    if (source === "lucide") {
+      return { type: "lucide", name };
+    }
+
+    if (source === "simpleicons") {
+      const simpleIcon = getSimpleIcon(name);
+      if (simpleIcon) {
+        return { type: "simpleicons", icon: simpleIcon };
+      }
+      // Fallback: if the provided simpleicons name doesn't resolve, try lucide.
+      return { type: "lucide", name };
+    }
+
+    // Unknown prefix: try SimpleIcons first, then Lucide.
+    const simpleIcon = getSimpleIcon(name) || getSimpleIcon(icon);
+    if (simpleIcon) {
+      return { type: "simpleicons", icon: simpleIcon };
+    }
+    return { type: "lucide", name };
+  }
+
+  // No prefix: try SimpleIcons first, then return null so callers can fall back to templates.
+  const simpleIcon = getSimpleIcon(icon);
+  if (simpleIcon) {
+    return { type: "simpleicons", icon: simpleIcon };
+  }
+  return null;
+}
+
 /**
  * Resolve a system's icon to a renderable format.
  * Handles:
@@ -324,45 +332,15 @@ export type ResolvedIcon =
  * - Legacy format: "salesforce" (assumes simpleicons)
  * - Fallback to template matching by system id/urlHost
  */
-export function resolveSystemIcon(system: {
-  id?: string;
-  urlHost?: string;
-  icon?: string | null;
-  templateName?: string;
-}): ResolvedIcon {
+export function resolveSystemIcon(system: Partial<System>): ResolvedIcon {
   // First, try the system's own icon field
-  if (system.icon) {
-    const colonIndex = system.icon.indexOf(":");
-    if (colonIndex !== -1) {
-      // New prefixed format
-      const source = system.icon.substring(0, colonIndex);
-      const name = system.icon.substring(colonIndex + 1);
-
-      if (source === "lucide") {
-        return { type: "lucide", name };
-      }
-      // simpleicons or unknown source - try to resolve
-      const simpleIcon = getSimpleIcon(name);
-      if (simpleIcon) {
-        return { type: "simpleicons", icon: simpleIcon };
-      }
-    } else {
-      // Legacy format - no prefix, assume simpleicons
-      const simpleIcon = getSimpleIcon(system.icon);
-      if (simpleIcon) {
-        return { type: "simpleicons", icon: simpleIcon };
-      }
-    }
-  }
+  const directIcon = resolveIconString(system.icon);
+  if (directIcon) return directIcon;
 
   // Fallback: try to get icon from templates via findTemplateForSystem
   const match = findTemplateForSystem(system);
-  if (match?.template.icon) {
-    const simpleIcon = getSimpleIcon(match.template.icon);
-    if (simpleIcon) {
-      return { type: "simpleicons", icon: simpleIcon };
-    }
-  }
+  const templateIcon = resolveIconString(match?.template.icon);
+  if (templateIcon) return templateIcon;
 
   return null;
 }
@@ -480,25 +458,25 @@ export function getGroupedTimezones(): Record<string, Array<{ value: string; lab
 }
 
 /**
- * Wraps a loop selector function to limit the number of iterations
- * @param loopSelectorCode The original loop selector code
+ * Wraps a data selector function to limit the number of iterations
+ * @param dataSelectorCode The original data selector code
  * @param limit Maximum number of items to return (defaults to 1)
  * @returns Wrapped code that limits the array to specified number of items
  *
  * @example
  * const original = "(sourceData) => { return [1,2,3] }";
- * const wrapped = wrapLoopSelectorWithLimit(original, 1);
+ * const wrapped = wrapDataSelectorWithLimit(original, 1);
  * // Result: "(sourceData) => { const originalFunction = (sourceData) => { return [1,2,3] }; const out = originalFunction(sourceData); return Array.isArray(out) ? out.slice(0, 1) : out; }"
  */
-export function wrapLoopSelectorWithLimit(
-  loopSelectorCode: string | undefined | null,
+export function wrapDataSelectorWithLimit(
+  dataSelectorCode: string | undefined | null,
   limit: number = 1,
 ): string {
-  if (!loopSelectorCode || !loopSelectorCode.trim()) {
-    return loopSelectorCode || "";
+  if (!dataSelectorCode || !dataSelectorCode.trim()) {
+    return dataSelectorCode || "";
   }
 
-  const trimmedCode = assertValidArrowFunction(loopSelectorCode);
+  const trimmedCode = assertValidArrowFunction(dataSelectorCode);
 
   return `(sourceData) => {
   const originalFunction = ${trimmedCode};
@@ -538,3 +516,70 @@ export const handleCopyCode = async (code: string): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Truncates tool result to fit within max length by progressively sampling data.
+ * Only samples fields that can be large (data, stepResults, toolPayload).
+ * All other fields (diffs, config, metadata, etc.) are preserved as-is.
+ *
+ * @param result - The result data to truncate (string, object, or array)
+ * @param maxLength - Maximum character length (default: 100000)
+ * @returns Truncated string representation of the result
+ */
+export function truncateToolResult(result: any, maxLength: number = 100000): string {
+  // If result is already a string, just truncate if needed
+  if (typeof result === "string") {
+    return result.length > maxLength
+      ? result.slice(0, maxLength) + "\n\n... [Output truncated - result too large]"
+      : result;
+  }
+
+  // For objects/arrays, try progressive sampling before stringifying
+  try {
+    // First try without any sampling - most results fit
+    let resultString = JSON.stringify(result, null, 2);
+    if (resultString.length <= maxLength) {
+      return resultString;
+    }
+
+    // Only sample fields that can be large - preserve everything else
+    const sampleableKeys = ["data", "stepResults", "toolPayload", "rawData", "transformedData"];
+
+    const sampleFields = (obj: any, sampleSize: number): any => {
+      if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
+        return sampleResultObject(obj, sampleSize);
+      }
+
+      const sampled: Record<string, any> = {};
+      for (const [key, val] of Object.entries(obj)) {
+        sampled[key] = sampleableKeys.includes(key) ? sampleResultObject(val, sampleSize) : val;
+      }
+      return sampled;
+    };
+
+    // Sample with size 3
+    let sampled = sampleFields(result, 4);
+    resultString = JSON.stringify(sampled, null, 2);
+
+    if (resultString.length <= maxLength) {
+      return resultString;
+    }
+
+    // More aggressive sampling with size 1
+    sampled = sampleFields(result, 1);
+    resultString = JSON.stringify(sampled, null, 2);
+
+    if (resultString.length <= maxLength) {
+      return resultString;
+    }
+
+    // Last resort: truncate the string (may break JSON structure)
+    return resultString.slice(0, maxLength) + "\n\n... [Output truncated - result too large]";
+  } catch {
+    // If sampling or stringifying fails (e.g., circular references), use safe stringify
+    const basicString = safeStringify(result);
+    return basicString.length > maxLength
+      ? basicString.slice(0, maxLength) + "\n\n... [Output truncated - result too large]"
+      : basicString;
+  }
+}

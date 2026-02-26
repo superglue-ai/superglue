@@ -32,7 +32,6 @@ interface UseGalleryNavigationReturn {
 }
 
 const NAV_SUPPRESS_MS = 300;
-const NAV_DELAY_MS = 50;
 
 export function useGalleryNavigation({
   initialIndex = 1,
@@ -48,7 +47,6 @@ export function useGalleryNavigation({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isNavigatingRef = useRef(false);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const navDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConfiguratorEditingRef = useRef(false);
 
   useEffect(() => {
@@ -58,7 +56,6 @@ export function useGalleryNavigation({
   useEffect(() => {
     return () => {
       if (navigationTimeoutRef.current) clearTimeout(navigationTimeoutRef.current);
-      if (navDelayTimeoutRef.current) clearTimeout(navDelayTimeoutRef.current);
     };
   }, []);
 
@@ -135,34 +132,30 @@ export function useGalleryNavigation({
         isNavigatingRef.current = false;
       }, NAV_SUPPRESS_MS);
 
-      if (navDelayTimeoutRef.current) clearTimeout(navDelayTimeoutRef.current);
-      navDelayTimeoutRef.current = setTimeout(() => {
-        setActiveIndex(nextIndex);
+      setActiveIndex(nextIndex);
 
-        const container = listRef.current;
-        const card = container?.children?.[nextIndex] as HTMLElement | undefined;
-        if (container && card) {
-          card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-        }
+      const container = listRef.current;
+      const card = container?.children?.[nextIndex] as HTMLElement | undefined;
+      if (container && card) {
+        card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      }
 
-        // Scroll to top
-        if (embedded) {
-          let scrollParent = scrollContainerRef.current?.parentElement;
-          while (scrollParent && scrollParent !== document.body) {
-            const { overflowY } = window.getComputedStyle(scrollParent);
-            if (overflowY === "auto" || overflowY === "scroll") {
-              scrollParent.scrollTo({ top: 0, behavior: "smooth" });
-              break;
-            }
-            scrollParent = scrollParent.parentElement;
+      if (embedded) {
+        let scrollParent = scrollContainerRef.current?.parentElement;
+        while (scrollParent && scrollParent !== document.body) {
+          const { overflowY } = window.getComputedStyle(scrollParent);
+          if (overflowY === "auto" || overflowY === "scroll") {
+            scrollParent.scrollTo({ top: 0, behavior: "smooth" });
+            break;
           }
-          if (!scrollParent || scrollParent === document.body) {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        } else if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+          scrollParent = scrollParent.parentElement;
         }
-      }, NAV_DELAY_MS);
+        if (!scrollParent || scrollParent === document.body) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } else if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
     },
     [embedded],
   );

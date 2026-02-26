@@ -30,15 +30,14 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
-  // Extract z-index from className if present (e.g., "z-[110]")
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { overlayClassName?: string }
+>(({ className, children, overlayClassName, ...props }, ref) => {
   const zIndexMatch = className?.match(/z-\[(\d+)\]/);
   const overlayZIndex = zIndexMatch ? `z-[${zIndexMatch[1]}]` : undefined;
 
   return (
     <DialogPortal>
-      <DialogOverlay className={overlayZIndex || undefined} />
+      <DialogOverlay className={cn(overlayZIndex, overlayClassName)} />
       <DialogPrimitive.Content
         ref={ref}
         className={cn(

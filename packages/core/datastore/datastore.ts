@@ -1,37 +1,28 @@
-import { FileStore } from "./filestore.js";
-import { MemoryStore } from "./memory.js";
 import { PostgresService } from "./postgres.js";
-import { DataStore } from "./types.js";
+import type { DataStore } from "./types.js";
 
-export function createDataStore(config: { type: "memory" | "file" | "postgres" }): DataStore {
-  if (config.type === "file") {
-    const fileStoreConfig = getFileStoreConfig();
-    return new FileStore(fileStoreConfig.storageDir);
-  }
+let _dataStore: DataStore | null = null;
+
+export async function createDataStore(config: { type: "postgres" }): Promise<DataStore> {
   if (config.type === "postgres") {
     const postgresConfig = getPostgresConfig();
-    return new PostgresService(postgresConfig);
+    _dataStore = new PostgresService(postgresConfig);
+    await _dataStore.ready();
+    return _dataStore;
   }
-  if (config.type === "memory") {
-    return new MemoryStore();
+  throw new Error(`Unsupported datastore type: ${config.type}.`);
+}
+
+export function getDataStore(): DataStore {
+  if (!_dataStore) {
+    throw new Error("DataStore not initialized. Call createDataStore() first.");
   }
-  throw new Error(
-    `Unsupported datastore type: ${config.type}. Use 'file', 'postgres', or 'memory'.`,
-  );
+  return _dataStore;
 }
 
 export function getFileStoreConfig() {
   return {
     storageDir: process.env.STORAGE_DIR || "/data",
-  };
-}
-
-export function getRedisConfig() {
-  return {
-    host: process.env.REDIS_HOST!,
-    port: parseInt(process.env.REDIS_PORT || "6379"),
-    username: process.env.REDIS_USERNAME!,
-    password: process.env.REDIS_PASSWORD!,
   };
 }
 

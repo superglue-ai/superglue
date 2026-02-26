@@ -4,13 +4,14 @@ import { useSystems } from "@/src/app/systems-context";
 import { useTools } from "@/src/app/tools-context";
 import { createSuperglueClient } from "@/src/lib/client-utils";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
-import { buildStepInput } from "@/src/lib/general-utils";
 import {
-  ExecutionStep,
+  ToolStep,
   generateDefaultFromSchema,
   System,
   Tool,
   ToolResult,
+  ToolStepResult,
+  isRequestConfig,
 } from "@superglue/shared";
 import { useFileUpload } from "./hooks/use-file-upload";
 import { usePayloadValidation } from "./hooks/use-payload-validation";
@@ -18,7 +19,7 @@ import { useToolExecution } from "./hooks/use-tool-execution";
 import { useToolData } from "./hooks/use-tool-data";
 import { ToolConfigProvider, useToolConfig, ExecutionProvider, useExecution } from "./context";
 import { useToast } from "@/src/hooks/use-toast";
-import { ArchiveRestore, Check, Loader2, Play, Square, X } from "lucide-react";
+import { ArchiveRestore, Check, Loader2, Play, Square, FileQuestion } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   forwardRef,
@@ -78,10 +79,6 @@ export interface ToolPlaygroundHandle {
   getCurrentTool: () => Tool;
 }
 
-interface ToolPlaygroundInnerProps extends ToolPlaygroundProps {
-  innerRef: React.ForwardedRef<ToolPlaygroundHandle>;
-}
-
 function ToolPlaygroundInner({
   id,
   embedded = false,
@@ -102,11 +99,11 @@ function ToolPlaygroundInner({
   renderAgentInline = false,
   initialError,
   innerRef,
-}: ToolPlaygroundInnerProps) {
+}: ToolPlaygroundProps & { innerRef: React.ForwardedRef<ToolPlaygroundHandle> }) {
   const router = useRouter();
   const { toast } = useToast();
   const config = useConfig();
-  const { refreshTools } = useTools();
+  const { refreshTools, tools } = useTools();
   const toolConfig = useToolConfig();
   const execution = useExecution();
 
@@ -116,14 +113,13 @@ function ToolPlaygroundInner({
     payload,
     setToolId,
     setInstruction,
-    setFinalTransform,
+    setOutputTransform,
     setInputSchema,
-    setResponseSchema,
+    setOutputSchema,
     setPayloadText,
-    setUploadedFiles: setContextUploadedFiles,
-    setFilePayloads: setContextFilePayloads,
     setFilesAndPayloads: setContextFilesAndPayloads,
     markPayloadEdited,
+    markCurrentStateAsBaseline,
     setSteps,
     setFolder,
     setIsArchived,
@@ -132,17 +128,20 @@ function ToolPlaygroundInner({
   const {
     currentExecutingStepIndex: contextCurrentExecutingStepIndex,
     currentRunId,
-    clearAllExecutions,
-    setFinalResult,
-    setTransformStatus,
-    stepResultsMap,
     isExecutingTransform,
   } = execution;
 
   const toolId = tool.id;
   const folder = tool.folder;
   const isArchived = tool.isArchived;
-  const { setShowAgent, agentPortalRef, AgentSidebarComponent } = useRightSidebar();
+  const {
+    setShowAgent,
+    agentPortalRef,
+    AgentSidebarComponent,
+    setSavedTool,
+    setPlaygroundTool,
+    setOnRestoreDraft,
+  } = useRightSidebar();
 
   useEffect(() => {
     if (!isArchived && !renderAgentInline && AgentSidebarComponent) {
@@ -151,10 +150,51 @@ function ToolPlaygroundInner({
     return () => setShowAgent(false);
   }, [isArchived, setShowAgent, renderAgentInline, AgentSidebarComponent]);
 
-  const finalTransform = toolConfig.finalTransform;
-  const responseSchema = toolConfig.responseSchema;
+  const outputTransform = toolConfig.outputTransform;
+  const outputSchema = toolConfig.outputSchema;
   const inputSchema = toolConfig.inputSchema;
   const instructions = tool.instruction;
+
+  // Register saved tool with sidebar for history panel
+  useEffect(() => {
+    if (!embedded && toolId) {
+      const toolFromContext = tools.find((t) => t.id === toolId);
+      setSavedTool(toolFromContext || null);
+    } else {
+      setSavedTool(null);
+    }
+    return () => {
+      setSavedTool(null);
+    };
+  }, [embedded, toolId, tools, setSavedTool]);
+
+  useEffect(() => {
+    if (!embedded && toolId) {
+      setOnRestoreDraft((draft) => {
+        if (!draft) return;
+        setSteps(draft.steps);
+        setInstruction(draft.instruction);
+        setOutputTransform(draft.outputTransform);
+        setInputSchema(draft.inputSchema);
+        setOutputSchema(draft.outputSchema);
+        // Payload is not part of the draft - it's saved separately
+        setTimeout(markCurrentStateAsBaseline, 0);
+      });
+    }
+    return () => {
+      setOnRestoreDraft(undefined);
+    };
+  }, [
+    embedded,
+    toolId,
+    setOnRestoreDraft,
+    setSteps,
+    setInstruction,
+    setOutputTransform,
+    setInputSchema,
+    setOutputSchema,
+    markCurrentStateAsBaseline,
+  ]);
   const manualPayloadText = payload.manualPayloadText;
   const hasUserEditedPayload = payload.hasUserEdited;
   const computedPayload = payload.computedPayload;
@@ -170,11 +210,10 @@ function ToolPlaygroundInner({
     externalPayloads: payload.filePayloads,
   });
 
-  const uploadedFiles = parentUploadedFiles ?? payload.uploadedFiles;
   const totalFileSize = parentTotalFileSize ?? localFileUpload.totalFileSize;
   const isProcessingFiles = parentIsProcessingFiles ?? localFileUpload.isProcessing;
 
-  const { loading, saving, justSaved, loadTool, saveTool, setLoading } = useToolData({
+  const { loading, saving, justSaved, notFound, loadTool, saveTool, setLoading } = useToolData({
     id,
     initialTool,
     initialInstruction,
@@ -310,52 +349,47 @@ function ToolPlaygroundInner({
   };
 
   const currentTool = useMemo(
-    () =>
-      ({
-        id: toolId,
-        steps,
-        instruction: instructions,
-        finalTransform,
-        responseSchema: responseSchema ? JSON.parse(responseSchema) : null,
-        inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-        folder,
-        createdAt: initialTool?.createdAt,
-        updatedAt: initialTool?.updatedAt,
-      }) as Tool,
-    [toolId, steps, instructions, finalTransform, responseSchema, inputSchema, folder, initialTool],
-  );
-
-  const getCurrentTool = useCallback(
     (): Tool =>
       ({
         id: toolId,
-        steps: steps.map((step: ExecutionStep) => ({
-          ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null,
-          },
-        })),
-        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+        steps: steps.map((step: ToolStep) => {
+          // Only request steps need pagination handling, transform steps pass through as-is
+          if (!isRequestConfig(step.config)) {
+            return step;
+          }
+          return step;
+        }),
+        outputSchema: outputSchema && outputSchema.trim() ? JSON.parse(outputSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-        finalTransform,
+        outputTransform,
         instruction: instructions,
         folder,
         createdAt: initialTool?.createdAt,
         updatedAt: initialTool?.updatedAt,
       }) as Tool,
-    [toolId, steps, responseSchema, inputSchema, finalTransform, instructions, folder, initialTool],
+    [toolId, steps, outputSchema, inputSchema, outputTransform, instructions, folder, initialTool],
   );
+
+  // Register current playground state for draft comparisons
+  useEffect(() => {
+    if (!embedded && toolId) {
+      setPlaygroundTool(currentTool);
+    } else {
+      setPlaygroundTool(null);
+    }
+    return () => {
+      setPlaygroundTool(null);
+    };
+  }, [embedded, toolId, currentTool, setPlaygroundTool]);
 
   useImperativeHandle(
     innerRef,
     () => ({
       executeTool,
       saveTool,
-      getCurrentTool,
+      getCurrentTool: () => currentTool,
     }),
-    [executeTool, saveTool, getCurrentTool],
+    [executeTool, saveTool, currentTool],
   );
 
   const handleStepEdit = (stepId: string, updatedStep: any, _isUserInitiated?: boolean) => {
@@ -364,10 +398,7 @@ function ToolPlaygroundInner({
         step.id === stepId
           ? {
               ...updatedStep,
-              apiConfig: {
-                ...updatedStep.apiConfig,
-                id: updatedStep.apiConfig.id || updatedStep.id,
-              },
+              config: updatedStep.config,
             }
           : step,
       ),
@@ -387,7 +418,7 @@ function ToolPlaygroundInner({
 
   const handleUnarchive = async () => {
     try {
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
       await client.archiveWorkflow(toolId, false);
       setIsArchived(false);
       refreshTools();
@@ -507,26 +538,54 @@ function ToolPlaygroundInner({
             <div className="w-full h-full">
               <div className="h-full">
                 <div className={embedded ? "h-full" : "h-full"}>
-                  <ToolStepGallery
-                    onStepEdit={handleStepEdit}
-                    onExecuteStep={handleExecuteStep}
-                    onExecuteStepWithLimit={handleExecuteStepWithLimit}
-                    onExecuteTransform={handleExecuteTransform}
-                    onAbort={currentRunId ? handleStopExecution : undefined}
-                    onFilesUpload={handleFilesUpload}
-                    onFileRemove={handleFileRemove}
-                    toolActionButtons={toolActionButtons}
-                    headerActions={
-                      headerActions !== undefined ? headerActions : defaultHeaderActions
-                    }
-                    navigateToFinalSignal={navigateToFinalSignal}
-                    showStepOutputSignal={showStepOutputSignal}
-                    focusStepId={focusStepId}
-                    isProcessingFiles={isProcessingFiles}
-                    totalFileSize={totalFileSize}
-                    isPayloadValid={isPayloadValid}
-                    embedded={embedded}
-                  />
+                  {notFound ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex flex-col items-center gap-4 text-center">
+                        <FileQuestion className="h-16 w-16 text-muted-foreground" />
+                        <div>
+                          <h2 className="text-xl font-semibold mb-2">Tool Not Found</h2>
+                          <p className="text-muted-foreground mb-4">
+                            The tool &quot;{id}&quot; doesn&apos;t exist or has been deleted.
+                          </p>
+                          <Button
+                            variant="glass"
+                            className="rounded-xl"
+                            onClick={() => router.push("/tools")}
+                          >
+                            Back to Tools
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : loading && steps.length === 0 && !instructions ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+                        <p className="text-sm text-muted-foreground">Loading tool...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ToolStepGallery
+                      onStepEdit={handleStepEdit}
+                      onExecuteStep={handleExecuteStep}
+                      onExecuteStepWithLimit={handleExecuteStepWithLimit}
+                      onExecuteTransform={handleExecuteTransform}
+                      onAbort={currentRunId ? handleStopExecution : undefined}
+                      onFilesUpload={handleFilesUpload}
+                      onFileRemove={handleFileRemove}
+                      toolActionButtons={toolActionButtons}
+                      headerActions={
+                        headerActions !== undefined ? headerActions : defaultHeaderActions
+                      }
+                      navigateToFinalSignal={navigateToFinalSignal}
+                      showStepOutputSignal={showStepOutputSignal}
+                      focusStepId={focusStepId}
+                      isProcessingFiles={isProcessingFiles}
+                      totalFileSize={totalFileSize}
+                      isPayloadValid={isPayloadValid}
+                      embedded={embedded}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -593,6 +652,7 @@ function ToolPlaygroundInner({
 const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((props, ref) => {
   const { systems: contextSystems } = useSystems();
   const systems = props.systems || contextSystems;
+  const toolId = props.id || props.initialTool?.id;
 
   return (
     <ToolConfigProvider

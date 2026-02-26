@@ -27,10 +27,8 @@ import {
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { splitUrl } from "@/src/lib/client-utils";
-import { composeUrl } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { ExecutionStep } from "@superglue/shared";
+import { ToolStep, RequestStepConfig, isTransformConfig } from "@superglue/shared";
 import {
   Bug,
   Check,
@@ -43,7 +41,6 @@ import {
   Pencil,
   Play,
   RotateCw,
-  Route,
   Square,
   Trash2,
   X,
@@ -58,19 +55,20 @@ import { CopyButton } from "../shared/CopyButton";
 import { StepInputTab } from "./tabs/StepInputTab";
 import { StepResultTab } from "./tabs/StepResultTab";
 import { useRightSidebar } from "../../sidebar/RightSidebarContext";
+import { SpotlightTransformStepCard } from "./SpotlightTransformStepCard";
 
 export interface StepItem {
   type: "step";
-  data: ExecutionStep;
+  data: ToolStep;
   stepResult: any;
   transformError: undefined;
   categorizedSources: ReturnType<typeof buildCategorizedSources>;
 }
 
 interface SpotlightStepCardProps {
-  step: ExecutionStep;
+  step: ToolStep;
   stepIndex: number;
-  onEdit?: (stepId: string, updatedStep: ExecutionStep, isUserInitiated?: boolean) => void;
+  onEdit?: (stepId: string, updatedStep: ToolStep, isUserInitiated?: boolean) => void;
   onRemove?: () => void;
   onExecuteStep?: () => Promise<void>;
   onExecuteStepWithLimit?: (limit: number) => Promise<void>;
@@ -121,6 +119,11 @@ export const SpotlightStepCard = React.memo(
     const showFixButton = errorResult && !stepAborted;
 
     const { output: dataSelectorOutput, error: dataSelectorError } = getDataSelectorResult(step.id);
+    const loopCount =
+      Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 0
+        ? dataSelectorOutput.length
+        : null;
+    const isLooping = loopCount !== null;
     const lastNotifiedStepIdRef = useRef<string | null>(null);
 
     // Notify parent of data selector changes
@@ -140,9 +143,10 @@ export const SpotlightStepCard = React.memo(
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [pendingAction, setPendingAction] = useState<"execute" | null>(null);
     const [isEditingInstruction, setIsEditingInstruction] = useState(false);
-    const [instructionEditValue, setInstructionEditValue] = useState(
-      step.apiConfig?.instruction || "",
-    );
+    const requestConfig = step.config as RequestStepConfig;
+    const isTransformStep = isTransformConfig(step.config);
+    const stepInstruction = step.instruction;
+    const [instructionEditValue, setInstructionEditValue] = useState(stepInstruction || "");
     const prevShowOutputSignalRef = useRef<number | undefined>(undefined);
     const editingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const instructionTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -178,11 +182,13 @@ export const SpotlightStepCard = React.memo(
     };
 
     useEffect(() => {
-      const headers = serializeValue(step.apiConfig?.headers);
-      const queryParams = serializeValue(step.apiConfig?.queryParams);
+      // Update headers/queryParams for request steps
+      if (!requestConfig) return;
+      const headers = serializeValue(requestConfig?.headers);
+      const queryParams = serializeValue(requestConfig?.queryParams);
       setHeadersText(headers);
       setQueryParamsText(queryParams);
-    }, [step.id, step.apiConfig?.headers, step.apiConfig?.queryParams, step.apiConfig?.body]);
+    }, [step.id, requestConfig?.headers, requestConfig?.queryParams, requestConfig?.body]);
 
     useEffect(() => {
       if (
@@ -216,27 +222,29 @@ export const SpotlightStepCard = React.memo(
       if (value === "none") {
         handleImmediateEdit((s) => ({
           ...s,
-          apiConfig: { ...s.apiConfig, pagination: undefined },
+          config: { ...s.config, pagination: undefined },
         }));
       } else {
-        handleImmediateEdit((s) => ({
-          ...s,
-          apiConfig: {
-            ...s.apiConfig,
-            pagination: {
-              type: value,
-              pageSize: s.apiConfig.pagination?.pageSize || "50",
-              cursorPath: s.apiConfig.pagination?.cursorPath || "",
-              stopCondition:
-                s.apiConfig.pagination?.stopCondition || DEFAULT_PAGINATION_STOP_CONDITION,
+        handleImmediateEdit((s) => {
+          const cfg = s.config as RequestStepConfig;
+          return {
+            ...s,
+            config: {
+              ...s.config,
+              pagination: {
+                type: value,
+                pageSize: cfg.pagination?.pageSize || "50",
+                cursorPath: cfg.pagination?.cursorPath || "",
+                stopCondition: cfg.pagination?.stopCondition || DEFAULT_PAGINATION_STOP_CONDITION,
+              },
             },
-          },
-        }));
+          };
+        });
       }
     };
 
     const handleEditStepInstruction = useCallback(() => {
-      setInstructionEditValue(step.apiConfig?.instruction || "");
+      setInstructionEditValue(stepInstruction || "");
       setIsEditingInstruction(true);
       setTimeout(() => {
         if (instructionTextareaRef.current) {
@@ -245,20 +253,20 @@ export const SpotlightStepCard = React.memo(
           instructionTextareaRef.current.setSelectionRange(len, len);
         }
       }, 0);
-    }, [step.apiConfig?.instruction]);
+    }, [stepInstruction]);
 
     const handleSaveInstruction = useCallback(() => {
       handleImmediateEdit((s) => ({
         ...s,
-        apiConfig: { ...s.apiConfig, instruction: instructionEditValue },
+        config: { ...s.config, instruction: instructionEditValue },
       }));
       setIsEditingInstruction(false);
     }, [instructionEditValue, handleImmediateEdit]);
 
     const handleCancelInstructionEdit = useCallback(() => {
-      setInstructionEditValue(step.apiConfig?.instruction || "");
+      setInstructionEditValue(stepInstruction || "");
       setIsEditingInstruction(false);
-    }, [step.apiConfig?.instruction]);
+    }, [stepInstruction]);
 
     const handleInstructionKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
@@ -286,22 +294,13 @@ export const SpotlightStepCard = React.memo(
         stepError || (typeof stepResult === "string" ? stepResult : "Step execution failed");
       const truncatedError = errorMsg.length > 500 ? `${errorMsg.slice(0, 500)}...` : errorMsg;
       sendMessageToAgent(
-        `Step "${step.id}" failed with the following error:\n\n${truncatedError}\n\nPlease fix this step.`,
+        `Step "${step.id}" failed with the following error:\n\n${truncatedError}\n\nPlease search documentation and/or web search to diagnose the issue and fix the step.`,
       );
     }, [step.id, stepResult, getStepError, sendMessageToAgent]);
 
     return (
       <Card className="w-full max-w-6xl mx-auto shadow-md border border-border/50 dark:border-border/70 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 dark:from-muted/40 dark:to-muted/20 backdrop-blur-sm">
         <div className="p-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Route className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <h3 className="text-lg font-semibold truncate">
-                {step.id || `Step ${stepIndex + 1}`}
-              </h3>
-            </div>
-          </div>
-
           <div className={activePanel === "config" ? "space-y-1" : "space-y-2"}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -364,54 +363,47 @@ export const SpotlightStepCard = React.memo(
                         }
                       >
                         <div
-                          className={`relative flex rounded-xl border border-input bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm shadow-sm ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? "" : ""}`}
+                          className={`relative flex rounded-xl border border-input bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/50 dark:to-muted/30 backdrop-blur-sm shadow-sm ${isLooping && onExecuteStepWithLimit ? "" : ""}`}
                         >
                           <Button
                             variant="ghost"
                             onClick={handleRunStepClick}
                             disabled={!canExecute || isExecuting || isGlobalExecuting}
-                            className={`h-8 pl-3 gap-2 border-0 ${dataSelectorOutput && Array.isArray(dataSelectorOutput) && dataSelectorOutput.length > 1 && onExecuteStepWithLimit ? "pr-2 rounded-r-none" : "pr-3"}`}
+                            className={`h-8 pl-3 gap-2 border-0 ${isLooping && onExecuteStepWithLimit ? "pr-2 rounded-r-none" : "pr-3"}`}
                           >
-                            {dataSelectorOutput &&
-                            Array.isArray(dataSelectorOutput) &&
-                            dataSelectorOutput.length > 1 ? (
+                            {isLooping ? (
                               <RotateCw className="h-3.5 w-3.5" />
                             ) : (
                               <Play className="h-3 w-3" />
                             )}
                             <span className="font-medium text-[13px]">Run Step</span>
                           </Button>
-                          {dataSelectorOutput &&
-                            Array.isArray(dataSelectorOutput) &&
-                            dataSelectorOutput.length > 1 &&
-                            onExecuteStepWithLimit && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    disabled={!canExecute || isExecuting || isGlobalExecuting}
-                                    className="h-8 px-1.5 rounded-l-none border-0"
-                                  >
-                                    <ChevronDown className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
-                                    <Bug className="h-3.5 w-3.5 mr-2" />
-                                    Run single iteration
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          {dataSelectorOutput &&
-                            Array.isArray(dataSelectorOutput) &&
-                            dataSelectorOutput.length > 1 && (
-                              <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
-                                {dataSelectorOutput.length >= 1000
-                                  ? `${Math.floor(dataSelectorOutput.length / 1000)}k`
-                                  : dataSelectorOutput.length}
-                              </span>
-                            )}
+                          {isLooping && onExecuteStepWithLimit && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  disabled={!canExecute || isExecuting || isGlobalExecuting}
+                                  className="h-8 px-1.5 rounded-l-none border-0"
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => onExecuteStepWithLimit(1)}>
+                                  <Bug className="h-3.5 w-3.5 mr-2" />
+                                  Run single iteration
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                          {isLooping && (
+                            <span className="absolute -top-2 -left-2 min-w-[16px] h-[16px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded flex items-center justify-center">
+                              {(loopCount as number) >= 1000
+                                ? `${Math.floor((loopCount as number) / 1000)}k`
+                                : loopCount}
+                            </span>
+                          )}
                         </div>
                       </span>
                     )}
@@ -480,10 +472,10 @@ export const SpotlightStepCard = React.memo(
                             >
                               <Pencil className="h-3 w-3 text-muted-foreground" />
                             </button>
-                            <CopyButton text={step.apiConfig.instruction || ""} />
+                            <CopyButton text={stepInstruction || ""} />
                           </div>
                           <div className="h-9 flex items-center text-xs text-muted-foreground px-3 pr-16 truncate">
-                            {step.apiConfig.instruction || (
+                            {stepInstruction || (
                               <span className="text-muted-foreground italic">
                                 Describe what this step should do...
                               </span>
@@ -492,373 +484,390 @@ export const SpotlightStepCard = React.memo(
                         </div>
                       )}
                     </div>
-                    <div>
-                      <Label className="text-xs flex items-center gap-1">
-                        Request &amp; URL
-                        <HelpTooltip text="Configure the HTTP method and URL for this request. Use variables like {variable} to reference previous step outputs." />
-                      </Label>
-                      <div className="space-y-2 mt-1">
-                        <div className="flex gap-2">
-                          <div className="rounded-lg border shadow-sm bg-muted/30">
-                            <Select
-                              value={step.apiConfig.method}
-                              onValueChange={(value) =>
-                                handleImmediateEdit((s) => ({
-                                  ...s,
-                                  apiConfig: { ...s.apiConfig, method: value },
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="h-9 w-28 border-0 bg-transparent shadow-none">
-                                <SelectValue placeholder="Method" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {["GET", "POST", "PUT", "DELETE", "PATCH"].map((method) => (
-                                  <SelectItem key={method} value={method}>
-                                    {method}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                    {isTransformStep ? (
+                      <SpotlightTransformStepCard
+                        step={step}
+                        onImmediateEdit={handleImmediateEdit}
+                      />
+                    ) : (
+                      <>
+                        <div>
+                          <Label className="text-xs flex items-center gap-1">
+                            Request &amp; URL
+                            <HelpTooltip text="Configure the HTTP method and URL for this request. Use variables like {variable} to reference previous step outputs." />
+                          </Label>
+                          <div className="space-y-2 mt-1">
+                            <div className="flex gap-2">
+                              <div className="rounded-lg border shadow-sm bg-muted/30 flex items-stretch">
+                                <Select
+                                  value={requestConfig?.method}
+                                  onValueChange={(value) =>
+                                    handleImmediateEdit((s) => ({
+                                      ...s,
+                                      config: { ...s.config, method: value },
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="h-full min-h-9 w-28 border-0 bg-transparent shadow-none">
+                                    <SelectValue placeholder="Method" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {["GET", "POST", "PUT", "DELETE", "PATCH"].map((method) => (
+                                      <SelectItem key={method} value={method}>
+                                        {method}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <TemplateAwareTextEditor
+                                value={requestConfig?.url || ""}
+                                onChange={(newValue) => {
+                                  handleImmediateEdit((s) => ({
+                                    ...s,
+                                    config: { ...s.config, url: newValue },
+                                  }));
+                                }}
+                                stepId={step.id}
+                                className="flex-1"
+                                placeholder="https://api.example.com/endpoint"
+                              />
+                            </div>
                           </div>
-                          <TemplateAwareTextEditor
-                            value={composeUrl(
-                              step.apiConfig.urlHost || "",
-                              step.apiConfig.urlPath || "",
-                            )}
-                            onChange={(newValue) => {
-                              const { urlHost, urlPath } = splitUrl(newValue);
-                              handleImmediateEdit((s) => ({
-                                ...s,
-                                apiConfig: { ...s.apiConfig, urlHost, urlPath },
-                              }));
-                            }}
-                            stepId={step.id}
-                            className="flex-1"
-                            placeholder="https://api.example.com/endpoint"
-                          />
                         </div>
-                      </div>
-                    </div>
-                    {(() => {
-                      const showBody = ["POST", "PUT", "PATCH"].includes(step.apiConfig.method);
-                      const hasHeaders = !isEmptyValue(headersText);
-                      const hasQueryParams = !isEmptyValue(queryParamsText);
-                      const hasBody = showBody && !isEmptyValue(step.apiConfig.body || "");
-                      const hasAnyRequestOptions = hasHeaders || hasQueryParams || hasBody;
+                        {(() => {
+                          const showBody = ["POST", "PUT", "PATCH"].includes(
+                            requestConfig?.method || "",
+                          );
+                          const hasHeaders = !isEmptyValue(headersText);
+                          const hasQueryParams = !isEmptyValue(queryParamsText);
+                          const hasBody = showBody && !isEmptyValue(requestConfig?.body || "");
+                          const hasAnyRequestOptions = hasHeaders || hasQueryParams || hasBody;
 
-                      return (
+                          return (
+                            <div>
+                              <div
+                                onClick={() => setRequestOptionsOpen(!requestOptionsOpen)}
+                                className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setRequestOptionsOpen(!requestOptionsOpen);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-1">
+                                  {requestOptionsOpen ? (
+                                    <ChevronDown className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3" />
+                                  )}
+                                  <span>Request Options</span>
+                                  {!requestOptionsOpen && hasAnyRequestOptions && (
+                                    <span className="text-[10px] text-muted-foreground ml-1">
+                                      (configured)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div
+                                className={`overflow-hidden transition-all duration-200 ease-in-out ${requestOptionsOpen ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"}`}
+                              >
+                                <div className="pl-2 space-y-3 pt-2">
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground mb-1 block">
+                                      Headers
+                                    </Label>
+                                    <TemplateAwareJsonEditor
+                                      value={headersText}
+                                      onChange={(val) => {
+                                        setHeadersText(val || "");
+                                        handleImmediateEdit((s) => ({
+                                          ...s,
+                                          config: { ...s.config, headers: val || "" },
+                                        }));
+                                      }}
+                                      stepId={step.id}
+                                      minHeight="75px"
+                                      maxHeight="300px"
+                                      placeholder="{}"
+                                      showValidation={true}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground mb-1 block">
+                                      Query Parameters
+                                    </Label>
+                                    <TemplateAwareJsonEditor
+                                      value={queryParamsText}
+                                      onChange={(val) => {
+                                        setQueryParamsText(val || "");
+                                        handleImmediateEdit((s) => ({
+                                          ...s,
+                                          config: { ...s.config, queryParams: val || "" },
+                                        }));
+                                      }}
+                                      stepId={step.id}
+                                      minHeight="75px"
+                                      maxHeight="300px"
+                                      placeholder="{}"
+                                      showValidation={true}
+                                    />
+                                  </div>
+                                  {showBody && (
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground mb-1 block">
+                                        Body
+                                      </Label>
+                                      <TemplateAwareJsonEditor
+                                        value={requestConfig?.body || ""}
+                                        onChange={(val) =>
+                                          handleImmediateEdit((s) => ({
+                                            ...s,
+                                            config: { ...s.config, body: val || "" },
+                                          }))
+                                        }
+                                        stepId={step.id}
+                                        minHeight="75px"
+                                        maxHeight="300px"
+                                        placeholder=""
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div>
                           <div
-                            onClick={() => setRequestOptionsOpen(!requestOptionsOpen)}
+                            onClick={() => setPaginationOpen(!paginationOpen)}
                             className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                setRequestOptionsOpen(!requestOptionsOpen);
+                                setPaginationOpen(!paginationOpen);
                               }
                             }}
                           >
                             <div className="flex items-center gap-1">
-                              {requestOptionsOpen ? (
+                              {paginationOpen ? (
                                 <ChevronDown className="h-3 w-3" />
                               ) : (
                                 <ChevronRight className="h-3 w-3" />
                               )}
-                              <span>Request Options</span>
-                              {!requestOptionsOpen && hasAnyRequestOptions && (
-                                <span className="text-[10px] text-muted-foreground ml-1">
-                                  (configured)
-                                </span>
-                              )}
+                              <span>Pagination</span>
+                              <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
                             </div>
                           </div>
                           <div
-                            className={`overflow-hidden transition-all duration-200 ease-in-out ${requestOptionsOpen ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"}`}
+                            className={`overflow-hidden transition-all duration-200 ease-in-out ${paginationOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"}`}
                           >
-                            <div className="pl-2 space-y-3 pt-2">
-                              <div>
-                                <Label className="text-xs text-muted-foreground mb-1 block">
-                                  Headers
-                                </Label>
-                                <TemplateAwareJsonEditor
-                                  value={headersText}
-                                  onChange={(val) => {
-                                    setHeadersText(val || "");
-                                    handleImmediateEdit((s) => ({
-                                      ...s,
-                                      apiConfig: { ...s.apiConfig, headers: val || "" },
-                                    }));
-                                  }}
-                                  stepId={step.id}
-                                  minHeight="75px"
-                                  maxHeight="300px"
-                                  placeholder="{}"
-                                  showValidation={true}
-                                />
+                            <div className="space-y-2 mt-1 border-muted">
+                              <div className="pl-2 mb-1">
+                                <div className="rounded-lg border shadow-sm bg-muted/30">
+                                  <Select
+                                    value={requestConfig?.pagination?.type || "none"}
+                                    onValueChange={handlePaginationTypeChange}
+                                  >
+                                    <SelectTrigger className="h-9 border-0 bg-transparent shadow-none">
+                                      <SelectValue placeholder="No pagination" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No pagination</SelectItem>
+                                      <SelectItem value="offsetBased">
+                                        Offset-based (uses {"<<offset>>"})
+                                      </SelectItem>
+                                      <SelectItem value="pageBased">
+                                        Page-based (uses {"<<page>>"})
+                                      </SelectItem>
+                                      <SelectItem value="cursorBased">
+                                        Cursor-based (uses {"<<cursor>>"})
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
-                              <div>
-                                <Label className="text-xs text-muted-foreground mb-1 block">
-                                  Query Parameters
-                                </Label>
-                                <TemplateAwareJsonEditor
-                                  value={queryParamsText}
-                                  onChange={(val) => {
-                                    setQueryParamsText(val || "");
-                                    handleImmediateEdit((s) => ({
-                                      ...s,
-                                      apiConfig: { ...s.apiConfig, queryParams: val || "" },
-                                    }));
-                                  }}
-                                  stepId={step.id}
-                                  minHeight="75px"
-                                  maxHeight="300px"
-                                  placeholder="{}"
-                                  showValidation={true}
-                                />
-                              </div>
-                              {showBody && (
-                                <div>
-                                  <Label className="text-xs text-muted-foreground mb-1 block">
-                                    Body
-                                  </Label>
-                                  <TemplateAwareJsonEditor
-                                    value={step.apiConfig.body || ""}
-                                    onChange={(val) =>
-                                      handleImmediateEdit((s) => ({
-                                        ...s,
-                                        apiConfig: { ...s.apiConfig, body: val || "" },
-                                      }))
-                                    }
-                                    stepId={step.id}
-                                    minHeight="75px"
-                                    maxHeight="300px"
-                                    placeholder=""
-                                  />
+                              {requestConfig?.pagination && (
+                                <div className="mt-2 gap-2 pl-2">
+                                  <div className="flex gap-2">
+                                    <div className="flex-1">
+                                      <Label className="text-xs">Page Size</Label>
+                                      <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                        <Input
+                                          value={requestConfig?.pagination?.pageSize || "50"}
+                                          onChange={(e) =>
+                                            handleImmediateEdit((s) => {
+                                              const cfg = s.config as RequestStepConfig;
+                                              return {
+                                                ...s,
+                                                config: {
+                                                  ...s.config,
+                                                  pagination: {
+                                                    ...(cfg.pagination || {}),
+                                                    pageSize: e.target.value,
+                                                  },
+                                                },
+                                              };
+                                            })
+                                          }
+                                          className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
+                                          placeholder="50"
+                                        />
+                                      </div>
+                                    </div>
+                                    {requestConfig?.pagination?.type === "cursorBased" && (
+                                      <div className="flex-1">
+                                        <Label className="text-xs">Cursor Path</Label>
+                                        <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
+                                          <Input
+                                            value={requestConfig?.pagination?.cursorPath || ""}
+                                            onChange={(e) =>
+                                              handleImmediateEdit((s) => {
+                                                const cfg = s.config as RequestStepConfig;
+                                                return {
+                                                  ...s,
+                                                  config: {
+                                                    ...s.config,
+                                                    pagination: {
+                                                      ...(cfg.pagination || {}),
+                                                      cursorPath: e.target.value,
+                                                    },
+                                                  },
+                                                };
+                                              })
+                                            }
+                                            className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
+                                            placeholder="e.g., response.nextCursor"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="mt-2 gap-2">
+                                    <Label className="text-xs flex items-center gap-1">
+                                      Stop Condition (JavaScript)
+                                      <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
+                                    </Label>
+                                    <div className="mt-1">
+                                      <JavaScriptCodeEditor
+                                        value={
+                                          requestConfig?.pagination?.stopCondition ||
+                                          DEFAULT_PAGINATION_STOP_CONDITION
+                                        }
+                                        onChange={(val) =>
+                                          handleImmediateEdit((s) => {
+                                            const cfg = s.config as RequestStepConfig;
+                                            return {
+                                              ...s,
+                                              config: {
+                                                ...s.config,
+                                                pagination: {
+                                                  ...(cfg.pagination || {}),
+                                                  stopCondition: val,
+                                                },
+                                              },
+                                            };
+                                          })
+                                        }
+                                        minHeight="50px"
+                                        maxHeight="300px"
+                                        resizable={true}
+                                        isTransformEditor={false}
+                                        autoFormatOnMount={true}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
                           </div>
                         </div>
-                      );
-                    })()}
-                    <div>
-                      <div
-                        onClick={() => setPaginationOpen(!paginationOpen)}
-                        className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setPaginationOpen(!paginationOpen);
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-1">
-                          {paginationOpen ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                          <span>Pagination</span>
-                          <HelpTooltip text="Configure pagination if the API returns data in pages. Only set this if you're using pagination variables like {'<<offset>>'}, {'<<page>>'}, or {'<<cursor>>'} in your request." />
-                        </div>
-                      </div>
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${paginationOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"}`}
-                      >
-                        <div className="space-y-2 mt-1 border-muted">
-                          <div className="pl-2 mb-1">
-                            <div className="rounded-lg border shadow-sm bg-muted/30">
-                              <Select
-                                value={step.apiConfig.pagination?.type || "none"}
-                                onValueChange={handlePaginationTypeChange}
-                              >
-                                <SelectTrigger className="h-9 border-0 bg-transparent shadow-none">
-                                  <SelectValue placeholder="No pagination" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">No pagination</SelectItem>
-                                  <SelectItem value="OFFSET_BASED">
-                                    Offset-based (uses {"<<offset>>"})
-                                  </SelectItem>
-                                  <SelectItem value="PAGE_BASED">
-                                    Page-based (uses {"<<page>>"})
-                                  </SelectItem>
-                                  <SelectItem value="CURSOR_BASED">
-                                    Cursor-based (uses {"<<cursor>>"})
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
+                        <div>
+                          <div
+                            onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
+                            className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setAdvancedSettingsOpen(!advancedSettingsOpen);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {advancedSettingsOpen ? (
+                                <ChevronDown className="h-3 w-3" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3" />
+                              )}
+                              <span>Advanced Settings</span>
                             </div>
                           </div>
-                          {step.apiConfig.pagination && (
-                            <div className="mt-2 gap-2 pl-2">
-                              <div className="flex gap-2">
-                                <div className="flex-1">
-                                  <Label className="text-xs">Page Size</Label>
-                                  <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
-                                    <Input
-                                      value={step.apiConfig.pagination.pageSize || "50"}
-                                      onChange={(e) =>
-                                        handleImmediateEdit((s) => ({
-                                          ...s,
-                                          apiConfig: {
-                                            ...s.apiConfig,
-                                            pagination: {
-                                              ...(s.apiConfig.pagination || {}),
-                                              pageSize: e.target.value,
-                                            },
-                                          },
-                                        }))
-                                      }
-                                      className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
-                                      placeholder="50"
-                                    />
-                                  </div>
+                          <div
+                            className={`overflow-hidden transition-all duration-200 ease-in-out ${advancedSettingsOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}
+                          >
+                            <div className="space-y-3 mt-2 border-muted">
+                              <div className="flex items-center justify-between space-x-2 pl-2">
+                                <div className="flex flex-col gap-1">
+                                  <label
+                                    htmlFor={`modify-${step.id}`}
+                                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    Modifies data
+                                  </label>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Enable this if the step can modify or delete live data. When
+                                    enabled, you'll be prompted to confirm before execution.
+                                  </p>
                                 </div>
-                                {step.apiConfig.pagination.type === "CURSOR_BASED" && (
-                                  <div className="flex-1">
-                                    <Label className="text-xs">Cursor Path</Label>
-                                    <div className="rounded-lg border shadow-sm bg-muted/30 mt-1">
-                                      <Input
-                                        value={step.apiConfig.pagination.cursorPath || ""}
-                                        onChange={(e) =>
-                                          handleImmediateEdit((s) => ({
-                                            ...s,
-                                            apiConfig: {
-                                              ...s.apiConfig,
-                                              pagination: {
-                                                ...(s.apiConfig.pagination || {}),
-                                                cursorPath: e.target.value,
-                                              },
-                                            },
-                                          }))
-                                        }
-                                        className="h-9 text-xs border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
-                                        placeholder="e.g., response.nextCursor"
-                                      />
-                                    </div>
-                                  </div>
-                                )}
+                                <Switch
+                                  id={`modify-${step.id}`}
+                                  checked={step.modify === true}
+                                  onCheckedChange={(checked) => {
+                                    handleImmediateEdit((s) => ({
+                                      ...s,
+                                      modify: checked === true,
+                                    }));
+                                  }}
+                                />
                               </div>
-                              <div className="mt-2 gap-2">
-                                <Label className="text-xs flex items-center gap-1">
-                                  Stop Condition (JavaScript)
-                                  <HelpTooltip text="JavaScript function that returns true when pagination should stop. Receives (response, pageInfo) where pageInfo has: page, offset, cursor, total fetched." />
-                                </Label>
-                                <div className="mt-1">
-                                  <JavaScriptCodeEditor
-                                    value={
-                                      step.apiConfig.pagination.stopCondition ||
-                                      DEFAULT_PAGINATION_STOP_CONDITION
-                                    }
-                                    onChange={(val) =>
-                                      handleImmediateEdit((s) => ({
-                                        ...s,
-                                        apiConfig: {
-                                          ...s.apiConfig,
-                                          pagination: {
-                                            ...(s.apiConfig.pagination || {}),
-                                            stopCondition: val,
-                                          },
-                                        },
-                                      }))
-                                    }
-                                    minHeight="50px"
-                                    maxHeight="300px"
-                                    resizable={true}
-                                    isTransformEditor={false}
-                                    autoFormatOnMount={true}
-                                  />
+                              <div className="flex items-center justify-between space-x-2 pl-2">
+                                <div className="flex flex-col gap-1">
+                                  <label
+                                    htmlFor={`continue-on-failure-${step.id}`}
+                                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    Continue on failure
+                                  </label>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    When enabled, the workflow continues even if this step fails.
+                                    Failed iterations are tracked in the results but don't stop
+                                    execution. Error detection is automatically disabled when this
+                                    is enabled.
+                                  </p>
                                 </div>
+                                <Switch
+                                  id={`continue-on-failure-${step.id}`}
+                                  checked={step.failureBehavior === "continue"}
+                                  onCheckedChange={(checked) => {
+                                    handleImmediateEdit((s) => ({
+                                      ...s,
+                                      failureBehavior: checked === true ? "continue" : "fail",
+                                    }));
+                                  }}
+                                />
                               </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <div
-                        onClick={() => setAdvancedSettingsOpen(!advancedSettingsOpen)}
-                        className="w-full flex items-center justify-between text-xs font-medium text-left p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setAdvancedSettingsOpen(!advancedSettingsOpen);
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-1">
-                          {advancedSettingsOpen ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                          <span>Advanced Settings</span>
-                        </div>
-                      </div>
-                      <div
-                        className={`overflow-hidden transition-all duration-200 ease-in-out ${advancedSettingsOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}
-                      >
-                        <div className="space-y-3 mt-2 border-muted">
-                          <div className="flex items-center justify-between space-x-2 pl-2">
-                            <div className="flex flex-col gap-1">
-                              <label
-                                htmlFor={`modify-${step.id}`}
-                                className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                Modifies data
-                              </label>
-                              <p className="text-[10px] text-muted-foreground">
-                                Enable this if the step can modify or delete live data. When
-                                enabled, you'll be prompted to confirm before execution.
-                              </p>
-                            </div>
-                            <Switch
-                              id={`modify-${step.id}`}
-                              checked={step.modify === true}
-                              onCheckedChange={(checked) => {
-                                handleImmediateEdit((s) => ({
-                                  ...s,
-                                  modify: checked === true,
-                                }));
-                              }}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between space-x-2 pl-2">
-                            <div className="flex flex-col gap-1">
-                              <label
-                                htmlFor={`continue-on-failure-${step.id}`}
-                                className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                Continue on failure
-                              </label>
-                              <p className="text-[10px] text-muted-foreground">
-                                When enabled, the workflow continues even if this step fails. Failed
-                                iterations are tracked in the results but don't stop execution.
-                                Error detection is automatically disabled when this is enabled.
-                              </p>
-                            </div>
-                            <Switch
-                              id={`continue-on-failure-${step.id}`}
-                              checked={step.failureBehavior === "CONTINUE"}
-                              onCheckedChange={(checked) => {
-                                handleImmediateEdit((s) => ({
-                                  ...s,
-                                  failureBehavior: checked === true ? "CONTINUE" : "FAIL",
-                                }));
-                              }}
-                            />
                           </div>
                         </div>
-                      </div>
-                    </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )}

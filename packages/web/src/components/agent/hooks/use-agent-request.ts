@@ -4,9 +4,7 @@ import { tokenRegistry } from "@/src/lib/token-registry";
 import {
   AgentRequest,
   UserAction,
-  ToolConfirmationAction,
-  ToolExecutionFeedback,
-  FileUploadAction,
+  ToolEventAction,
   ToolExecutionPolicies,
 } from "@/src/lib/agent/agent-types";
 import { truncateFileContent } from "@/src/lib/file-utils";
@@ -31,8 +29,10 @@ interface UseAgentRequestOptions {
   currentStreamControllerRef: React.MutableRefObject<AbortController | null>;
   uploadedFiles: UploadedFile[];
   pendingFiles: UploadedFile[];
+  sessionFiles: UploadedFile[];
   filePayloads: Record<string, any>;
   toolExecutionPolicies: ToolExecutionPolicies;
+  conversationIdRef: React.MutableRefObject<string | null>;
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
@@ -49,11 +49,14 @@ export function useAgentRequest({
   currentStreamControllerRef,
   uploadedFiles,
   pendingFiles,
+  sessionFiles,
   filePayloads,
   toolExecutionPolicies,
+  conversationIdRef,
   toast,
 }: UseAgentRequestOptions): UseAgentRequestReturn {
   const actionBufferRef = useRef<UserAction[]>([]);
+  const prevFileKeysRef = useRef<string>("");
   const chatEndpoint = config.chatEndpoint || "/api/agent/chat";
   const getAuthToken = config.getAuthToken || (() => tokenRegistry.getToken());
 
@@ -75,32 +78,78 @@ export function useAgentRequest({
     return Object.keys(result).length > 0 ? result : undefined;
   }, [uploadedFiles, filePayloads]);
 
-  const buildFileUploadAction = useCallback((): FileUploadAction | undefined => {
-    if (Object.keys(filePayloads).length === 0) return undefined;
+  const FILE_PREVIEW_MAX_CHARS = 4000;
 
-    const FILE_PREVIEW_MAX_CHARS = 2000;
+  const buildFileStateMessage = useCallback((): Message | null => {
+    const readyPending = pendingFiles.filter((f) => f.status === "ready");
+    const currentFiles = [...sessionFiles, ...readyPending];
+    const currentKeys = currentFiles
+      .map((f) => f.key)
+      .sort()
+      .join(",");
 
-    const files = Object.entries(filePayloads).map(([key, content]) => {
-      const file = uploadedFiles.find((f) => f.key === key);
-      const fileName = file?.name || key;
+    if (currentKeys === prevFileKeysRef.current) return null;
 
-      let contentStr: string;
-      try {
-        contentStr =
-          typeof content === "string" ? content : (JSON.stringify(content, null, 2) ?? "");
-      } catch {
-        contentStr = "[Unable to serialize]";
+    const prevKeys = new Set(prevFileKeysRef.current.split(",").filter(Boolean));
+    const currKeys = new Set(currentKeys.split(",").filter(Boolean));
+    prevFileKeysRef.current = currentKeys;
+
+    const added = currentFiles.filter((f) => !prevKeys.has(f.key));
+    const removedKeys = [...prevKeys].filter((k) => !currKeys.has(k));
+
+    const parts: string[] = ["[FILE STATE]"];
+
+    if (added.length > 0) {
+      parts.push(`Files added: ${added.map((f) => f.name).join(", ")}`);
+    }
+    if (removedKeys.length > 0) {
+      parts.push(`Files removed: ${removedKeys.join(", ")}`);
+    }
+
+    if (currentFiles.length > 0) {
+      const addedKeys = new Set(added.map((f) => f.key));
+      const fileList = currentFiles
+        .map((f) => {
+          const tag = addedKeys.has(f.key) ? "[new]" : "[previously uploaded]";
+          return `- ${f.name} (file::${f.key}) ${tag}`;
+        })
+        .join("\n");
+      parts.push(`\nCurrent session files:\n${fileList}`);
+    } else {
+      parts.push("\nNo files are currently available in this session.");
+    }
+
+    if (added.length > 0) {
+      const previews = added
+        .map((file) => {
+          const content = filePayloads[file.key];
+          if (content === undefined || content === null) return null;
+          let contentStr: string;
+          try {
+            contentStr =
+              typeof content === "string" ? content : (JSON.stringify(content, null, 2) ?? "");
+          } catch {
+            contentStr = "[Unable to serialize]";
+          }
+          const truncated = truncateFileContent(contentStr, FILE_PREVIEW_MAX_CHARS).truncated;
+          return `### ${file.name} (file::${file.key})\n\`\`\`\n${truncated}\n\`\`\``;
+        })
+        .filter(Boolean)
+        .join("\n\n");
+
+      if (previews) {
+        parts.push(`\nFile content previews:\n${previews}`);
       }
+    }
 
-      return {
-        key,
-        name: fileName,
-        contentPreview: truncateFileContent(contentStr, FILE_PREVIEW_MAX_CHARS).truncated,
-      };
-    });
-
-    return files.length > 0 ? { type: "file_upload" as const, files } : undefined;
-  }, [uploadedFiles, filePayloads]);
+    return {
+      id: `file-state-${Date.now()}`,
+      role: "user",
+      content: parts.join("\n"),
+      timestamp: new Date(),
+      isHidden: true,
+    } as Message;
+  }, [sessionFiles, pendingFiles, filePayloads]);
 
   const sendAgentRequest = useCallback(
     async (
@@ -109,7 +158,6 @@ export function useAgentRequest({
     ) => {
       let actionsToSend: UserAction[];
       if (options?.userActions) {
-        // Merge buffered actions with explicit actions (buffered first to preserve chronological order)
         actionsToSend = [...actionBufferRef.current.splice(0), ...options.userActions];
       } else {
         actionsToSend = actionBufferRef.current.splice(0);
@@ -117,18 +165,21 @@ export function useAgentRequest({
       const hasMessage = userMessage && userMessage.trim().length > 0;
       const hasActions = actionsToSend.length > 0;
 
-      if (!hasMessage && !hasActions) {
-        console.warn("sendAgentRequest called with no userMessage or userActions");
+      await Promise.resolve();
+
+      const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
+      const hasHiddenContext = !!hiddenContext;
+      const playgroundDraft = config.playgroundDraftBuilder?.() || undefined;
+
+      if (!hasMessage && !hasActions && !hasHiddenContext) {
+        console.warn("sendAgentRequest called with no userMessage, userActions, or hiddenContext");
         return;
       }
 
-      const confirmationAction = actionsToSend.find(
-        (a): a is ToolConfirmationAction => a.type === "tool_confirmation",
+      const toolEventAction = actionsToSend.find(
+        (a): a is ToolEventAction => a.type === "tool_event",
       );
-      const feedbackAction = actionsToSend.find(
-        (a): a is ToolExecutionFeedback => a.type === "tool_execution_feedback",
-      );
-      const resumeToolId = confirmationAction?.toolCallId || feedbackAction?.toolCallId;
+      const resumeToolId = toolEventAction?.toolCallId;
 
       const shouldResume = resumeToolId && !hasMessage;
 
@@ -143,22 +194,14 @@ export function useAgentRequest({
 
       const currentMessages = [...messagesRef.current];
 
-      const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
+      const fileStateMessage = buildFileStateMessage();
+      if (fileStateMessage) {
+        currentMessages.push(fileStateMessage);
+        setMessages((prev) => [...prev, fileStateMessage]);
+      }
 
       if (hasMessage) {
         const readyPendingFiles = pendingFiles.filter((f) => f.status === "ready");
-
-        if (hiddenContext) {
-          const contextMessage: Message = {
-            id: `${Date.now()}-context`,
-            content: hiddenContext,
-            role: "user",
-            timestamp: new Date(),
-            isHidden: true,
-          };
-          currentMessages.push(contextMessage);
-          setMessages((prev) => [...prev, contextMessage]);
-        }
 
         const userMessageObj: Message = {
           id: Date.now().toString(),
@@ -175,28 +218,27 @@ export function useAgentRequest({
       setIsLoading(true);
 
       let assistantMessage: Message | null = null;
-      if (hasMessage) {
-        assistantMessage = createStreamingAssistantMessage(1);
-        setMessages((prev) => [...prev, assistantMessage!]);
-      } else if (shouldResume) {
+      if (shouldResume) {
         assistantMessage = findAndResumeMessageWithTool(resumeToolId);
+      } else if (hasMessage || hasHiddenContext) {
+        assistantMessage = createStreamingAssistantMessage(hasMessage ? 1 : 0);
+        setMessages((prev) => [...prev, assistantMessage!]);
       }
 
       const controller = new AbortController();
       currentStreamControllerRef.current = controller;
 
-      const fileUploadAction = buildFileUploadAction();
-      const allActions = fileUploadAction ? [...actionsToSend, fileUploadAction] : actionsToSend;
-
       const request: AgentRequest = {
         agentId: config.agentId,
         messages: currentMessages,
         userMessage: hasMessage ? userMessage!.trim() : undefined,
-        userActions: allActions.length > 0 ? allActions : undefined,
+        userActions: actionsToSend.length > 0 ? actionsToSend : undefined,
         filePayloads: buildFilePayloads(),
-        agentParams: config.agentParams,
+        hiddenContext: hiddenContext || undefined,
         toolExecutionPolicies:
           Object.keys(toolExecutionPolicies).length > 0 ? toolExecutionPolicies : undefined,
+        conversationId: conversationIdRef.current ?? undefined,
+        playgroundDraft,
       };
 
       try {
@@ -214,7 +256,14 @@ export function useAgentRequest({
           if (response.status === 401) {
             throw new Error("Authentication failed. Please check your API key configuration.");
           }
-          throw new Error(`HTTP error! status: ${response.status}`);
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          try {
+            const errorBody = await response.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch {}
+          throw new Error(errorMessage);
         }
 
         if (!response.body) {
@@ -228,10 +277,9 @@ export function useAgentRequest({
 
         console.error("Error sending agent request:", error);
         toast({
-          title: "Error",
+          title: "Connection issue",
           description:
-            error instanceof Error ? error.message : "Failed to send request. Please try again.",
-          variant: "destructive",
+            error instanceof Error ? error.message : "Couldn't reach the server. Please try again.",
         });
 
         setMessages((prev) => {
@@ -241,7 +289,7 @@ export function useAgentRequest({
               idx === lastStreamingIndex
                 ? {
                     ...msg,
-                    content: "Sorry, I encountered an error. Please try again.",
+                    content: "I had trouble processing that request. Let me try again.",
                     isStreaming: false,
                   }
                 : msg,
@@ -278,8 +326,9 @@ export function useAgentRequest({
       currentStreamControllerRef,
       uploadedFiles,
       pendingFiles,
+      sessionFiles,
       buildFilePayloads,
-      buildFileUploadAction,
+      buildFileStateMessage,
       toolExecutionPolicies,
       chatEndpoint,
       getAuthToken,
@@ -287,5 +336,9 @@ export function useAgentRequest({
     ],
   );
 
-  return { sendAgentRequest, bufferAction, actionBufferRef };
+  const resetFileTracking = useCallback(() => {
+    prevFileKeysRef.current = "";
+  }, []);
+
+  return { sendAgentRequest, bufferAction, actionBufferRef, resetFileTracking };
 }

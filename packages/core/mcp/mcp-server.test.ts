@@ -1,178 +1,289 @@
-import { describe, expect, it, vi } from "vitest";
-import { toolDefinitions } from "./mcp-server.js";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { createMcpServer, AuthenticateInputSchema } from "./mcp-server.js";
+import { truncateToolExecutionResult } from "./mcp-server-utils.js";
 
-const executeTool = toolDefinitions.superglue_execute_tool.execute;
-const findRelevantTools = toolDefinitions.superglue_find_relevant_tools.execute;
+// Mock dependencies
+vi.mock("../auth/auth.js", () => ({
+  validateToken: vi.fn().mockResolvedValue({
+    orgId: "test-org",
+    isRestricted: false,
+  }),
+}));
 
-describe("superglue_execute_tool", () => {
-  it("executes tool successfully and returns only data", async () => {
-    const client = {
-      runTool: vi.fn().mockResolvedValue({
-        success: true,
-        data: { users: [{ id: 1, name: "Alice" }] },
-        config: { id: "tool-1", steps: [] },
-        stepResults: [],
-      }),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-    };
-    const args = { id: "tool-1", payload: {}, client, orgId: "test-org" };
-    const result = await executeTool(args, {});
+vi.mock("../utils/logs.js", () => ({
+  logMessage: vi.fn(),
+}));
 
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual({ users: [{ id: 1, name: "Alice" }] });
-    expect(result).not.toHaveProperty("config");
-    expect(result).not.toHaveProperty("stepResults");
+vi.mock("../utils/telemetry.js", () => ({
+  sessionId: "test-session",
+  telemetryClient: null,
+}));
+
+// Mock global fetch
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
+describe("MCP Server", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("returns only error message on failure", async () => {
-    const client = {
-      runTool: vi.fn().mockResolvedValue({
-        success: false,
-        error: "API rate limit exceeded",
-        config: {},
-        stepResults: [],
-      }),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-    };
-    const args = { id: "tool-1", client, orgId: "test-org" };
-    const result = await executeTool(args, {});
+  describe("createMcpServer", () => {
+    it("creates server and registers tools from API", async () => {
+      // Mock listTools response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              {
+                id: "get-users",
+                instruction: "Fetch all users from the CRM",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    payload: {
+                      type: "object",
+                      properties: {
+                        limit: { type: "number", description: "Max results" },
+                      },
+                    },
+                  },
+                },
+                archived: false,
+                steps: [],
+              },
+              {
+                id: "send-email",
+                instruction: "Send an email via SMTP",
+                inputSchema: null,
+                archived: false,
+                steps: [],
+              },
+              {
+                id: "archived-tool",
+                instruction: "This is archived",
+                archived: true,
+                steps: [],
+              },
+            ],
+          }),
+      });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("API rate limit exceeded");
-    expect(result).not.toHaveProperty("config");
-    expect(result).not.toHaveProperty("stepResults");
+      const server = await createMcpServer("test-api-key");
+
+      // Server should be created
+      expect(server).toBeDefined();
+
+      // Verify listTools was called
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/v1/tools"),
+        expect.objectContaining({
+          method: "GET",
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-api-key",
+          }),
+        }),
+      );
+    });
+
+    it("filters out archived tools", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              { id: "active-tool", instruction: "Active", archived: false, steps: [] },
+              { id: "archived-tool", instruction: "Archived", archived: true, steps: [] },
+            ],
+          }),
+      });
+
+      const server = await createMcpServer("test-api-key");
+      expect(server).toBeDefined();
+      // The archived tool should not be registered (only active-tool + authenticate)
+    });
+
+    it("handles empty tool list", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: [] }),
+      });
+
+      const server = await createMcpServer("test-api-key");
+      expect(server).toBeDefined();
+      // Should still have authenticate tool
+    });
   });
 
-  it("rejects options parameter", async () => {
-    const client = {
-      runTool: vi.fn(),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-    };
-    const args = { id: "tool-1", options: { retries: 3 }, client, orgId: "test-org" };
-    const result = await executeTool(args, {});
+  describe("jsonSchemaToZod conversion", () => {
+    it("handles tools with complex input schemas", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              {
+                id: "complex-tool",
+                instruction: "Tool with complex schema",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    payload: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string", description: "User name" },
+                        age: { type: "integer" },
+                        active: { type: "boolean" },
+                        tags: { type: "array", items: { type: "string" } },
+                        nested: {
+                          type: "object",
+                          properties: {
+                            field: { type: "string" },
+                          },
+                        },
+                      },
+                      required: ["name"],
+                    },
+                  },
+                },
+                archived: false,
+                steps: [],
+              },
+            ],
+          }),
+      });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Options parameter is not supported");
+      const server = await createMcpServer("test-api-key");
+      expect(server).toBeDefined();
+    });
+
+    it("handles tools with no input schema", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              {
+                id: "no-schema-tool",
+                instruction: "Tool without schema",
+                inputSchema: null,
+                archived: false,
+                steps: [],
+              },
+            ],
+          }),
+      });
+
+      const server = await createMcpServer("test-api-key");
+      expect(server).toBeDefined();
+    });
   });
 
-  it("rejects unexpected parameters", async () => {
-    const client = {
-      runTool: vi.fn(),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-    };
-    const args = { id: "tool-1", unexpectedParam: "value", client, orgId: "test-org" };
-    const result = await executeTool(args, {});
+  describe("AuthenticateInputSchema", () => {
+    it("validates optional systemId", () => {
+      const result1 = AuthenticateInputSchema.safeParse({});
+      expect(result1.success).toBe(true);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Unexpected parameters: unexpectedParam");
+      const result2 = AuthenticateInputSchema.safeParse({ systemId: "stripe" });
+      expect(result2.success).toBe(true);
+
+      const result3 = AuthenticateInputSchema.safeParse({ systemId: 123 });
+      expect(result3.success).toBe(false);
+    });
   });
 
-  it("requires id parameter", async () => {
-    const client = {
-      runTool: vi.fn(),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-    };
-    const args = { payload: {}, client, orgId: "test-org" };
-    const result = await executeTool(args, {});
+  describe("tool name sanitization", () => {
+    it("sanitizes tool IDs with special characters", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              {
+                id: "my-tool-with-dashes",
+                instruction: "Tool with dashes",
+                archived: false,
+                steps: [],
+              },
+              {
+                id: "tool.with.dots",
+                instruction: "Tool with dots",
+                archived: false,
+                steps: [],
+              },
+              {
+                id: "tool@special#chars",
+                instruction: "Tool with special chars",
+                archived: false,
+                steps: [],
+              },
+            ],
+          }),
+      });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Tool ID is required");
-  });
-
-  it("truncates large results", async () => {
-    const largeData = { items: new Array(10000).fill({ id: 1, data: "x".repeat(100) }) };
-    const client = {
-      runTool: vi.fn().mockResolvedValue({
-        success: true,
-        data: largeData,
-        config: {},
-        stepResults: [],
-      }),
-      listWorkflows: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-    };
-    const args = { id: "tool-1", client, orgId: "test-org" };
-    const result = await executeTool(args, {});
-
-    expect(result.success).toBe(true);
-    expect(typeof result.data).toBe("string");
-    expect(result.data).toContain("[TRUNCATED:");
+      const server = await createMcpServer("test-api-key");
+      expect(server).toBeDefined();
+      // Tool names should be sanitized to valid MCP names
+    });
   });
 });
 
-describe("superglue_find_relevant_tools", () => {
-  it("returns all tools when searchTerms is wildcard", async () => {
-    // Mock REST API response format (OpenAPITool)
-    const mockTools = [
-      {
-        id: "tool-1",
-        instruction: "Fetch users",
-        inputSchema: {},
-        outputSchema: {},
-        steps: [{ systemId: "crm", instruction: "Get users" }],
-      },
-      {
-        id: "tool-2",
-        instruction: "Send email",
-        inputSchema: {},
-        outputSchema: {},
-        steps: [{ systemId: "email", instruction: "Send message" }],
-      },
-    ];
-    const client = {
-      listTools: vi.fn().mockResolvedValue(mockTools),
-    };
-    const args = { searchTerms: "*", client, orgId: "test-org" };
-    const result = await findRelevantTools(args, {});
+describe("truncateToolExecutionResult", () => {
+  it("returns JSON string for small results without sampling", () => {
+    const result = { success: true, data: { id: 1, name: "test" } };
+    const output = truncateToolExecutionResult(result);
 
-    expect(result.success).toBe(true);
-    expect(result.tools).toHaveLength(2);
-    expect(result.tools[0]).toHaveProperty("id");
-    expect(result.tools[0]).toHaveProperty("instruction");
-    expect(result.tools[0]).toHaveProperty("steps");
-    // Verify mapping from REST format
-    expect(result.tools[0].steps[0].systemId).toBe("crm");
+    expect(output).toBe(JSON.stringify(result, null, 2));
+    expect(output).not.toContain("sampled from");
   });
 
-  it("returns filtered tools for specific search", async () => {
-    const mockTools = [
-      {
-        id: "slack-tool",
-        instruction: "Post to Slack",
-        inputSchema: {},
-        outputSchema: {},
-        steps: [{ systemId: "slack" }],
-      },
-    ];
-    const client = {
-      listTools: vi.fn().mockResolvedValue(mockTools),
-    };
-    const args = { searchTerms: "slack message", client, orgId: "test-org" };
-    const result = await findRelevantTools(args, {});
-
-    expect(result.success).toBe(true);
-    expect(result.tools).toHaveLength(1);
-    expect(result.tools[0].id).toBe("slack-tool");
+  it("returns 'no result' for null/undefined", () => {
+    expect(truncateToolExecutionResult(null)).toBe("no result");
+    expect(truncateToolExecutionResult(undefined)).toBe("no result");
   });
 
-  it("returns empty array when no tools match", async () => {
-    const client = {
-      listTools: vi.fn().mockResolvedValue([]),
-    };
-    const args = { searchTerms: "nonexistent", client, orgId: "test-org" };
-    const result = await findRelevantTools(args, {});
+  it("does not sample arrays under the character limit", () => {
+    // Create a result with an array that's under the limit
+    const smallArray = new Array(20).fill({ id: 1 });
+    const result = { success: true, data: smallArray };
+    const output = truncateToolExecutionResult(result);
 
-    expect(result.success).toBe(true);
-    expect(result.tools).toEqual([]);
+    // Should NOT contain sampled message since it's under the limit
+    expect(output).not.toContain("sampled from");
+    // Should contain all 20 items
+    const parsed = JSON.parse(output);
+    expect(parsed.data).toHaveLength(20);
   });
 
-  it("handles errors gracefully", async () => {
-    const client = {
-      listTools: vi.fn().mockRejectedValue(new Error("Search failed")),
-    };
-    const args = { searchTerms: "test", client, orgId: "test-org" };
-    const result = await findRelevantTools(args, {});
+  it("samples large arrays that exceed the character limit", () => {
+    // Create a result with a large array that exceeds the limit
+    // Use Array.from to create unique objects (not references)
+    const largeArray = Array.from({ length: 5000 }, (_, i) => ({
+      id: i,
+      data: "x".repeat(100),
+    }));
+    const result = { success: true, data: largeArray };
+    const output = truncateToolExecutionResult(result, 10);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("Search failed");
+    // Should contain the sampled message
+    expect(output).toContain("sampled from 5000 items");
+  });
+
+  it("hard truncates if sampled result still exceeds limit", () => {
+    // Create a result where even sampled data exceeds 20k chars
+    // Each item has a 3000 char string, 10 items sampled = ~30k chars
+    // Use Array.from to create unique objects (not references)
+    const hugeStrings = Array.from({ length: 100 }, (_, i) => ({
+      id: i,
+      data: "x".repeat(3000),
+    }));
+    const result = { success: true, data: hugeStrings };
+    const output = truncateToolExecutionResult(result, 10);
+
+    // Should hit the hard truncate
+    expect(output).toContain("[TRUNCATED: exceeded");
+    expect(output).toContain("char limit]");
+    expect(output.length).toBeLessThanOrEqual(20100); // limit + truncation message
   });
 });

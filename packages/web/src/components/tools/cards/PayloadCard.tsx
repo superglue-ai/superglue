@@ -1,11 +1,12 @@
 import JsonSchemaEditor from "@/src/components/editors/JsonSchemaEditor";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
-import { FileChip } from "@/src/components/ui/FileChip";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { formatBytes, isAllowedFileType, MAX_TOTAL_FILE_SIZE_TOOLS } from "@/src/lib/file-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
+import { useResizable } from "@/src/hooks/use-resizable";
 import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
 import { FileBraces, FileBracesCorner, FileJson, Upload } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -45,40 +46,9 @@ export const PayloadSpotlight = ({
   const [localInputSchema, setLocalInputSchema] = useState(inputSchema || null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sharedPayloadResize = useResizable({ minHeight: 200, maxHeight: 400, initialHeight: 260 });
 
-  // Save payload to localStorage whenever it changes (debounced)
-  useEffect(() => {
-    if (!tool.id) return;
-
-    const STORAGE_KEY = `superglue-payload:${tool.id}`;
-    const MAX_PAYLOAD_SIZE = 100 * 1024; // Only cache small payloads (100KB)
-    const DEBOUNCE_MS = 500;
-
-    const timeoutId = setTimeout(() => {
-      try {
-        const trimmed = (payloadText || "").trim();
-        if (trimmed === "") {
-          localStorage.removeItem(STORAGE_KEY);
-          return;
-        }
-
-        const payloadSize = new Blob([payloadText]).size;
-
-        if (payloadSize > MAX_PAYLOAD_SIZE) {
-          localStorage.removeItem(STORAGE_KEY);
-          return;
-        }
-
-        localStorage.setItem(STORAGE_KEY, payloadText);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "QuotaExceededError") {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      }
-    }, DEBOUNCE_MS);
-
-    return () => clearTimeout(timeoutId);
-  }, [tool.id, payloadText]);
+  // Payload persistence is now handled in tool-config-context.tsx
 
   useEffect(() => {
     setLocalPayload(payloadText || "");
@@ -159,7 +129,7 @@ export const PayloadSpotlight = ({
         className="hidden"
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="h-9 p-1 rounded-md mb-3">
+        <TabsList className="h-9 p-1 rounded-md">
           <TabsTrigger
             value="payload"
             className="h-full px-3 text-xs flex items-center gap-1 rounded-sm data-[state=active]:rounded-sm"
@@ -183,7 +153,10 @@ export const PayloadSpotlight = ({
             </TabsTrigger>
           )}
         </TabsList>
-        <TabsContent value="payload" className="mt-1 space-y-3">
+        <TabsContent value="payload" className="mt-3 space-y-3">
+          <span className="text-xs text-muted-foreground block">
+            Enter your inputs here manually, or upload files to autofill missing JSON fields.
+          </span>
           {onFilesUpload && uploadedFiles.length > 0 && (
             <div className="space-y-1.5">
               {uploadedFiles.map((file) => (
@@ -199,9 +172,6 @@ export const PayloadSpotlight = ({
               ))}
             </div>
           )}
-          <span className="text-xs text-muted-foreground">
-            Enter your inputs here manually, or upload files to autofill missing JSON fields.
-          </span>
           {uploadedFiles.length > 0 ? (
             <div className="flex gap-3">
               <div className="flex-1 min-w-0">
@@ -213,8 +183,11 @@ export const PayloadSpotlight = ({
                   value={localPayload}
                   onChange={(val) => handlePayloadChange(val || "")}
                   readOnly={false}
-                  maxHeight="250px"
-                  resizable={true}
+                  minHeight="200px"
+                  maxHeight="400px"
+                  height={sharedPayloadResize.height}
+                  resizeHandleProps={sharedPayloadResize.resizeHandleProps}
+                  resizable={false}
                   showValidation={true}
                 />
               </div>
@@ -228,8 +201,11 @@ export const PayloadSpotlight = ({
                 <JsonCodeEditor
                   value={JSON.stringify(payload.computedPayload, null, 2)}
                   readOnly={true}
-                  maxHeight="300px"
-                  resizable={true}
+                  minHeight="200px"
+                  maxHeight="400px"
+                  height={sharedPayloadResize.height}
+                  resizeHandleProps={sharedPayloadResize.resizeHandleProps}
+                  resizable={false}
                   showValidation={false}
                 />
               </div>
@@ -240,7 +216,7 @@ export const PayloadSpotlight = ({
                 value={localPayload}
                 onChange={(val) => handlePayloadChange(val || "")}
                 readOnly={false}
-                maxHeight="300px"
+                maxHeight="400px"
                 resizable={true}
                 showValidation={true}
               />
@@ -334,13 +310,6 @@ export const PayloadMiniStepCard = React.memo(
     return (
       <Card className="w-full max-w-6xl mx-auto shadow-md border border-border/50 dark:border-border/70 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 dark:from-muted/40 dark:to-muted/20 backdrop-blur-sm">
         <div className="p-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <FileJson className="h-4 w-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold">Tool Input</h3>
-            </div>
-            <HelpTooltip text="Payload is the JSON input to tool execution. Editing here does NOT save values to the tool; it only affects this session/run. Use Input Schema to optionally describe the expected structure for validation and tooling." />
-          </div>
           <PayloadSpotlight
             onFilesUpload={onFilesUpload}
             onFileRemove={onFileRemove}

@@ -2,10 +2,6 @@ import { tavilySearch } from "@tavily/ai-sdk";
 import { System, ServiceMetadata } from "@superglue/shared";
 import { LLMToolDefinition, LLMToolImplementation } from "./llm-tool-utils.js";
 import { SystemManager } from "../systems/system-manager.js";
-import { DocumentationSearch } from "../documentation/documentation-search.js";
-import { sanitizeInstructionSuggestions, runCodeInIVM } from "../utils/helpers.js";
-import { LanguageModel, LLMMessage } from "./llm-base-model.js";
-import { GENERATE_INSTRUCTIONS_SYSTEM_PROMPT } from "../context/context-prompts.js";
 
 export function getWebSearchTool(): any {
   if (!process.env.TAVILY_API_KEY) {
@@ -99,100 +95,4 @@ export const searchDocumentationToolDefinition: LLMToolDefinition = {
     required: ["query"],
   },
   execute: searchDocumentationToolImplementation,
-};
-
-export interface InstructionGenerationContext extends ServiceMetadata {
-  systems: System[];
-}
-
-export const generateInstructionsToolImplementation: LLMToolImplementation<
-  InstructionGenerationContext
-> = async (args, context) => {
-  const { systems } = context;
-  const metadata = context as ServiceMetadata;
-
-  if (!systems || systems.length === 0) {
-    return {
-      success: false,
-      error: "No systems provided in context",
-    };
-  }
-
-  // Prepare system summaries with smart documentation truncation
-  const systemSummaries = systems.map((system) => {
-    // Use DocumentationSearch to intelligently truncate documentation
-    // Focus on getting started, authentication, and basic operations
-    const documentationSearch = new DocumentationSearch(metadata);
-    let truncatedDocs = system.documentation
-      ? documentationSearch.extractRelevantSections(
-          system.documentation,
-          "getting started overview endpoints reference",
-          10, // max_chunks
-          1000, // chunk_size - smaller chunks for summaries
-          system.openApiSchema,
-        )
-      : "";
-
-    // Always append specific instructions if they exist
-    if (system.specificInstructions && system.specificInstructions.trim().length > 0) {
-      if (truncatedDocs) {
-        truncatedDocs =
-          truncatedDocs +
-          "\n\n=== SPECIFIC INSTRUCTIONS ===\n\n" +
-          system.specificInstructions.trim();
-      } else {
-        truncatedDocs = "=== SPECIFIC INSTRUCTIONS ===\n\n" + system.specificInstructions.trim();
-      }
-    }
-
-    return {
-      id: system.id,
-      urlHost: system.urlHost,
-      urlPath: system.urlPath,
-      documentation: truncatedDocs.slice(0, 1000) + (truncatedDocs.length > 1000 ? "..." : ""),
-      documentationUrl: system.documentationUrl,
-    };
-  });
-
-  const messages: LLMMessage[] = [
-    {
-      role: "system",
-      content: GENERATE_INSTRUCTIONS_SYSTEM_PROMPT,
-    },
-    {
-      role: "user",
-      content: `<systems>${JSON.stringify(systemSummaries, null, 2)}</systems>`,
-    },
-  ];
-
-  const schema = {
-    type: "array",
-    items: { type: "string" },
-  };
-
-  const result = await LanguageModel.generateObject<string[]>({
-    messages,
-    schema,
-    temperature: 0.2,
-    metadata,
-  });
-
-  if (!result.success) {
-    throw new Error(`Error generating instructions: ${result.response}`);
-  }
-
-  return {
-    success: true,
-    data: sanitizeInstructionSuggestions(result.response),
-  };
-};
-
-export const generateInstructionsToolDefinition: LLMToolDefinition = {
-  name: "generate_instructions",
-  description: "Generate specific, implementable workflow instructions for the available systems.",
-  arguments: {
-    type: "object",
-    properties: {},
-    required: [],
-  },
 };

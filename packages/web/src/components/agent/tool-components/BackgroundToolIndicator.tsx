@@ -4,20 +4,26 @@ import { ToolCall } from "@superglue/shared";
 import {
   Search,
   BookOpen,
-  LayoutTemplate,
   Globe,
   Hammer,
   Blocks,
   Save,
   History,
+  GraduationCap,
+  Eye,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/src/lib/general-utils";
 import { MessagePart } from "@superglue/shared";
+import { useState } from "react";
 
-const BACKGROUND_TOOL_CONFIG: Record<
-  string,
-  { icon: typeof Search; label: string; activeLabel: string }
-> = {
+interface BackgroundToolConfig {
+  icon: typeof Search;
+  label: string | ((tool: ToolCall) => string);
+  activeLabel: string;
+}
+
+const BACKGROUND_TOOL_CONFIG: Record<string, BackgroundToolConfig> = {
   web_search: {
     icon: Globe,
     label: "Searched web",
@@ -28,11 +34,6 @@ const BACKGROUND_TOOL_CONFIG: Record<
     label: "Read documentation",
     activeLabel: "Reading documentation...",
   },
-  find_system_templates: {
-    icon: LayoutTemplate,
-    label: "Found templates",
-    activeLabel: "Finding templates...",
-  },
   find_tool: {
     icon: Hammer,
     label: "Found tools",
@@ -40,18 +41,32 @@ const BACKGROUND_TOOL_CONFIG: Record<
   },
   find_system: {
     icon: Blocks,
-    label: "Found systems",
-    activeLabel: "Finding systems...",
+    label: "Found system",
+    activeLabel: "Finding system...",
   },
   save_tool: {
     icon: Save,
     label: "Saved tool",
     activeLabel: "Saving tool...",
   },
-  get_runs: {
-    icon: History,
-    label: "Fetched runs",
-    activeLabel: "Fetching runs...",
+  find_system_templates: {
+    icon: Search,
+    label: "Found templates",
+    activeLabel: "Finding templates...",
+  },
+  read_skill: {
+    icon: GraduationCap,
+    label: (tool: ToolCall) => {
+      const loaded = tool.output?.loaded as string[] | undefined;
+      if (loaded?.length) return `Loaded ${loaded.join(", ")}`;
+      return "Loaded skills";
+    },
+    activeLabel: "Loading skills...",
+  },
+  inspect_tool: {
+    icon: Eye,
+    label: "Inspected tool",
+    activeLabel: "Inspecting tool...",
   },
 };
 
@@ -60,6 +75,7 @@ export const BACKGROUND_TOOL_NAMES = new Set(Object.keys(BACKGROUND_TOOL_CONFIG)
 export type GroupedPart =
   | { type: "content"; part: MessagePart }
   | { type: "tool"; part: MessagePart }
+  | { type: "error"; part: MessagePart }
   | { type: "background_tools"; tools: ToolCall[] };
 
 export function groupMessageParts(parts: MessagePart[]): GroupedPart[] {
@@ -82,6 +98,8 @@ export function groupMessageParts(parts: MessagePart[]): GroupedPart[] {
         grouped.push({ type: "content", part });
       } else if (part.type === "tool") {
         grouped.push({ type: "tool", part });
+      } else if (part.type === "error") {
+        grouped.push({ type: "error", part });
       }
     }
   }
@@ -109,14 +127,17 @@ function ShimmerText({ text, className }: { text: string; className?: string }) 
 
 interface BackgroundToolIndicatorProps {
   tool: ToolCall;
+  count?: number;
 }
 
-export function BackgroundToolIndicator({ tool }: BackgroundToolIndicatorProps) {
+export function BackgroundToolIndicator({ tool, count }: BackgroundToolIndicatorProps) {
   const config = BACKGROUND_TOOL_CONFIG[tool.name];
   if (!config) return null;
 
   const isActive = tool.status === "running" || tool.status === "pending";
   const Icon = config.icon;
+  const label = typeof config.label === "function" ? config.label(tool) : config.label;
+  const displayLabel = label;
 
   return (
     <div
@@ -129,10 +150,28 @@ export function BackgroundToolIndicator({ tool }: BackgroundToolIndicatorProps) 
       {isActive ? (
         <ShimmerText text={config.activeLabel} className="font-medium" />
       ) : (
-        <span className="font-medium">{config.label}</span>
+        <span className="font-medium">{displayLabel}</span>
       )}
     </div>
   );
+}
+
+interface DeduplicatedTool {
+  tool: ToolCall;
+  count: number;
+}
+
+function deduplicateTools(tools: ToolCall[]): DeduplicatedTool[] {
+  const seen = new Map<string, DeduplicatedTool>();
+  for (const tool of tools) {
+    const existing = seen.get(tool.name);
+    if (existing) {
+      existing.count++;
+    } else {
+      seen.set(tool.name, { tool, count: 1 });
+    }
+  }
+  return Array.from(seen.values());
 }
 
 interface BackgroundToolGroupProps {
@@ -140,7 +179,13 @@ interface BackgroundToolGroupProps {
 }
 
 export function BackgroundToolGroup({ tools }: BackgroundToolGroupProps) {
+  const [expanded, setExpanded] = useState(false);
   if (tools.length === 0) return null;
+
+  const hasAnyActive = tools.some((t) => t.status === "running" || t.status === "pending");
+
+  const deduplicated = deduplicateTools(tools);
+  const showCollapsible = deduplicated.length > 1 && !hasAnyActive;
 
   return (
     <>
@@ -169,11 +214,37 @@ export function BackgroundToolGroup({ tools }: BackgroundToolGroupProps) {
           animation: shimmer-icon 1.5s ease-in-out infinite;
         }
       `}</style>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-1">
-        {tools.map((tool) => (
-          <BackgroundToolIndicator key={tool.id} tool={tool} />
-        ))}
-      </div>
+      {showCollapsible ? (
+        <div className="py-0.5">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setExpanded((v) => !v)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setExpanded((v) => !v);
+            }}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground/80 transition-colors cursor-pointer select-none"
+          >
+            <ChevronRight
+              className={cn("w-3 h-3 transition-transform duration-150", expanded && "rotate-90")}
+            />
+            <span className="font-medium">{tools.length} background actions</span>
+          </div>
+          {expanded && (
+            <div className="flex flex-col gap-0.5 pl-4 pt-0.5">
+              {deduplicated.map(({ tool, count }) => (
+                <BackgroundToolIndicator key={tool.name} tool={tool} count={count} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-0.5 py-0.5">
+          {deduplicated.map(({ tool, count }) => (
+            <BackgroundToolIndicator key={tool.name} tool={tool} count={count} />
+          ))}
+        </div>
+      )}
     </>
   );
 }

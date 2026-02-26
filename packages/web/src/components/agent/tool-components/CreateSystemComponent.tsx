@@ -2,72 +2,62 @@
 
 import { useSystems } from "@/src/app/systems-context";
 import { Button } from "@/src/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/src/components/ui/dialog";
+import { Input } from "@/src/components/ui/input";
 import { useToast } from "@/src/hooks/use-toast";
 import { useSystemActions } from "@/src/hooks/use-system-actions";
 import { SystemIcon } from "@/src/components/ui/system-icon";
-import { composeUrl, getSimpleIcon } from "@/src/lib/general-utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
-import { systemOptions, ToolCall } from "@superglue/shared";
+import { System, SystemInput, ToolCall } from "@superglue/shared";
+import { UserAction } from "@/src/lib/agent/agent-types";
 import {
   AlertTriangle,
   CheckCircle,
   ChevronDown,
   ChevronRight,
   Clock,
-  Edit,
+  Eye,
+  EyeOff,
   Globe,
   Key,
+  KeyRound,
+  Loader2,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SystemForm } from "../../systems/SystemForm";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 
 interface CreateSystemComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
+  onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
+  sendAgentRequest?: (
+    userMessage?: string,
+    options?: { userActions?: UserAction[] },
+  ) => Promise<void>;
+  onAbortStream?: () => void;
 }
 
-interface CreateSystemInput {
-  id: string;
-  name: string;
-  urlHost: string;
-  urlPath: string;
-  credentials: Record<string, any>;
-  documentationUrl?: string;
-  documentationKeywords?: string[];
-  specificInstructions?: string;
-}
+type CreateSystemInput = SystemInput & { sensitiveCredentials?: Record<string, boolean> };
 
 interface CreateSystemOutput {
-  success: boolean;
-  note?: string;
-  system: {
-    id: string;
-    name: string;
-    urlHost: string;
-    urlPath: string;
-    credentials: Record<string, any>;
-    documentationUrl?: string;
-    documentationKeywords?: string[];
-    specificInstructions?: string;
-    documentationPending?: boolean;
-    icon?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
+  success?: boolean;
+  confirmationState?: string;
+  systemConfig?: any;
+  requiredSensitiveFields?: string[];
+  system?: System;
 }
 
-function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponentProps) {
+function CreateSystemComponentImpl({
+  tool,
+  onInputChange,
+  onToolUpdate,
+  sendAgentRequest,
+  onAbortStream,
+}: CreateSystemComponentProps) {
   const [isInstructionsExpanded, setIsInstructionsExpanded] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [systemNotFound, setSystemNotFound] = useState(false);
+  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
+  const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
+  const [isExecuting, setIsExecuting] = useState(false);
   const { saveSystem, handleOAuth } = useSystemActions();
   const { toast } = useToast();
   const { systems, refreshSystems, isRefreshing } = useSystems();
@@ -77,7 +67,6 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
       return { color: "amber", label: "No Auth", icon: "clock" };
     }
 
-    // Check for common auth types
     const keys = Object.keys(credentials);
     if (keys.includes("client_id") && keys.includes("client_secret")) {
       return { color: "blue", label: "OAuth", icon: "key" };
@@ -95,65 +84,6 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     return { color: "green", label: "Custom Auth", icon: "key" };
   }, []);
 
-  // Handle system save
-  const handleSystemSave = useCallback(
-    async (systemData: any) => {
-      try {
-        // Close the modal first to prevent scroll issues
-        setIsEditModalOpen(false);
-
-        // Save to database using the hook
-        const savedSystem = await saveSystem(systemData);
-
-        if (savedSystem) {
-          // Refresh systems from context to get updated data
-          await refreshSystems();
-
-          // Check if OAuth should be triggered
-          const grantType = systemData.credentials?.grant_type || "authorization_code";
-          const shouldTriggerOAuth =
-            systemData.credentials &&
-            // For authorization code: trigger if OAuth is not configured yet
-            ((grantType === "authorization_code" &&
-              (!systemData.credentials.access_token || !systemData.credentials.refresh_token)) ||
-              // For client credentials: trigger if OAuth fields have changed (backend will handle it)
-              (grantType === "client_credentials" &&
-                systemData.credentials.client_id &&
-                systemData.credentials.client_secret));
-
-          if (shouldTriggerOAuth) {
-            // Handle OAuth flow
-            await handleOAuth(savedSystem);
-          }
-
-          toast({
-            title: "System Updated",
-            description: "System has been updated successfully.",
-          });
-
-          return savedSystem;
-        } else {
-          throw new Error("Failed to save system");
-        }
-      } catch (error) {
-        console.error("Error updating system:", error);
-        toast({
-          title: "Error",
-          description: "Failed to update system.",
-          variant: "destructive",
-        });
-        return null;
-      }
-    },
-    [saveSystem, handleOAuth, toast, refreshSystems],
-  );
-
-  // Handle modal close
-  const handleModalClose = useCallback(() => {
-    setIsEditModalOpen(false);
-  }, []);
-
-  // Parse input and output
   const input = (() => {
     if (!tool.input) return null;
     try {
@@ -176,17 +106,34 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     }
   })();
 
+  const requiredSensitiveFields = useMemo(() => {
+    if (output?.requiredSensitiveFields && output.requiredSensitiveFields.length > 0) {
+      return output.requiredSensitiveFields;
+    }
+    if (input?.sensitiveCredentials) {
+      return Object.keys(input.sensitiveCredentials);
+    }
+    return [];
+  }, [output?.requiredSensitiveFields, input?.sensitiveCredentials]);
+
+  const hasSensitiveCredentials = requiredSensitiveFields.length > 0;
+  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && hasSensitiveCredentials;
+  const isConfirming = tool.status === "running" && hasSensitiveCredentials;
   const isCompleted = tool.status === "completed" && output?.success;
   const isToolInProgress = tool.status === "running" || tool.status === "pending";
-  const hasNoOutput = !output || !output.success;
+  const showPendingMessage = isToolInProgress && !isCompleted && !hasSensitiveCredentials;
 
-  // Get system from context (refreshes when OAuth completes), fallback to output/input
-  const systemId = output?.system?.id || input?.id;
+  const systemConfig = output?.systemConfig || input;
+
+  const systemId = output?.system?.id || systemConfig?.id || input?.id;
+  const systemName = output?.system?.name || systemConfig?.name || input?.name;
   const systemFromContext = useMemo(() => {
-    return systemId ? systems.find((i) => i.id === systemId) : null;
-  }, [systems, systemId]);
+    if (systemId) return systems.find((i) => i.id === systemId) || null;
+    if (systemName) return systems.find((i) => i.name === systemName) || null;
+    return null;
+  }, [systems, systemId, systemName]);
 
-  const displaySystem = systemFromContext || output?.system || input;
+  const displaySystem = systemFromContext || output?.system || systemConfig || input;
 
   const badge = useMemo(
     () => getAuthBadge(displaySystem?.credentials || {}),
@@ -201,7 +148,6 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     [],
   );
 
-  // Refresh systems when tool completes to get the newly created system
   const hasTriggeredRefreshRef = useRef(false);
   useEffect(() => {
     if (isCompleted && systemId && !hasTriggeredRefreshRef.current) {
@@ -210,22 +156,75 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     }
   }, [isCompleted, systemId, refreshSystems]);
 
-  // Track if we've ever seen this system in context (to detect deletion)
+  useEffect(() => {
+    if (isCompleted || tool.status === "declined" || tool.status === "error") {
+      setIsExecuting(false);
+    }
+  }, [isCompleted, tool.status]);
+
   const wasFoundInContextRef = useRef(false);
   useEffect(() => {
     if (systemFromContext) {
       wasFoundInContextRef.current = true;
       setSystemNotFound(false);
     } else if (wasFoundInContextRef.current && !isRefreshing) {
-      // We previously found it but now it's gone - it was deleted
       setSystemNotFound(true);
     }
   }, [systemFromContext, isRefreshing]);
 
+  const handleConfirm = useCallback(() => {
+    if (!sendAgentRequest) return;
+
+    setIsExecuting(true);
+    onToolUpdate?.(tool.id, { status: "running" });
+
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_event",
+          toolCallId: tool.id,
+          toolName: "create_system",
+          event: "confirmed",
+          payload: {
+            systemConfig,
+            userProvidedCredentials: credentialValues,
+          },
+        },
+      ],
+    });
+  }, [sendAgentRequest, onToolUpdate, tool.id, systemConfig, credentialValues]);
+
+  const handleCancel = useCallback(() => {
+    if (!sendAgentRequest) return;
+
+    onToolUpdate?.(tool.id, { status: "declined" });
+
+    sendAgentRequest(undefined, {
+      userActions: [
+        {
+          type: "tool_event",
+          toolCallId: tool.id,
+          toolName: "create_system",
+          event: "declined",
+        },
+      ],
+    });
+  }, [sendAgentRequest, onToolUpdate, tool.id]);
+
+  const allCredentialsProvided = useMemo(() => {
+    return requiredSensitiveFields.every(
+      (field) => credentialValues[field] && credentialValues[field].trim() !== "",
+    );
+  }, [requiredSensitiveFields, credentialValues]);
+
   if (!displaySystem) {
     if (isRefreshing || isToolInProgress) {
       return (
-        <ToolCallWrapper tool={tool} openByDefault={true}>
+        <ToolCallWrapper
+          tool={tool}
+          openByDefault={true}
+          statusOverride={isToolInProgress ? "running" : undefined}
+        >
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
               <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-pulse" />
@@ -250,10 +249,15 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
     }
   }
 
+  const wrapperStatusOverride = isToolInProgress ? "running" : undefined;
+
   return (
-    <ToolCallWrapper tool={tool} openByDefault={true}>
+    <ToolCallWrapper
+      tool={tool}
+      openByDefault={!isCompleted}
+      statusOverride={wrapperStatusOverride}
+    >
       <div className="space-y-4">
-        {/* Warning Banner for Deleted System */}
         {systemNotFound && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
             <div className="flex items-center gap-2">
@@ -266,126 +270,105 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {isCompleted ? (
-              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-            ) : isToolInProgress ? (
-              <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-pulse" />
-              </div>
-            ) : (
-              <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-                <div className="w-2 h-2 bg-amber-600 dark:bg-amber-400 rounded-full" />
-              </div>
-            )}
-            <div>
-              <div className="text-sm font-medium">
-                {isCompleted ? "Created System" : isToolInProgress ? "Creating System" : "System"}
-              </div>
-              <div className="text-lg font-semibold">
-                {displaySystem.name || displaySystem.id || "System"}
-              </div>
-            </div>
-          </div>
-
-          {/* Edit Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => !systemNotFound && !isToolInProgress && setIsEditModalOpen(true)}
-            disabled={systemNotFound || isToolInProgress}
-            className="h-8 w-8 p-0 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-            title={
-              systemNotFound
-                ? "Cannot edit deleted system"
-                : isToolInProgress
-                  ? "Cannot edit while tool is running"
-                  : "Edit system"
-            }
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* System Details */}
         <div
           className={`bg-background border rounded-lg p-4 ${
-            isToolInProgress || hasNoOutput
+            isAwaitingConfirmation
               ? "border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10"
-              : "border-border"
+              : showPendingMessage
+                ? "border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10"
+                : "border-border"
           }`}
         >
-          {/* Input Data Indicator */}
-          {(isToolInProgress || hasNoOutput) && (
+          {showPendingMessage && (
             <div className="mb-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded">
               Showing input data - system will be created shortly
             </div>
           )}
           <div className="flex items-start gap-4">
-            {/* Icon */}
             <div className="flex-shrink-0">
-              {displaySystem?.id ? (
+              {displaySystem?.name || displaySystem?.id ? (
                 <SystemIcon system={displaySystem} size={24} fallbackClassName="text-foreground" />
               ) : (
                 <Globe className="h-6 w-6 text-foreground" />
               )}
             </div>
 
-            {/* Details */}
             <div className="flex-1 min-w-0 space-y-3">
-              {/* 1. API Endpoint */}
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">API Endpoint</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  System Endpoint
+                </div>
                 <div className="text-sm font-mono bg-muted/50 px-2 py-1 rounded">
-                  {(() => {
-                    // Check for different possible URL properties
-                    const urlHost = displaySystem.urlHost || displaySystem.host || "";
-                    const urlPath = displaySystem.urlPath || displaySystem.path || "";
-
-                    // If we have a host, compose the URL
-                    if (urlHost) {
-                      return composeUrl(urlHost, urlPath);
-                    }
-
-                    // If we have a path but no host, show just the path
-                    if (urlPath) {
-                      return urlPath;
-                    }
-
-                    // If neither, show a placeholder
-                    return "No API endpoint specified";
-                  })()}
+                  {displaySystem.url || "No API endpoint specified"}
                 </div>
               </div>
 
-              {/* 2. System ID */}
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">System ID</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">System</div>
                 <div className="text-sm font-mono bg-muted/50 px-2 py-1 rounded">
-                  {displaySystem.id || "N/A"}
+                  {displaySystem.name || displaySystem.id || "N/A"}
                 </div>
               </div>
 
-              {/* 3. Authentication */}
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Authentication</div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-xs ${colorClasses[badge.color]} px-2 py-1 rounded flex items-center gap-1`}
-                  >
-                    {badge.icon === "clock" ? (
-                      <Clock className="h-3 w-3" />
-                    ) : (
-                      <Key className="h-3 w-3" />
-                    )}
-                    {badge.label}
-                  </span>
+              {!isAwaitingConfirmation && (
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Authentication
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs ${colorClasses[badge.color as keyof typeof colorClasses]} px-2 py-1 rounded flex items-center gap-1`}
+                    >
+                      {badge.icon === "clock" ? (
+                        <Clock className="h-3 w-3" />
+                      ) : (
+                        <Key className="h-3 w-3" />
+                      )}
+                      {badge.label}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* 4. Additional API Instructions */}
+              {isAwaitingConfirmation && requiredSensitiveFields.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  {requiredSensitiveFields.map((field) => (
+                    <div key={field} className="space-y-1">
+                      <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                        <KeyRound className="w-3 h-3 text-amber-500" />
+                        {field}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type={showCredentials[field] ? "text" : "password"}
+                          value={credentialValues[field] || ""}
+                          onChange={(e) =>
+                            setCredentialValues((prev) => ({ ...prev, [field]: e.target.value }))
+                          }
+                          placeholder={`Enter ${field}...`}
+                          className="h-9 text-sm pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
+                          onClick={() =>
+                            setShowCredentials((prev) => ({ ...prev, [field]: !prev[field] }))
+                          }
+                        >
+                          {showCredentials[field] ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {displaySystem.specificInstructions && displaySystem.specificInstructions.trim() && (
                 <div>
                   <Collapsible
@@ -416,34 +399,32 @@ function CreateSystemComponentImpl({ tool, onInputChange }: CreateSystemComponen
           </div>
         </div>
 
-        {/* Edit Modal */}
-        <Dialog
-          open={isEditModalOpen && !systemNotFound && !isToolInProgress}
-          onOpenChange={(open) => {
-            if (!open) {
-              handleModalClose();
-            }
-          }}
-        >
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Edit System</DialogTitle>
-              <DialogDescription>Modify the system settings and credentials.</DialogDescription>
-            </DialogHeader>
-            <SystemForm
-              system={displaySystem}
-              onSave={handleSystemSave}
-              onCancel={handleModalClose}
-              systemOptions={systemOptions}
-              getSimpleIcon={getSimpleIcon}
-              modal={true}
-            />
-          </DialogContent>
-        </Dialog>
+        {(isAwaitingConfirmation || isExecuting) && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="glass"
+              className="!bg-[#ffa500] hover:!bg-[#ffd700] dark:!bg-[#ffa500] dark:hover:!bg-[#ffd700] !text-black !border-amber-400/50 dark:!border-amber-500/50 font-semibold"
+              onClick={handleConfirm}
+              disabled={!allCredentialsProvided || isExecuting}
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  Confirming...
+                </>
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+            <Button size="sm" variant="glass" onClick={handleCancel} disabled={isExecuting}>
+              Cancel
+            </Button>
+          </div>
+        )}
       </div>
     </ToolCallWrapper>
   );
 }
 
-// Memoize the component to prevent unnecessary re-renders
 export const CreateSystemComponent = memo(CreateSystemComponentImpl);

@@ -39,6 +39,7 @@ export function TemplateAwareTextEditor({
   const isUpdatingRef = useRef(false);
   const lastValueRef = useRef(value);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitializedRef = useRef(false);
 
   const debouncedOnChange = useCallback(
     (newValue: string) => {
@@ -91,6 +92,13 @@ export function TemplateAwareTextEditor({
     },
     onUpdate: ({ editor }) => {
       if (isUpdatingRef.current) return;
+      // Skip the initial update that fires when the editor is created
+      if (!isInitializedRef.current) {
+        isInitializedRef.current = true;
+        // Update lastValueRef to the normalized value to prevent spurious onChange
+        lastValueRef.current = tiptapToTemplateString(editor.getJSON());
+        return;
+      }
       const newValue = tiptapToTemplateString(editor.getJSON());
       if (newValue !== lastValueRef.current) {
         lastValueRef.current = newValue;

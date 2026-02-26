@@ -1,10 +1,13 @@
-import { ExecutionStep, RequestOptions, ResponseFilter, Tool } from "@superglue/shared";
-import { SystemManager } from "../systems/system-manager.js";
+import { ToolStep, ResponseFilter, Tool, RequestSource, ServiceMetadata } from "@superglue/shared";
+import { executeTool, ToolExecutionContext } from "../tools/tool-execution-service.js";
 import { logMessage } from "../utils/logs.js";
-import type { ToolExecutionPayload } from "../worker/types.js";
 import { registerApiModule } from "./registry.js";
 import { addTraceHeader, sendError } from "./response-helpers.js";
 import type { AuthenticatedFastifyRequest, RouteHandler } from "./types.js";
+
+export function rewriteUrlForTunnel(url: string, _tunnelPortMappings?: any): string {
+  return url;
+}
 
 // Step execution types (internal only, not in OpenAPI spec)
 interface RunStepRequestOptions {
@@ -12,7 +15,7 @@ interface RunStepRequestOptions {
 }
 
 interface RunStepRequestBody {
-  step: Record<string, unknown>; // ExecutionStep
+  step: Record<string, unknown>; // ToolStep
   payload?: Record<string, unknown>;
   previousResults?: Record<string, unknown>;
   credentials?: Record<string, unknown>;
@@ -25,13 +28,13 @@ interface RunStepResponse {
   success: boolean;
   data?: unknown;
   error?: string;
-  updatedStep?: Record<string, unknown>; // ExecutionStep if self-healed
+  updatedStep?: Record<string, unknown>; // ToolStep if self-healed
 }
 
 // Transform execution types (internal only, not in OpenAPI spec)
 interface RunTransformRequestBody {
-  finalTransform: string;
-  responseSchema?: Record<string, unknown>;
+  outputTransform: string;
+  outputSchema?: Record<string, unknown>;
   inputSchema?: Record<string, unknown>;
   payload?: Record<string, unknown>;
   stepResults?: Record<string, unknown>;
@@ -45,7 +48,7 @@ interface RunTransformResponse {
   data?: unknown;
   error?: string;
   updatedTransform?: string;
-  updatedResponseSchema?: Record<string, unknown>;
+  updatedOutputSchema?: Record<string, unknown>;
 }
 
 // POST /tools/step/run - Execute a single step without creating a run
@@ -60,47 +63,44 @@ const runStep: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "Step configuration is required");
   }
 
-  const step = body.step as unknown as ExecutionStep;
-  const clientRunId = body.runId || crypto.randomUUID();
-  const runId = `${authReq.authInfo.orgId}:${clientRunId}`;
+  const step = body.step as unknown as ToolStep;
 
-  const requestOptions: RequestOptions = {
-    timeout: body.options?.timeout,
+  // For non-run executions, prefix runId with orgId for abort tracking uniqueness
+  const clientRunId = body.runId || crypto.randomUUID();
+  const internalRunId = `${authReq.authInfo.orgId}:${clientRunId}`;
+
+  // Build execution context
+  const ctx: ToolExecutionContext = {
+    datastore: authReq.datastore,
+    workerPools: authReq.workerPools,
+    orgId: authReq.authInfo.orgId,
+    metadata,
+    requestSource: RequestSource.FRONTEND,
   };
 
-  // Create a temporary single-step tool for execution
+  // Wrap step in a temporary tool and execute without creating a run record
   const tempTool: Tool = {
     id: `temp_step_${step.id}`,
     steps: [step],
-    finalTransform: "",
+    outputTransform: "",
   } as Tool;
 
-  // Build the execution payload combining tool input and previous results
+  // Merge payload with previous results
   const executionPayload = {
     ...(body.payload || {}),
     ...(body.previousResults || {}),
   };
 
-  // Get system managers for tool execution
-  const systemManagers = await SystemManager.forToolExecution(
-    tempTool,
-    authReq.datastore,
-    metadata,
-  );
-
-  const taskPayload: ToolExecutionPayload = {
-    runId,
-    workflow: tempTool,
-    payload: executionPayload,
-    credentials: body.credentials as Record<string, string> | undefined,
-    options: requestOptions,
-    systems: systemManagers.map((m) => m.toSystemSync()),
-    orgId: authReq.authInfo.orgId,
-    traceId,
-  };
-
   try {
-    const result = await authReq.workerPools.toolExecution.runTask(runId, taskPayload);
+    const result = await executeTool(ctx, {
+      tool: tempTool,
+      payload: executionPayload,
+      credentials: body.credentials as Record<string, string> | undefined,
+      requestOptions: { timeout: body.options?.timeout },
+      createRun: false,
+      runId: internalRunId,
+    });
+
     const stepResult = result.stepResults?.[0];
 
     const response: RunStepResponse = {
@@ -108,7 +108,7 @@ const runStep: RouteHandler = async (request, reply) => {
       success: result.success,
       data: stepResult?.data,
       error: result.error,
-      updatedStep: result.config?.steps?.[0] as unknown as Record<string, unknown> | undefined,
+      updatedStep: result.tool?.steps?.[0] as unknown as Record<string, unknown> | undefined,
     };
 
     return addTraceHeader(reply, traceId).code(200).send(response);
@@ -131,25 +131,22 @@ const runTransform: RouteHandler = async (request, reply) => {
   const body = request.body as RunTransformRequestBody;
 
   const traceId = authReq.traceId;
-  const metadata = { orgId: authReq.authInfo.orgId, traceId };
+  const metadata: ServiceMetadata = { orgId: authReq.authInfo.orgId, traceId };
 
-  if (!body.finalTransform && !body.responseFilters?.length) {
-    return sendError(reply, 400, "Either finalTransform or responseFilters is required");
+  if (!body.outputTransform && !body.responseFilters?.length) {
+    return sendError(reply, 400, "Either outputTransform or responseFilters is required");
   }
 
+  // For non-run executions, prefix runId with orgId for abort tracking uniqueness
   const clientRunId = body.runId || crypto.randomUUID();
-  const runId = `${authReq.authInfo.orgId}:${clientRunId}`;
-
-  const requestOptions: RequestOptions = {
-    timeout: body.options?.timeout,
-  };
+  const internalRunId = `${authReq.authInfo.orgId}:${clientRunId}`;
 
   // Create a temporary tool with no steps, just the transform
   const tempTool: Tool = {
     id: `temp_transform`,
     steps: [],
-    finalTransform: body.finalTransform || "",
-    responseSchema: body.responseSchema,
+    outputTransform: body.outputTransform || "",
+    outputSchema: body.outputSchema,
     inputSchema: body.inputSchema,
     responseFilters: body.responseFilters as unknown as ResponseFilter[] | undefined,
   } as Tool;
@@ -160,26 +157,30 @@ const runTransform: RouteHandler = async (request, reply) => {
     ...(body.stepResults || {}),
   };
 
-  const taskPayload: ToolExecutionPayload = {
-    runId,
-    workflow: tempTool,
-    payload: executionPayload,
-    credentials: undefined,
-    options: requestOptions,
-    systems: [],
+  // Build execution context
+  const ctx: ToolExecutionContext = {
+    datastore: authReq.datastore,
+    workerPools: authReq.workerPools,
     orgId: authReq.authInfo.orgId,
-    traceId,
+    metadata,
+    requestSource: RequestSource.FRONTEND,
   };
 
   try {
-    const result = await authReq.workerPools.toolExecution.runTask(runId, taskPayload);
+    const result = await executeTool(ctx, {
+      tool: tempTool,
+      payload: executionPayload,
+      requestOptions: { timeout: body.options?.timeout },
+      createRun: false,
+      runId: internalRunId,
+    });
 
     const response: RunTransformResponse = {
       success: result.success,
       data: result.data,
       error: result.error,
-      updatedTransform: result.config?.finalTransform,
-      updatedResponseSchema: result.config?.responseSchema as Record<string, unknown> | undefined,
+      updatedTransform: result.tool?.outputTransform,
+      updatedOutputSchema: result.tool?.outputSchema as Record<string, unknown> | undefined,
     };
 
     return addTraceHeader(reply, traceId).code(200).send(response);
@@ -204,6 +205,7 @@ const abortStep: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "runId is required");
   }
 
+  // Step executions use prefixed runIds for abort tracking
   const internalRunId = `${authReq.authInfo.orgId}:${runId}`;
   authReq.workerPools.toolExecution.abortTask(internalRunId);
   return addTraceHeader(reply, authReq.traceId).code(200).send({ success: true, runId });

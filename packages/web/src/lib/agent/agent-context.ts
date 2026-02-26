@@ -1,13 +1,21 @@
-import { Message, Run, Tool } from "@superglue/shared";
-import { systems } from "@superglue/shared/templates";
-import { AgentDefinition, ToolExecutionContext } from "./agent-types";
-import { SUPERGLUE_INFORMATION_PROMPT } from "./agent-prompts";
-
-export interface DraftLookup {
-  config: Tool;
-  systemIds: string[];
-  instruction: string;
-}
+import {
+  Message,
+  Run,
+  RunStatus,
+  StoredRunResults,
+  getDateMessage,
+  System,
+} from "@superglue/shared";
+import { truncateToolResult } from "../general-utils";
+import { DraftLookup, SystemPromptResult, ToolExecutionContext } from "./agent-types";
+import {
+  MAIN_AGENT_SYSTEM_PROMPT,
+  TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT,
+  SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT,
+  SUPERGLUE_INFORMATION_PROMPT,
+  GENERAL_RULES,
+  SKILL_LOADING_INSTRUCTIONS,
+} from "./agent-prompts";
 
 export function findDraftInMessages(messages: Message[], draftId: string): DraftLookup | null {
   const DRAFT_SOURCE_TOOLS = new Set(["build_tool", "edit_tool"]);
@@ -90,17 +98,21 @@ export function injectContextIntoMessages(messages: Message[], context: string):
 export interface PlaygroundContextData {
   toolId: string;
   instruction: string;
-  stepsCount: number;
+  steps: Array<{ id: string; systemId?: string; method?: string; status?: string }>;
+  hasOutputTransform: boolean;
+  hasResponseFilters: boolean;
+  inputSchemaFields: string[];
+  outputSchemaFieldCount: number;
+  transformStatus: string;
   currentPayload: string;
-  executionSummary: string;
   uploadedFiles?: Array<{ name: string; key: string; status?: string }>;
   mergedPayload?: string;
 }
 
-export function formatPlaygroundRuntimeContext(ctx: PlaygroundContextData): string {
+export function formatPlaygroundHiddenContext(ctx: PlaygroundContextData): string {
   const truncatedPayload =
-    ctx.currentPayload.length > 2000
-      ? ctx.currentPayload.substring(0, 2000) +
+    ctx.currentPayload.length > 1000
+      ? ctx.currentPayload.substring(0, 1000) +
         `\n... [truncated, ${ctx.currentPayload.length} chars total]`
       : ctx.currentPayload;
 
@@ -111,49 +123,49 @@ export function formatPlaygroundRuntimeContext(ctx: PlaygroundContextData): stri
     const fileList = ctx
       .uploadedFiles!.map((f) => `  - ${f.name} (key: "${f.key}", status: ${f.status || "ready"})`)
       .join("\n");
-    fileSection = `
-<uploaded_files>
-${fileList}
-Note: File data is automatically parsed and merged with the manual payload. Each file's parsed content is available under its "key" in the merged payload.
-</uploaded_files>
-`;
+    fileSection = `\nUploaded files:\n${fileList}\n`;
   }
 
   let mergedPayloadSection = "";
   if (hasFiles && ctx.mergedPayload) {
     const truncatedMerged =
-      ctx.mergedPayload.length > 2000
-        ? ctx.mergedPayload.substring(0, 2000) +
+      ctx.mergedPayload.length > 1000
+        ? ctx.mergedPayload.substring(0, 1000) +
           `\n... [truncated, ${ctx.mergedPayload.length} chars total]`
         : ctx.mergedPayload;
-    mergedPayloadSection = `
-<merged_payload_preview>
-This is the ACTUAL payload that will be sent when the tool executes (manual payload + file data merged):
-${truncatedMerged}
-</merged_payload_preview>
-`;
+    mergedPayloadSection = `\nMerged payload (manual + files):\n${truncatedMerged}\n`;
   }
 
+  const stepsBlock = ctx.steps
+    .map(
+      (s, i) =>
+        `  ${i + 1}. ${s.id} → ${s.systemId || "n/a"} ${s.method || ""} | ${s.status || "pending"}`,
+    )
+    .join("\n");
+
+  const inputSchemaDesc =
+    ctx.inputSchemaFields.length > 0
+      ? `inputSchema (${ctx.inputSchemaFields.length} fields: ${ctx.inputSchemaFields.join(", ")})`
+      : "inputSchema: none";
+  const outputSchemaDesc =
+    ctx.outputSchemaFieldCount > 0
+      ? `outputSchema (${ctx.outputSchemaFieldCount} fields)`
+      : "outputSchema: none";
+
   return `[PLAYGROUND CONTEXT]
-<current_tool_config>
-Tool ID: ${ctx.toolId || "(unsaved)"}
+Tool: ${ctx.toolId || "(unsaved)"}
 Instruction: ${ctx.instruction?.substring(0, 200) || "(none)"}
-Steps: ${ctx.stepsCount} step(s)
-</current_tool_config>
-
-<current_test_payload>
-${hasFiles ? "Manual payload (before file merge):" : ""}
-${truncatedPayload}
-</current_test_payload>
+Steps (${ctx.steps.length}):
+${stepsBlock}
+Schemas: ${inputSchemaDesc}, ${outputSchemaDesc}
+Has outputTransform: ${ctx.hasOutputTransform ? "yes" : "no"}
+Has responseFilters: ${ctx.hasResponseFilters ? "yes" : "no"}
+Final transform: ${ctx.transformStatus}
 ${fileSection}${mergedPayloadSection}
-<execution_state>
-${ctx.executionSummary}
-</execution_state>
+Payload (${ctx.currentPayload.length} chars):
+${truncatedPayload}
 
-<draft_info>
-The current tool is available as draft ID: "playground-draft". Use this draftId with edit_tool to make changes.
-The test payload above is managed separately - do NOT include payload in edit_tool calls. Use edit_payload if the user wants to change test data.
-</draft_info>
+Draft ID: "playground-draft" — use with edit_tool, run_tool, save_tool.
 `;
 }
 
@@ -169,7 +181,7 @@ async function getToolsForContext(ctx: ToolExecutionContext) {
       };
     }
 
-    const toolsWithTruncatedInstructions = result.map(({ reason, ...tool }: any) => ({
+    const toolsSummary = result.map(({ reason, ...tool }: any) => ({
       id: tool.id,
       instruction: tool.instruction?.substring(0, 100) || "",
     }));
@@ -177,7 +189,7 @@ async function getToolsForContext(ctx: ToolExecutionContext) {
     return {
       success: true,
       toolIds: result.map((t: any) => t.id),
-      tools: toolsWithTruncatedInstructions,
+      tools: toolsSummary,
     };
   } catch (error: any) {
     return {
@@ -193,24 +205,14 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
   try {
     const result = await ctx.superglueClient.listSystems(1000);
 
-    const formattedSystems = result.items.map((system: any) => {
-      const credentials = system?.credentials || {};
-      const credentialStatus = Object.entries(credentials).map(([key, value]) => ({
-        key,
-        placeholder: `<<${system?.id}_${key}>>`,
-        hasValue: !!value && value !== "",
-      }));
-
-      return {
-        id: system?.id,
-        urlHost: system?.urlHost,
-        credentials: credentialStatus,
-      };
-    });
+    const systemsSummary = result.items.map((system: any) => ({
+      id: system?.id,
+      name: system?.name || system?.id,
+    }));
 
     return {
       success: true,
-      systems: formattedSystems,
+      systems: systemsSummary,
     };
   } catch (error: any) {
     return {
@@ -221,44 +223,56 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
   }
 }
 
-export async function initializeMainAgentContext(ctx: ToolExecutionContext): Promise<string> {
+export async function generateMainAgentSystemPrompt(
+  ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
   const [toolsResult, systemsResult] = await Promise.all([
     getToolsForContext(ctx),
     getSystemsForContext(ctx),
   ]);
 
-  const templateIds = Object.keys(systems);
+  const dateMessage = getDateMessage();
 
-  const result = `
-    [PRELOADED CONTEXT - The user's available superglue tools and systems are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+  const content = `${MAIN_AGENT_SYSTEM_PROMPT}
 
-    AVAILABLE SUPERGLUE TOOLS:
-    ${JSON.stringify(toolsResult.tools || [])}
+[GENERAL INFORMATION]
+${SUPERGLUE_INFORMATION_PROMPT}
 
-    AVAILABLE SUPERGLUE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-    ${JSON.stringify(systemsResult.systems || [])}
+AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
 
-    AVAILABLE SYSTEM TEMPLATES:
-    ${templateIds.join(", ")}
-    `;
-  return result;
+AVAILABLE TOOLS: ${JSON.stringify(toolsResult.tools || [])}
+
+${dateMessage.content}`;
+  return { content };
 }
 
-export async function initializeToolPlaygroundAgentContext(
-  ctx: ToolExecutionContext,
-): Promise<string> {
-  const systemsResult = await getSystemsForContext(ctx);
-  const toolsResult = await getToolsForContext(ctx);
+export async function generatePlaygroundSystemPrompt(
+  _ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
+  const dateMessage = getDateMessage();
 
-  return `
-    [PRELOADED CONTEXT - The user's available superglue systems and tools are listed below]${SUPERGLUE_INFORMATION_PROMPT}
+  const content = `${TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT}
 
-    AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-    ${JSON.stringify(systemsResult.systems || [])}
+${GENERAL_RULES}
+${SKILL_LOADING_INSTRUCTIONS}
 
-    AVAILABLE SUPERGLUE TOOLS:
-    ${JSON.stringify(toolsResult.tools || [])}
-    `;
+${dateMessage.content}`;
+
+  return { content };
+}
+
+export async function generateSystemPlaygroundSystemPrompt(
+  _ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
+  const dateMessage = getDateMessage();
+  const content = `${SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT}
+
+${GENERAL_RULES}
+${SKILL_LOADING_INSTRUCTIONS}
+
+${dateMessage.content}`;
+
+  return { content };
 }
 
 export function getDiscoveryContext(systemIds: string[]): string {
@@ -345,7 +359,54 @@ export function getDiscoveryPrompts(systemIds: string[]): {
   return { systemPrompt, userPrompt };
 }
 
-export function getInvestigationPrompts(run: Run): {
+export interface ToolBuilderPrompt {
+  userPrompt: string;
+  systemPrompt: string;
+  chatTitle: string;
+  chatIcon?: string;
+}
+
+const normalizeSystemIds = (systemIds?: string[]): string[] => {
+  if (!systemIds) return [];
+  return systemIds.map((id) => id.trim()).filter(Boolean);
+};
+
+export function getToolBuilderPrompts({
+  systemIds,
+  systems = [],
+}: {
+  systemIds?: string[];
+  systems?: System[];
+}): ToolBuilderPrompt {
+  const normalizedIds = normalizeSystemIds(systemIds);
+  const matchedSystems = systems.filter((system) => normalizedIds.includes(system.id));
+  const resolvedIds = normalizedIds.length > 0 ? normalizedIds : matchedSystems.map((s) => s.id);
+  const hasSystems = resolvedIds.length > 0;
+
+  const systemLabel = hasSystems ? resolvedIds.join(", ") : "your systems";
+  const userPrompt = hasSystems
+    ? `I want to build a tool with ${systemLabel}.`
+    : "I want to build a tool.";
+
+  const systemPrompt = JSON.stringify({
+    display: hasSystems ? `Build tool with ${systemLabel}` : "Build tool",
+    toolBuilderContext: {
+      systemIds: resolvedIds,
+    },
+  });
+
+  return {
+    userPrompt,
+    systemPrompt,
+    chatTitle: "Build tool",
+    chatIcon: matchedSystems.length === 1 ? matchedSystems[0].icon : undefined,
+  };
+}
+
+export function getInvestigationPrompts(
+  run: Run,
+  storedResults?: StoredRunResults | null,
+): {
   systemPrompt: string;
   userPrompt: string;
 } {
@@ -364,14 +425,31 @@ export function getInvestigationPrompts(run: Run): {
     }
   };
 
+  // Determine run status
+  const isFailed =
+    run.status === RunStatus.FAILED || run.status?.toString().toUpperCase() === "FAILED";
+  const isSuccess =
+    run.status === RunStatus.SUCCESS || run.status?.toString().toUpperCase() === "SUCCESS";
+  const isRunning =
+    run.status === RunStatus.RUNNING || run.status?.toString().toUpperCase() === "RUNNING";
+  const isAborted =
+    run.status === RunStatus.ABORTED || run.status?.toString().toUpperCase() === "ABORTED";
+
+  // Use stored results if available, otherwise fall back to run data
+  const stepResults = storedResults?.stepResults ?? run.stepResults;
+  const toolPayload = storedResults?.toolPayload ?? run.toolPayload;
+  const toolResult = storedResults?.data ?? run.data;
+  const hasStoredResults = !!storedResults;
+  const hasStorageUri = !!run.resultStorageUri;
+
   // Check if tool exists and version info
   const toolExists = !!run.tool;
   const runToolVersion = run.tool?.version;
   const runStartedAt = formatDate(run.metadata?.startedAt);
 
-  // Build tool existence section
+  // Build tool existence section (only relevant for failed runs needing fixes)
   let toolExistenceSection = "";
-  if (!toolExists) {
+  if (isFailed && !toolExists) {
     toolExistenceSection = `
 IMPORTANT - TOOL NOT FOUND:
 The tool "${run.toolId}" does not currently exist in the system. This could be because:
@@ -394,27 +472,30 @@ Do NOT start creating or editing tools without user confirmation.
   // Build version comparison section
   let versionSection = "";
   if (toolExists && runToolVersion) {
-    // Note: We include the version from the run's tool snapshot
-    // The agent should use get_tool to fetch the current version and compare
     versionSection = `
 VERSION INFORMATION:
 - Tool version at time of this run: ${runToolVersion}
 - Run timestamp: ${runStartedAt}
 
-IMPORTANT: Before analyzing the error, use get_tool to fetch the current saved version of "${run.toolId}".
+${
+  isFailed
+    ? `IMPORTANT: Before analyzing the error, use get_tool to fetch the current saved version of "${run.toolId}".
 Compare the current version with the version from this run (${runToolVersion}).
 If the versions differ:
 1. Identify what changed between versions
 2. Determine if the changes might have fixed or could fix the error we're seeing
 3. Let the user know they're looking at an old run and the tool has been updated since
-4. Analyze whether the current version would still have this issue
+4. Analyze whether the current version would still have this issue`
+    : `You can use get_tool to fetch the current version of "${run.toolId}" if needed for comparison.`
+}
 `;
   }
 
   // Build request source section
   let requestSourceSection = "";
   if (run.requestSource === "webhook") {
-    requestSourceSection = `
+    requestSourceSection = isFailed
+      ? `
 WEBHOOK TRIGGER ANALYSIS:
 This run was triggered by a webhook. When debugging webhook-triggered runs:
 1. Carefully examine the INPUT PAYLOAD below - this is what the webhook sent
@@ -425,58 +506,57 @@ This run was triggered by a webhook. When debugging webhook-triggered runs:
 6. If the payload is the problem, either:
    - Update the tool's inputSchema and steps to handle the actual webhook format
    - Or coordinate with the webhook sender to fix their payload format
+`
+      : `
+WEBHOOK TRIGGER:
+This run was triggered by a webhook. The INPUT PAYLOAD shows what the webhook sent.
 `;
   } else if (run.requestSource === "scheduler") {
-    requestSourceSection = `
+    requestSourceSection = isFailed
+      ? `
 SCHEDULED RUN ANALYSIS:
 This run was triggered by the scheduler. Consider:
 1. Check if any external dependencies (APIs, services) were unavailable at the scheduled time
 2. Look for rate limiting issues if this runs frequently
 3. Check if credentials or tokens may have expired
+`
+      : `
+SCHEDULED RUN:
+This run was triggered by the scheduler.
 `;
   } else if (run.requestSource === "tool-chain") {
-    requestSourceSection = `
+    requestSourceSection = isFailed
+      ? `
 TOOL CHAIN ANALYSIS:
 This run was triggered as part of a tool chain. Consider:
 1. Check if the input from the previous tool in the chain was in the expected format
 2. Look at the INPUT PAYLOAD to see what was passed from the upstream tool
 3. The error might be in the upstream tool's output rather than this tool's configuration
+`
+      : `
+TOOL CHAIN:
+This run was triggered as part of a tool chain. The INPUT PAYLOAD shows what was passed from the upstream tool.
 `;
   }
 
-  const systemPrompt = `You are helping debug a failed superglue tool run. Analyze the error and help the user fix it.
+  // Build status-specific intro and approach
+  let statusIntro: string;
+  let approachSection: string;
+
+  if (isFailed) {
+    statusIntro = `You are helping debug a failed superglue tool run. Analyze the error and help the user fix it.
 
 FAILED RUN DETAILS:
 - Run ID: ${run.runId}
 - Tool ID: ${run.toolId}
+- Status: FAILED
 - Error: ${run.error || "Unknown error"}
 - Triggered by: ${run.requestSource || "unknown"}
 - Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
 - Started: ${runStartedAt}
-- Completed: ${formatDate(run.metadata?.completedAt)}
-${toolExistenceSection}${versionSection}${requestSourceSection}
-${
-  run.tool
-    ? `TOOL CONFIGURATION (from time of run):
-${truncateJson(run.tool)}`
-    : `NO TOOL CONFIGURATION AVAILABLE - The tool was not saved or has been deleted.`
-}
+- Completed: ${formatDate(run.metadata?.completedAt)}`;
 
-${
-  run.stepResults && run.stepResults.length > 0
-    ? `STEP RESULTS:
-${truncateJson(run.stepResults)}`
-    : ""
-}
-
-${
-  run.toolPayload
-    ? `INPUT PAYLOAD:
-${truncateJson(run.toolPayload)}`
-    : ""
-}
-
-YOUR APPROACH:
+    approachSection = `YOUR APPROACH:
 1. First, explain the error in plain English - what went wrong and why
 2. ${toolExists ? "Check the current tool version and compare with the run version" : "Acknowledge the tool doesn't exist and ask user how to proceed"}
 3. Identify the root cause - is it a configuration issue, payload issue, external API issue, or transient error?
@@ -488,47 +568,150 @@ IMPORTANT GUIDELINES:
 - Ask for user confirmation before creating new tools or making significant changes
 - If this is a transient issue (timeout, rate limit), suggest retrying before making changes
 - Be specific about what needs to change and where`;
+  } else if (isSuccess) {
+    statusIntro = `You are helping the user understand a successful superglue tool run. Analyze the execution and results.
 
-  const errorPreview = run.error ? run.error.substring(0, 150) : "Unknown error";
-  const toolExistsNote = toolExists ? "" : "\n\nNote: This tool no longer exists in the system.";
-  const userPrompt = `Help me investigate why my "${run.toolId}" tool failed.
+SUCCESSFUL RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: SUCCESS
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Completed: ${formatDate(run.metadata?.completedAt)}`;
+
+    approachSection = `YOUR APPROACH:
+1. Summarize what the tool did and what results it produced
+2. Explain the step-by-step execution flow if step results are available
+3. Highlight any interesting data transformations or API calls
+4. Answer any questions the user has about the execution or results
+5. Offer to help optimize or modify the tool if needed
+
+IMPORTANT GUIDELINES:
+- Focus on explaining what happened and the results
+- Be ready to help with follow-up questions about the data
+- If the user wants to modify the tool, use edit_tool`;
+  } else if (isRunning) {
+    statusIntro = `You are helping the user understand a currently running superglue tool. Note that this run is still in progress.
+
+RUNNING RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: RUNNING (in progress)
+- Triggered by: ${run.requestSource || "unknown"}
+- Started: ${runStartedAt}`;
+
+    approachSection = `YOUR APPROACH:
+1. Note that this run is still in progress
+2. Explain what information is available so far
+3. Suggest the user refresh or check back later for complete results
+4. Answer any questions about the tool configuration or expected behavior`;
+  } else if (isAborted) {
+    statusIntro = `You are helping the user understand an aborted superglue tool run.
+
+ABORTED RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: ABORTED
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Aborted: ${formatDate(run.metadata?.completedAt)}`;
+
+    approachSection = `YOUR APPROACH:
+1. Explain that the run was aborted (manually stopped or timed out)
+2. Show what progress was made before the abort if step results are available
+3. Help the user understand if they should retry or if there's an issue to fix
+4. Answer any questions about why the run might have been aborted`;
+  } else {
+    statusIntro = `You are helping the user understand a superglue tool run.
+
+RUN DETAILS:
+- Run ID: ${run.runId}
+- Tool ID: ${run.toolId}
+- Status: ${run.status || "unknown"}
+- Triggered by: ${run.requestSource || "unknown"}
+- Duration: ${run.metadata?.durationMs ? `${run.metadata.durationMs}ms` : "unknown"}
+- Started: ${runStartedAt}
+- Completed: ${formatDate(run.metadata?.completedAt)}`;
+
+    approachSection = `YOUR APPROACH:
+1. Summarize the run and its results
+2. Answer any questions the user has
+3. Offer to help with modifications if needed`;
+  }
+
+  const systemPrompt = `${statusIntro}
+${hasStorageUri ? (hasStoredResults ? "- Full results loaded from storage\n" : "- Results stored (URI exists but not fetched)\n") : ""}
+${toolExistenceSection}${versionSection}${requestSourceSection}
+${
+  run.tool
+    ? `TOOL CONFIGURATION (from time of run):
+${truncateJson(run.tool)}`
+    : `NO TOOL CONFIGURATION AVAILABLE - The tool was not saved or has been deleted.`
+}
+
+${
+  stepResults
+    ? `STEP RESULTS${hasStoredResults ? " (FULL EXECUTION DATA)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+${truncateToolResult(stepResults, 20000)}`
+    : ""
+}
+
+${
+  toolResult
+    ? `TOOL OUTPUT${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+${truncateToolResult(toolResult, 10000)}`
+    : ""
+}
+
+${
+  toolPayload
+    ? `INPUT PAYLOAD${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+${truncateToolResult(toolPayload, 5000)}`
+    : ""
+}
+
+${approachSection}`;
+
+  // Build user prompt based on status
+  let userPrompt: string;
+  if (isFailed) {
+    const errorPreview = run.error ? run.error.substring(0, 150) : "Unknown error";
+    const toolExistsNote = toolExists ? "" : "\n\nNote: This tool no longer exists in the system.";
+    userPrompt = `Help me investigate why my "${run.toolId}" tool failed.
 
 Error: ${errorPreview}${run.error && run.error.length > 150 ? "..." : ""}
 
 What went wrong and how can I fix it?${toolExistsNote}`;
+  } else if (isSuccess) {
+    userPrompt = `Help me understand this successful run of my "${run.toolId}" tool.
+
+What did it do and what were the results?`;
+  } else if (isRunning) {
+    userPrompt = `Help me understand this currently running execution of my "${run.toolId}" tool.
+
+What's happening and what should I expect?`;
+  } else if (isAborted) {
+    userPrompt = `Help me understand why my "${run.toolId}" tool run was aborted.
+
+What happened and should I retry?`;
+  } else {
+    userPrompt = `Help me understand this run of my "${run.toolId}" tool.
+
+What happened during this execution?`;
+  }
 
   return { systemPrompt, userPrompt };
-}
-
-export function resolveSystemPrompt(agent: AgentDefinition, params?: Record<string, any>): string {
-  if (typeof agent.systemPrompt === "function") {
-    return agent.systemPrompt(params || {});
-  }
-  return agent.systemPrompt;
-}
-
-export async function generateAgentInitialContext(
-  agent: AgentDefinition,
-  ctx: ToolExecutionContext,
-  agentParams?: Record<string, any>,
-): Promise<string | null> {
-  if (!agent.initialContextGenerator) {
-    return null;
-  }
-  return agent.initialContextGenerator(ctx, agentParams);
 }
 
 export { type SystemContextForAgent as SystemPlaygroundContextData } from "@/src/components/systems/context/types";
 import type { SystemContextForAgent } from "@/src/components/systems/context/types";
 
-export function formatSystemRuntimeContext(ctx: SystemContextForAgent): string {
+export function formatSystemHiddenContext(ctx: SystemContextForAgent): string {
   const credentialPlaceholders = ctx.credentialKeys
     .map((key) => `<<${ctx.systemId}_${key}>>`)
     .join(", ");
-
-  const uploadedFileWarning = ctx.hasUploadedFile
-    ? "\nWARNING: Has uploaded file documentation - changing documentationUrl will lose content."
-    : "";
 
   const specificInstructionsLine = ctx.specificInstructions
     ? `\nSpecific Instructions: ${ctx.specificInstructions.substring(0, 200)}${ctx.specificInstructions.length > 200 ? "..." : ""}`
@@ -536,11 +719,10 @@ export function formatSystemRuntimeContext(ctx: SystemContextForAgent): string {
 
   return `[SYSTEM PLAYGROUND CONTEXT]
 System ID: ${ctx.systemId || "(not set)"}
-URL Host: ${ctx.urlHost || "(not set)"}
+URL: ${ctx.url || "(not set)"}
 Template: ${ctx.templateName || "(custom)"}
 Auth Type: ${ctx.authType}
-Credentials: ${credentialPlaceholders || "(none)"}
-Documentation: ${ctx.hasDocumentation ? "Yes" : "No"}${ctx.hasUploadedFile ? " (uploaded file)" : ""}${ctx.documentationUrl ? ` - ${ctx.documentationUrl}` : ""}${uploadedFileWarning}${specificInstructionsLine}
+Credentials: ${credentialPlaceholders || "(none)"}${specificInstructionsLine}
 
 Section Status:
 - Configuration: ${ctx.sectionStatuses.configuration.label}
@@ -549,17 +731,4 @@ Section Status:
 
 Use edit_system with id="${ctx.systemId}" to make changes.
 Use call_system with placeholders like ${credentialPlaceholders || "<<systemId_keyName>>"} to test.`;
-}
-
-export async function initializeSystemPlaygroundContext(
-  ctx: ToolExecutionContext,
-  _agentParams?: Record<string, any>,
-): Promise<string> {
-  const systemsResult = await getSystemsForContext(ctx);
-  const templateIds = Object.keys(systems);
-
-  return `AVAILABLE SYSTEMS (credentials with hasValue:true are configured, use the placeholder format shown):
-${JSON.stringify(systemsResult.systems || [])}
-
-AVAILABLE TEMPLATES: ${templateIds.slice(0, 30).join(", ")}${templateIds.length > 30 ? ` (+${templateIds.length - 30} more)` : ""}`;
 }

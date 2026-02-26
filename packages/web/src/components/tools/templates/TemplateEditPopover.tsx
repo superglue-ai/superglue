@@ -11,11 +11,7 @@ import { Switch } from "@/src/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { useMonacoTheme } from "@superglue/web/src/hooks/use-monaco-theme";
-import {
-  DEFAULT_CODE_TEMPLATE,
-  formatValueForDisplay,
-  normalizeTemplateExpression,
-} from "@/src/lib/templating-utils";
+import { DEFAULT_CODE_TEMPLATE, formatValueForDisplay } from "@/src/lib/templating-utils";
 import Editor from "@monaco-editor/react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { isArrowFunction, maskCredentials } from "@superglue/shared";
@@ -98,6 +94,7 @@ interface TemplateEditPopoverProps {
   loopMode?: boolean;
   title?: string;
   helpText?: string;
+  startFullscreen?: boolean;
 }
 
 export function TemplateEditPopover({
@@ -112,6 +109,7 @@ export function TemplateEditPopover({
   loopMode = false,
   title = "Template Expression",
   helpText,
+  startFullscreen = false,
 }: TemplateEditPopoverProps) {
   const { getStepTemplateData, sourceDataVersion } = useExecution();
   const { sourceData, credentials, canExecute } = getStepTemplateData(stepId);
@@ -134,12 +132,14 @@ export function TemplateEditPopover({
       onOpenChange?.(newOpen);
       if (!newOpen) {
         setIsFullscreen(false);
+      } else if (startFullscreen) {
+        setIsFullscreen(true);
       }
       if (newOpen) {
         window.dispatchEvent(new CustomEvent(TEMPLATE_POPOVER_OPEN_EVENT, { detail: popoverId }));
       }
     },
-    [isControlled, onExternalOpenChange, onOpenChange, popoverId],
+    [isControlled, onExternalOpenChange, onOpenChange, popoverId, startFullscreen],
   );
 
   useEffect(() => {
@@ -214,25 +214,21 @@ export function TemplateEditPopover({
     if (open) {
       let initialCode = DEFAULT_CODE_TEMPLATE;
       if (templateContent) {
-        try {
-          initialCode = normalizeTemplateExpression(templateContent);
-        } catch {
-          initialCode = templateContent;
-        }
+        initialCode = templateContent;
       }
 
       (async () => {
-        try {
-          const formatted = await prettierFormat(initialCode, {
-            parser: "babel",
-            plugins: [prettierBabel, prettierEstree],
-            printWidth: 80,
-            semi: true,
-            singleQuote: false,
-          });
-          initialCode = formatted.trim();
-        } catch {
-          // keep unformatted if Prettier fails
+        if (isArrowFunction(initialCode)) {
+          try {
+            const formatted = await prettierFormat(initialCode, {
+              parser: "babel",
+              plugins: [prettierBabel, prettierEstree],
+              printWidth: 80,
+              semi: true,
+              singleQuote: false,
+            });
+            initialCode = formatted.trim();
+          } catch {}
         }
         setCodeContent(initialCode);
         const maxCodeHeight = window.innerHeight * MAX_CODE_HEIGHT_VH;
@@ -362,22 +358,30 @@ export function TemplateEditPopover({
         </div>
         <div className="flex items-center gap-2">
           {isFullscreen && (
-            <div className="flex items-center gap-3 h-5">
+            <div className="flex items-center gap-3 h-6">
               {!autoPreview && (
                 <button
                   type="button"
                   onClick={handleRunPreview}
-                  className="h-5 px-2 flex items-center gap-1 rounded bg-primary/10 hover:bg-primary/20 transition-colors text-[10px] text-primary"
+                  className="h-6 px-2.5 flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 hover:bg-muted/60 transition-colors text-[11px] text-foreground/80"
                 >
-                  <Play className="h-3 w-3" />
+                  <Play className="h-3.5 w-3.5" />
                   <span>Execute</span>
                 </button>
               )}
-              <div className="flex items-center gap-1.5">
-                <Switch checked={autoPreview} onCheckedChange={setAutoPreview} />
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+              <div className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/20 px-2.5 py-1 shadow-sm">
+                <span
+                  className={`h-2 w-2 rounded-full ${autoPreview ? "bg-emerald-500" : "bg-muted-foreground/50"}`}
+                />
+                <span className="text-[10px] font-medium text-foreground/80 whitespace-nowrap">
                   Live Preview
                 </span>
+                <span className="h-4 w-px bg-border/70" />
+                <Switch
+                  checked={autoPreview}
+                  onCheckedChange={setAutoPreview}
+                  className="data-[state=checked]:bg-foreground/30"
+                />
               </div>
             </div>
           )}
@@ -407,7 +411,7 @@ export function TemplateEditPopover({
       </div>
       {previewError ? (
         <div
-          className="p-3 bg-destructive/10 rounded-md text-xs text-destructive overflow-auto flex-1"
+          className="p-3 rounded-md border border-red-200/40 dark:border-red-700/40 text-xs text-red-800 dark:text-red-200 overflow-auto flex-1"
           style={{ height: isFullscreen ? undefined : effectivePreviewHeight }}
         >
           {previewError}

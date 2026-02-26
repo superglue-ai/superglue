@@ -34,10 +34,8 @@ export default function SystemPage() {
       setError(null);
 
       try {
-        const client = createSuperglueClient(config.superglueEndpoint, config.apiEndpoint);
-        const fetchedSystem = await client.getSystem(decodeURIComponent(systemId), {
-          includeDocs: true,
-        });
+        const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
+        const fetchedSystem = await client.getSystem(decodeURIComponent(systemId));
 
         if (fetchedSystem) {
           setSystem(fetchedSystem);
@@ -53,7 +51,7 @@ export default function SystemPage() {
     };
 
     loadSystem();
-  }, [systemId, isNew, config.superglueEndpoint, config.apiEndpoint]);
+  }, [systemId, isNew, config.apiEndpoint, config.apiEndpoint]);
 
   if (isLoading) {
     return (

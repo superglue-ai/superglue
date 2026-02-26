@@ -5,6 +5,7 @@ import type { Message, ToolCall } from "@superglue/shared";
 import { UserAction, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
 import { AgentType } from "@/src/lib/agent/registry/agents";
 import { useTools } from "@/src/app/tools-context";
+import { useSystems } from "@/src/app/systems-context";
 import React, {
   createContext,
   useCallback,
@@ -134,6 +135,7 @@ export function AgentContextProvider({
   const { toast } = useToast();
   const welcomeRef = useRef<AgentWelcomeRef>(null);
   const { refreshTools } = useTools();
+  const { refreshSystems } = useSystems();
 
   const [toolExecutionPolicies, setToolExecutionPolicies] = useState<ToolExecutionPolicies>({});
 
@@ -163,7 +165,11 @@ export function AgentContextProvider({
   });
 
   // Messages hook needs streaming functions for drip animation
-  const messagesHook = useAgentMessages(tempStreaming.stopDrip, tempStreaming.streamDripBufferRef);
+  const messagesHook = useAgentMessages(
+    tempStreaming.stopDrip,
+    tempStreaming.streamDripBufferRef,
+    config.initialMessages,
+  );
 
   // Create updateToolCompletion at provider level (breaks circular dependency)
   const updateToolCompletion = useCallback(
@@ -197,8 +203,20 @@ export function AgentContextProvider({
           // ignore parse errors
         }
       }
+
+      if (data?.toolCall?.name === "edit_system" || data?.toolCall?.name === "create_system") {
+        try {
+          const output =
+            typeof data.toolCall.output === "string"
+              ? JSON.parse(data.toolCall.output)
+              : data.toolCall.output;
+          if (output?.success) {
+            refreshSystems();
+          }
+        } catch {}
+      }
     },
-    [messagesHook.setMessages, messagesHook.updateMessageWithData, refreshTools],
+    [messagesHook.setMessages, messagesHook.updateMessageWithData, refreshTools, refreshSystems],
   );
 
   // Now create the final streaming hook with all dependencies
@@ -216,6 +234,7 @@ export function AgentContextProvider({
 
   // Request hook - the main way to send requests
   const allUploadedFiles = [...fileUpload.sessionFiles, ...fileUpload.pendingFiles];
+  const conversationIdRef = useRef<string | null>(null);
   const requestHook = useAgentRequest({
     config,
     messagesRef: messagesHook.messagesRef,
@@ -229,8 +248,10 @@ export function AgentContextProvider({
     currentStreamControllerRef: streamingHook.currentStreamControllerRef,
     uploadedFiles: allUploadedFiles,
     pendingFiles: fileUpload.pendingFiles,
+    sessionFiles: fileUpload.sessionFiles,
     filePayloads: fileUpload.filePayloads,
     toolExecutionPolicies,
+    conversationIdRef,
     toast,
   });
 
@@ -238,15 +259,22 @@ export function AgentContextProvider({
   const conversationHook = useAgentConversation({
     setMessages: messagesHook.setMessages,
     setIsLoading: messagesHook.setIsLoading,
-    clearFiles: fileUpload.clearFiles,
+    clearFiles: useCallback(() => {
+      fileUpload.clearFiles();
+      requestHook.resetFileTracking();
+    }, [fileUpload, requestHook]),
     welcomeRef,
   });
+
+  useEffect(() => {
+    conversationIdRef.current = conversationHook.currentConversationId;
+  }, [conversationHook.currentConversationId]);
 
   // Composed actions
   const stopStreaming = useCallback(() => {
     if (streamingHook.currentStreamControllerRef.current) {
       streamingHook.currentStreamControllerRef.current.abort();
-      messagesHook.cleanupInterruptedStream("\n\n*[Response stopped]*");
+      messagesHook.cleanupInterruptedStream("\n\n");
       messagesHook.setIsLoading(false);
     }
   }, [streamingHook.currentStreamControllerRef, messagesHook]);
@@ -264,17 +292,24 @@ export function AgentContextProvider({
       if (messageIndex === -1) return;
 
       const truncatedMessages = messagesHook.messages.slice(0, messageIndex);
-      messagesHook.messagesRef.current = truncatedMessages;
-      messagesHook.setMessages(truncatedMessages);
+      const reseededMessages =
+        truncatedMessages.length === 0 &&
+        config.initialMessages &&
+        config.initialMessages.length > 0
+          ? [...config.initialMessages]
+          : truncatedMessages;
+      messagesHook.messagesRef.current = reseededMessages;
+      messagesHook.setMessages(reseededMessages);
       messagesHook.setEditingMessageId(null);
 
       const editedContent = messagesHook.editingContent.trim();
       messagesHook.setEditingContent("");
       fileUpload.clearFiles();
+      requestHook.resetFileTracking();
 
       await requestHook.sendAgentRequest(editedContent);
     },
-    [messagesHook, fileUpload, requestHook],
+    [messagesHook, fileUpload, requestHook, config.initialMessages],
   );
 
   const handleSendMessage = useCallback(

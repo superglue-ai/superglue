@@ -8,6 +8,7 @@
 export { GraphQLStrategy } from "./fetching-graphql.js";
 export { AxiosFetchingStrategy } from "./fetching-axios.js";
 export { PlaywrightFetchingStrategy } from "./fetching-playwright.js";
+export { LlmsTxtFetchingStrategy } from "./fetching-llms-txt.js";
 
 // Processing Strategies
 export { PostgreSqlStrategy } from "./processing-postgresql.js";

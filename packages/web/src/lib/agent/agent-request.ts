@@ -1,57 +1,39 @@
-import { Message, getDateMessage } from "@superglue/shared";
+import { Message } from "@superglue/shared";
 import { jsonSchema } from "ai";
 import { tavilySearch } from "@tavily/ai-sdk";
-import { resolveSystemPrompt, generateAgentInitialContext } from "./agent-context";
 import { AgentType, getAgent } from "./registry/agents";
-import { TOOL_CONTINUATION_MESSAGES, TOOL_REGISTRY } from "./registry/tools";
+import { TOOL_EVENTS, resolveEventMessage } from "./registry/tool-events";
+import { TOOL_REGISTRY } from "./registry/tool-definitions";
+import { truncateToolResult } from "../general-utils";
 import {
   ToolExecutionContext,
   ToolRegistryEntry,
   ValidatedAgentRequest,
   UserAction,
-  ToolConfirmationAction,
-  ToolExecutionFeedback,
-  FileUploadAction,
+  ToolEventAction,
 } from "./agent-types";
-import { TOOL_POLICIES, getEffectiveMode } from "./registry/tool-policies";
+import { getEffectiveMode } from "./registry/tool-policies";
+import { needsSystemMessage } from "./agent-helpers";
 
-function validateUserActions(actions: any[]): void {
+export interface ConfirmationResult {
+  toolId: string;
+  toolName: string;
+  output: string;
+  status: "completed" | "declined";
+}
+
+function validateUserActions(actions: UserAction[]): void {
   for (const action of actions) {
-    if (!action.type) {
-      throw new Error("UserAction must have a type");
-    }
-    if (action.type === "tool_confirmation") {
-      if (!action.toolCallId || !action.toolName || !action.action) {
-        throw new Error("ToolConfirmationAction requires toolCallId, toolName, and action");
+    if (action.type === "tool_event") {
+      if (!action.toolCallId || !action.toolName || !action.event) {
+        throw new Error("ToolEventAction requires toolCallId, toolName, and event");
       }
-      if (!["confirmed", "declined", "partial"].includes(action.action)) {
-        throw new Error("ToolConfirmationAction.action must be confirmed, declined, or partial");
-      }
-    } else if (action.type === "tool_execution_feedback") {
-      if (!action.toolCallId || !action.toolName || !action.feedback) {
-        throw new Error("ToolExecutionFeedback requires toolCallId, toolName, and feedback");
-      }
-      if (
-        ![
-          "manual_run",
-          "manual_run_success",
-          "manual_run_failure",
-          "request_fix",
-          "save_success",
-          "oauth_success",
-          "oauth_failure",
-        ].includes(action.feedback)
-      ) {
-        throw new Error(
-          "ToolExecutionFeedback.feedback must be manual_run, manual_run_success, manual_run_failure, request_fix, save_success, oauth_success, or oauth_failure",
-        );
-      }
-    } else if (action.type === "file_upload") {
-      if (!action.files || !Array.isArray(action.files)) {
-        throw new Error("FileUploadAction requires files array");
+      const eventDef = TOOL_EVENTS[action.toolName]?.[action.event];
+      if (!eventDef) {
+        throw new Error(`Unknown event "${action.event}" for tool "${action.toolName}"`);
       }
     } else {
-      throw new Error(`Unknown UserAction type: ${action.type}`);
+      throw new Error(`Unknown UserAction type: ${(action as any).type}`);
     }
   }
 }
@@ -69,24 +51,15 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     validateUserActions(body.userActions);
   }
 
-  if (!body.userMessage && (!body.userActions || body.userActions.length === 0)) {
-    throw new Error("Request must have userMessage or userActions");
+  if (
+    !body.userMessage &&
+    (!body.userActions || body.userActions.length === 0) &&
+    !body.hiddenContext
+  ) {
+    throw new Error("Request must have userMessage, userActions, or hiddenContext");
   }
 
   const agent = getAgent(body.agentId);
-
-  if (agent.agentParamsSchema && body.agentParams) {
-    try {
-      agent.agentParamsSchema.parse(body.agentParams);
-    } catch (error: any) {
-      if (error?.issues) {
-        throw new Error(
-          `Invalid agentParams: ${error.issues.map((e: any) => e.message).join(", ")}`,
-        );
-      }
-      throw error;
-    }
-  }
 
   if (body.toolExecutionPolicies && typeof body.toolExecutionPolicies !== "object") {
     throw new Error("toolExecutionPolicies must be an object");
@@ -99,15 +72,10 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     userActions: body.userActions,
     filePayloads: body.filePayloads,
     hiddenContext: body.hiddenContext,
-    agentParams: body.agentParams,
     toolExecutionPolicies: body.toolExecutionPolicies,
+    playgroundDraft: body.playgroundDraft,
     agent,
   };
-}
-
-function needsSystemMessage(messages: Message[]): boolean {
-  // New conversation = no system message has been injected yet
-  return !messages.some((m) => m.role === "system");
 }
 
 type ToolStatus =
@@ -117,6 +85,7 @@ type ToolStatus =
   | "awaiting_confirmation"
   | "running"
   | "stopped"
+  | "failed"
   | "error";
 
 function updateToolInMessages(
@@ -130,12 +99,14 @@ function updateToolInMessages(
     const updatedParts = msg.parts.map((part) => {
       if (part.type === "tool" && part.tool?.id === toolCallId) {
         let updatedOutput = part.tool.output;
-        if (updates.confirmationState) {
+        if (updates.confirmationState || updates.confirmationData) {
           if (updatedOutput) {
             try {
               const parsed =
                 typeof updatedOutput === "string" ? JSON.parse(updatedOutput) : updatedOutput;
-              parsed.confirmationState = updates.confirmationState;
+              if (updates.confirmationState) {
+                parsed.confirmationState = updates.confirmationState;
+              }
               if (updates.confirmationData) {
                 parsed.confirmationData = updates.confirmationData;
               }
@@ -169,99 +140,26 @@ function updateToolInMessages(
   }) as Message[];
 }
 
-function getConfirmationStateForAction(toolName: string, action: string): string | undefined {
-  const entry = TOOL_REGISTRY[toolName];
-  return entry?.confirmation?.states?.[action as keyof typeof entry.confirmation.states];
-}
-
-function processToolConfirmation(
-  action: ToolConfirmationAction,
+function processToolEvent(
+  action: ToolEventAction,
   messages: Message[],
-): { messages: Message[]; continuation: string | null } {
-  const statusMap: Record<string, ToolStatus> = {
-    confirmed: "running",
-    declined: "declined",
-    partial: "completed",
-  };
+): { messages: Message[]; continuation: string } {
+  const eventDef = TOOL_EVENTS[action.toolName]?.[action.event];
+  if (!eventDef) {
+    throw new Error(`Unknown event "${action.event}" for tool "${action.toolName}"`);
+  }
 
-  const confirmationState = getConfirmationStateForAction(action.toolName, action.action);
+  const continuation = resolveEventMessage(eventDef.message, action.payload);
 
-  const updatedMessages = updateToolInMessages(messages, action.toolCallId, {
-    status: statusMap[action.action],
-    confirmationState,
-    ...(action.data && { confirmationData: action.data }),
-  });
-
-  const continuationMessages =
-    TOOL_CONTINUATION_MESSAGES[action.toolName as keyof typeof TOOL_CONTINUATION_MESSAGES];
-  const continuation =
-    continuationMessages?.[action.action as keyof typeof continuationMessages] ?? null;
+  const updatedMessages = eventDef.statusUpdate
+    ? updateToolInMessages(messages, action.toolCallId, {
+        status: eventDef.statusUpdate,
+        confirmationState: action.event,
+        ...(action.payload && { confirmationData: action.payload }),
+      })
+    : messages;
 
   return { messages: updatedMessages, continuation };
-}
-
-function buildFeedbackContinuation(action: ToolExecutionFeedback): string {
-  switch (action.feedback) {
-    case "manual_run":
-      return `[USER ACTION] User manually ran tool "${action.toolName}". Result: ${JSON.stringify(action.data)}`;
-    case "manual_run_success": {
-      const successData = action.data || {};
-      const changesApplied =
-        successData.appliedChanges > 0
-          ? ` with ${successData.appliedChanges} pending change(s) applied`
-          : "";
-      const truncatedResult =
-        successData.result !== undefined
-          ? JSON.stringify(successData.result).substring(0, 500)
-          : "No result data";
-      return `[USER ACTION] User tested the tool "${action.toolName}"${changesApplied}. Execution succeeded. Result preview: ${truncatedResult}`;
-    }
-    case "manual_run_failure": {
-      const failData = action.data || {};
-      const failChangesApplied =
-        failData.appliedChanges > 0
-          ? ` with ${failData.appliedChanges} pending change(s) applied`
-          : "";
-      return `[USER ACTION] User tested the tool "${action.toolName}"${failChangesApplied} but it FAILED with error: ${failData.error || "Unknown error"}. Please analyze the error and fix the tool configuration using edit_tool.`;
-    }
-    case "request_fix":
-      return `[USER ACTION] User clicked "Request Fix" for tool "${action.toolName}". Error: ${action.data}. Please fix using edit_tool.`;
-    case "save_success":
-      return `[SYSTEM] Tool "${action.toolName}" saved successfully.`;
-    case "oauth_success":
-      return `[SYSTEM] OAuth authentication for "${action.data?.systemId}" completed successfully. Access token saved. Inform the user that authentication is complete and the system is ready to use, suggest to test it.`;
-    case "oauth_failure":
-      return `[SYSTEM] OAuth authentication for "${action.data?.systemId}" failed: ${action.data?.error}. Help the user troubleshoot the issue.`;
-  }
-}
-
-function processToolFeedback(
-  action: ToolExecutionFeedback,
-  messages: Message[],
-): { messages: Message[]; continuation: string | null } {
-  const continuation = buildFeedbackContinuation(action);
-  return { messages, continuation };
-}
-
-function processFileUpload(
-  _action: FileUploadAction,
-  messages: Message[],
-): { messages: Message[]; continuation: string | null } {
-  return { messages, continuation: null };
-}
-
-function processUserAction(
-  action: UserAction,
-  messages: Message[],
-): { messages: Message[]; continuation: string | null } {
-  switch (action.type) {
-    case "tool_confirmation":
-      return processToolConfirmation(action, messages);
-    case "tool_execution_feedback":
-      return processToolFeedback(action, messages);
-    case "file_upload":
-      return processFileUpload(action, messages);
-  }
 }
 
 function processUserActions(
@@ -272,9 +170,9 @@ function processUserActions(
   let updatedMessages = [...messages];
 
   for (const action of actions) {
-    const result = processUserAction(action, updatedMessages);
-    updatedMessages = result.messages;
-    if (result.continuation) {
+    if (action.type === "tool_event") {
+      const result = processToolEvent(action, updatedMessages);
+      updatedMessages = result.messages;
       continuations.push(result.continuation);
     }
   }
@@ -282,66 +180,21 @@ function processUserActions(
   return { messages: updatedMessages, continuations };
 }
 
-function buildContextInjection(
-  hiddenContext?: string,
-  filePayloads?: Record<string, { name: string; content: any }>,
-  userActions?: UserAction[],
-  messages?: Message[],
-): string | null {
-  const parts: string[] = [];
-
-  if (hiddenContext) {
-    parts.push(hiddenContext);
-  }
-
-  const hasFiles = filePayloads && Object.keys(filePayloads).length > 0;
-
-  if (hasFiles) {
-    const fileRefs = Object.entries(filePayloads!)
-      .map(([key, { name }]) => `- ${name} => file::${key}`)
-      .join("\n");
-    parts.push(`[SYSTEM] Files available in session (use file::key to reference):\n${fileRefs}`);
-  } else {
-    const conversationMentionsFiles =
-      messages?.some((m) => {
-        if (m.content?.includes("file::") || m.content?.includes("uploaded")) return true;
-        if (m.tools) {
-          return m.tools.some((t: any) => {
-            const resultStr = JSON.stringify(t.result || t.args || {});
-            return resultStr.includes("file::") || resultStr.includes("Files available");
-          });
-        }
-        return false;
-      }) ?? false;
-
-    if (conversationMentionsFiles) {
-      parts.push(
-        `[SYSTEM] IMPORTANT: No files are currently available in this session. Files are stored in browser memory and are cleared on page refresh. If a past chat mentions files that were previously uploaded, those files are NO LONGER AVAILABLE. You MUST ask the user to re-upload the files before making any tool calls that require file content. Do NOT attempt to use file:: references until the user has re-uploaded the files.`,
-      );
-    }
-  }
-
-  const fileUploadAction = userActions?.find(
-    (a): a is FileUploadAction => a.type === "file_upload",
-  );
-  if (fileUploadAction && fileUploadAction.files.length > 0) {
-    const previews = fileUploadAction.files
-      .map((f) => `### ${f.name} (file::${f.key})\n\`\`\`\n${f.contentPreview}\n\`\`\``)
-      .join("\n\n");
-    parts.push(`[SYSTEM] File content previews:\n${previews}`);
-  }
-
-  return parts.length > 0 ? parts.join("\n\n") : null;
-}
-
 function buildUserTurn(
-  contextInjection: string | null,
+  hiddenContext: string | null,
   continuations: string[],
   userMessage?: string,
 ): Message | null {
   const parts: string[] = [];
 
-  if (contextInjection) parts.push(contextInjection);
+  if (hiddenContext) {
+    try {
+      const parsed = JSON.parse(hiddenContext);
+      parts.push(parsed.display || hiddenContext);
+    } catch {
+      parts.push(hiddenContext);
+    }
+  }
   if (continuations.length > 0) parts.push(continuations.join("\n\n"));
   if (userMessage) parts.push(userMessage);
 
@@ -355,80 +208,30 @@ function buildUserTurn(
   };
 }
 
-function createPlaygroundDraftMessage(toolConfig: any): Message {
-  return {
-    id: `playground-draft-${Date.now()}`,
-    timestamp: new Date(),
-    role: "assistant",
-    content: "",
-    parts: [
-      {
-        id: `playground-draft-part-${Date.now()}`,
-        type: "tool",
-        tool: {
-          id: `playground-draft-tool-${Date.now()}`,
-          name: "build_tool",
-          input: { instruction: toolConfig.instruction },
-          output: {
-            success: true,
-            draftId: "playground-draft",
-            config: {
-              id: toolConfig.toolId,
-              instruction: toolConfig.instruction,
-              steps: toolConfig.steps,
-              finalTransform: toolConfig.finalTransform,
-              inputSchema: toolConfig.inputSchema,
-              responseSchema: toolConfig.responseSchema,
-              systemIds: toolConfig.systemIds,
-            },
-            systemIds: toolConfig.systemIds || [],
-          },
-          status: "completed",
-        },
-      },
-    ],
-  } as Message;
+export interface PrepareMessagesResult {
+  messages: Message[];
+  systemMessage?: { id: string; content: string };
 }
 
 export async function prepareMessages(
   request: ValidatedAgentRequest,
   ctx: ToolExecutionContext,
-): Promise<Message[]> {
+): Promise<PrepareMessagesResult> {
   let messages = [...request.messages];
+  let systemMessage: { id: string; content: string } | undefined;
 
   if (needsSystemMessage(messages)) {
-    const systemPrompt = resolveSystemPrompt(request.agent, request.agentParams);
-    const dateMessage = getDateMessage();
-    const initialContext = await generateAgentInitialContext(
-      request.agent,
-      ctx,
-      request.agentParams,
-    );
+    const result = await request.agent.systemPromptGenerator(ctx);
 
-    let fullSystemContent = systemPrompt;
-    if (initialContext) {
-      fullSystemContent += `\n\n${initialContext}`;
-    }
-    fullSystemContent += `\n\n${dateMessage.content}`;
-
-    const systemMessage: Message = {
+    const systemMessageObj: Message = {
       id: `system-${Date.now()}`,
       role: "system",
-      content: fullSystemContent,
+      content: result.content,
       timestamp: new Date(),
     };
 
-    messages = [systemMessage, ...messages];
-  }
-
-  if (request.agentId === AgentType.PLAYGROUND && request.agentParams?.playgroundToolConfig) {
-    const draftMessage = createPlaygroundDraftMessage(request.agentParams.playgroundToolConfig);
-    const systemIndex = messages.findIndex((m) => m.role === "system");
-    if (systemIndex !== -1) {
-      messages.splice(systemIndex + 1, 0, draftMessage);
-    } else {
-      messages.unshift(draftMessage);
-    }
+    messages = [systemMessageObj, ...messages];
+    systemMessage = { id: systemMessageObj.id, content: result.content };
   }
 
   let continuations: string[] = [];
@@ -438,27 +241,92 @@ export async function prepareMessages(
     continuations = result.continuations;
   }
 
-  const contextInjection = buildContextInjection(
-    request.hiddenContext,
-    request.filePayloads,
-    request.userActions,
-    messages,
-  );
-
   const lastMessage = messages[messages.length - 1];
   const userMessageAlreadyInHistory =
     lastMessage?.role === "user" && lastMessage?.content === request.userMessage;
 
   const userTurn = buildUserTurn(
-    contextInjection,
+    request.hiddenContext || null,
     continuations,
     userMessageAlreadyInHistory ? undefined : request.userMessage,
   );
+
   if (userTurn) {
     messages = [...messages, userTurn];
   }
 
-  return messages;
+  return { messages, systemMessage };
+}
+
+/**
+ * Extracts a tool part that has a pending confirmation needing processing.
+ * Returns null if the part is not a tool, has no confirmation config,
+ * or its confirmationState is not in the tool's declared validActions.
+ *
+ * Each tool declares its own processable states via validActions:
+ * - create_system, edit_system, call_system: confirmed, declined
+ * - edit_tool, edit_payload: confirmed, declined, partial
+ * - authenticate_oauth: oauth_success, oauth_failure, declined
+ */
+function extractPendingConfirmation(part: any): {
+  tool: any;
+  toolEntry: ToolRegistryEntry;
+} | null {
+  if (part.type !== "tool" || !part.tool) return null;
+
+  const toolEntry = TOOL_REGISTRY[part.tool.name];
+  if (!toolEntry?.confirmation || !part.tool.output) return null;
+
+  let parsedOutput: any;
+  try {
+    parsedOutput =
+      typeof part.tool.output === "string" ? JSON.parse(part.tool.output) : part.tool.output;
+  } catch {
+    return null;
+  }
+
+  if (!parsedOutput.confirmationState) return null;
+
+  const processableStates = new Set<string>(toolEntry.confirmation.validActions);
+  if (!processableStates.has(parsedOutput.confirmationState)) return null;
+
+  return { tool: part.tool, toolEntry };
+}
+
+export async function processConfirmations(
+  messages: Message[],
+  ctx: ToolExecutionContext,
+): Promise<ConfirmationResult[]> {
+  const results: ConfirmationResult[] = [];
+
+  for (const message of messages) {
+    if (message.role !== "assistant" || !message.parts) continue;
+
+    for (const part of message.parts) {
+      const pending = extractPendingConfirmation(part);
+      if (!pending) continue;
+
+      const { tool, toolEntry } = pending;
+      const result = await toolEntry.confirmation!.processConfirmation(
+        tool.input,
+        tool.output,
+        ctx,
+      );
+
+      if (result) {
+        tool.output = result.output;
+        tool.status = result.status;
+        results.push({
+          toolId: tool.id,
+          toolName: tool.name,
+          output: result.output,
+          status: result.status,
+        });
+      }
+    }
+  }
+
+  return results;
 }
 
 async function* executeToolWithLogs(
@@ -466,24 +334,27 @@ async function* executeToolWithLogs(
   input: any,
   context: ToolExecutionContext,
 ): AsyncGenerator<{
-  type: "tool_call_update" | "tool_call_complete" | "tool_call_error";
+  type: "tool_call_update" | "tool_call_complete";
   toolCall: {
     id: string;
     name: string;
     input?: any;
     output?: any;
-    error?: string;
     logs?: Array<{ id: string; message: string; level: string; timestamp: Date; traceId?: string }>;
   };
-  confirmation?: { timing: "before" | "after"; validActions: string[] };
+  confirmation?: { validActions: string[] };
 }> {
   const toolCallId = crypto.randomUUID();
   let logUpdates: any[] = [];
   let filterTraceId: string | undefined;
 
   const logCallback = (message: string) => {
-    if (message.startsWith("TOOL_CALL_UPDATE:run_tool:TRACE_ID:")) {
-      filterTraceId = message.split(":").pop();
+    // Handle TRACE_ID messages from run_tool, build_tool, and edit_tool
+    const traceIdMatch = message.match(
+      /^TOOL_CALL_UPDATE:(?:run_tool|build_tool|edit_tool):TRACE_ID:(.+)$/,
+    );
+    if (traceIdMatch) {
+      filterTraceId = traceIdMatch[1];
       return;
     }
     logUpdates.push({
@@ -554,26 +425,7 @@ async function* executeToolWithLogs(
       };
     }
 
-    let toolResultAsString = typeof result === "string" ? result : JSON.stringify(result, null, 2);
-    const MAX_TOOL_RESPONSE_LENGTH = 100000;
-
-    if (toolResultAsString.length > MAX_TOOL_RESPONSE_LENGTH) {
-      try {
-        const toolResultAsJSON = typeof result === "string" ? JSON.parse(result) : result;
-        const { sampleResultObject } = await import("@superglue/shared");
-        toolResultAsString = JSON.stringify(sampleResultObject(toolResultAsJSON, 2), null, 2);
-        if (toolResultAsString.length > MAX_TOOL_RESPONSE_LENGTH) {
-          toolResultAsString = JSON.stringify(sampleResultObject(toolResultAsJSON, 1), null, 2);
-        }
-        if (toolResultAsString.length > MAX_TOOL_RESPONSE_LENGTH) {
-          toolResultAsString =
-            toolResultAsString.slice(0, MAX_TOOL_RESPONSE_LENGTH) + "\n...(truncated)";
-        }
-      } catch {
-        toolResultAsString =
-          toolResultAsString.slice(0, MAX_TOOL_RESPONSE_LENGTH) + "\n...(truncated)";
-      }
-    }
+    const toolResultAsString = truncateToolResult(result, 50000);
 
     context.messages.push({
       id: crypto.randomUUID(),
@@ -593,17 +445,37 @@ async function* executeToolWithLogs(
       type: "tool_call_complete",
       toolCall: { id: toolCallId, name: entry.name, input, output: toolResultAsString },
       confirmation: entry.confirmation
-        ? { timing: entry.confirmation.timing, validActions: entry.confirmation.validActions }
+        ? { validActions: entry.confirmation.validActions }
         : undefined,
     };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorResult = { success: false, error: errorMessage };
+    const errorResultAsString = truncateToolResult(errorResult, 50000);
+
+    context.messages.push({
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+      role: "assistant",
+      content: "",
+      parts: [
+        {
+          id: crypto.randomUUID(),
+          type: "tool",
+          tool: {
+            id: toolCallId,
+            name: entry.name,
+            input,
+            output: errorResult,
+            status: "completed",
+          },
+        },
+      ],
+    } as Message);
+
     yield {
-      type: "tool_call_error",
-      toolCall: {
-        id: toolCallId,
-        name: entry.name,
-        error: error instanceof Error ? error.message : String(error),
-      },
+      type: "tool_call_complete",
+      toolCall: { id: toolCallId, name: entry.name, input, output: errorResultAsString },
     };
   } finally {
     unsubscribe?.();
@@ -641,13 +513,16 @@ export function buildToolsForAISDK(
       inputSchema: jsonSchema(schema),
     };
 
-    const policy = TOOL_POLICIES[entry.name];
-    const hasPolicy = policy !== undefined;
-    const shouldAutoExecute =
-      entry.execute && (entry.confirmation?.timing !== "before" || hasPolicy);
+    const effectiveMode = getEffectiveMode(toolName, context.toolExecutionPolicies);
+    const shouldAttachExecute =
+      entry.execute && (effectiveMode === "auto" || effectiveMode === "confirm_after_execution");
 
-    if (shouldAutoExecute) {
+    if (shouldAttachExecute) {
       toolDef.execute = async function* (input: any) {
+        const actualMode = getEffectiveMode(toolName, context.toolExecutionPolicies, input);
+        if (actualMode === "confirm_before_execution") {
+          return;
+        }
         yield* executeToolWithLogs(entry, input, context);
       };
     }
@@ -664,18 +539,4 @@ export function buildToolsForAISDK(
   }
 
   return tools;
-}
-
-export async function processConfirmation(
-  toolName: string,
-  toolInput: any,
-  toolOutput: any,
-  ctx: ToolExecutionContext,
-): Promise<{ output: string; status: "completed" | "declined" } | null> {
-  const entry = TOOL_REGISTRY[toolName];
-  if (!entry?.confirmation?.processConfirmation) {
-    return null;
-  }
-
-  return entry.confirmation.processConfirmation(toolInput, toolOutput, ctx);
 }

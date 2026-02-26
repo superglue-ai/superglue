@@ -4,8 +4,10 @@ import { MiniCard, StatusIndicator, TriggerCard } from "@/src/components/ui/mini
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { buildPreviousStepResults, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
+import { isRequestConfig, isTransformConfig, RequestStepConfig } from "@superglue/shared";
 import {
   Blocks,
+  Code2,
   ChevronLeft,
   ChevronRight,
   FileJson,
@@ -81,8 +83,8 @@ export function ToolStepGallery({
     payload,
     systems,
     inputSchema,
-    responseSchema,
-    finalTransform,
+    outputSchema,
+    outputTransform,
     setSteps,
     setInstruction,
     isPayloadReferenced,
@@ -158,10 +160,10 @@ export function ToolStepGallery({
     });
 
     // Transform
-    if (finalTransform !== undefined) {
+    if (outputTransform !== undefined) {
       items.push({
         type: "transform",
-        data: { transform: finalTransform, responseSchema },
+        data: { transform: outputTransform, outputSchema: outputSchema },
         stepResult: finalResult,
         transformError: hasTransformFailed ? stepResultsMap["__final_transform__"] : null,
         hasTransformCompleted,
@@ -179,8 +181,8 @@ export function ToolStepGallery({
     inputSchema,
     steps,
     stepResultsMap,
-    finalTransform,
-    responseSchema,
+    outputTransform,
+    outputSchema,
     finalResult,
     hasTransformCompleted,
     hasTransformFailed,
@@ -599,8 +601,8 @@ export function ToolStepGallery({
                             return (
                               <MiniCard isActive={isActive} onClick={handleClick}>
                                 <div className="flex-1 flex flex-col items-center justify-center">
-                                  <div className="p-2 rounded-full bg-primary/10">
-                                    <FilePlay className="h-4 w-4 text-primary" />
+                                  <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
+                                    <Code2 className="h-4 w-4 text-primary" />
                                   </div>
                                   <span className="text-[11px] font-semibold mt-1.5">
                                     Tool Result
@@ -639,10 +641,19 @@ export function ToolStepGallery({
                                 animate: false,
                               };
                           const statusInfo = isRunning ? RUNNING_STATUS : baseStatusInfo;
-                          const linkedSystem =
-                            step.systemId && systems
-                              ? systems.find((sys) => sys.id === step.systemId)
+                          const stepSystemId =
+                            step.config && isRequestConfig(step.config)
+                              ? (step.config as RequestStepConfig).systemId
                               : undefined;
+                          const isTransformStep = isTransformConfig(step.config);
+                          const linkedSystem =
+                            stepSystemId && systems
+                              ? systems.find((sys) => sys.id === stepSystemId)
+                              : undefined;
+                          const systemLabel =
+                            linkedSystem?.name ||
+                            stepSystemId ||
+                            (isTransformStep ? "Transform" : undefined);
 
                           return (
                             <MiniCard isActive={isActive} onClick={handleClick}>
@@ -670,16 +681,18 @@ export function ToolStepGallery({
                                   <div className="p-2 rounded-full bg-white dark:bg-gray-100 border border-border/50">
                                     {linkedSystem ? (
                                       <SystemIcon system={linkedSystem} size={18} />
+                                    ) : isTransformStep ? (
+                                      <Code2 className="h-4 w-4 text-primary" />
                                     ) : (
                                       <Blocks className="h-4 w-4 text-muted-foreground" />
                                     )}
                                   </div>
-                                  {step.systemId && (
+                                  {systemLabel && (
                                     <span
                                       className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
-                                      title={step.systemId}
+                                      title={systemLabel}
                                     >
-                                      {step.systemId}
+                                      {systemLabel}
                                     </span>
                                   )}
                                   <span
@@ -728,11 +741,11 @@ export function ToolStepGallery({
                                       e.stopPropagation();
                                       handleAddStep(getInsertIndex());
                                     }}
-                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/15 hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                                    className="group relative flex items-center justify-center h-8 w-8 rounded-full border border-muted-foreground/15 hover:border-muted-foreground/25 hover:bg-muted/40 transition-colors"
                                     title="Add step here"
                                   >
                                     <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:opacity-0 transition-opacity" />
-                                    <Plus className="h-4 w-4 text-primary absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Plus className="h-4 w-4 text-muted-foreground absolute opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </button>
                                 ) : null}
                               </div>

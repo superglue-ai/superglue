@@ -52,7 +52,12 @@ RUN apt-get update && \
 
 # Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
-    npm install --save-optional @napi-rs/canvas-linux-x64-gnu && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        npm install --save-optional @napi-rs/canvas-linux-x64-gnu; \
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        npm install --save-optional @napi-rs/canvas-linux-arm64-gnu; \
+    fi && \
     npm install -g next turbo cross-env && \
     npx playwright install --with-deps chromium
 
@@ -61,9 +66,10 @@ COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
 COPY --from=builder /usr/src/app/packages/web/.next ./packages/web/.next
 COPY --from=builder /usr/src/app/packages/web/public ./packages/web/public
 COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /usr/src/app/packages/web/src/lib/agent/skills/content ./packages/web/src/lib/agent/skills/content
 
-# Expose ports for both servers
-EXPOSE 3000 3001 3002
+# Expose ports for web and API servers
+EXPOSE 3001 3002
 
 # Start both servers using turbo
 CMD ["npm", "run", "start"]

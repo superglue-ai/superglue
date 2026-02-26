@@ -9,7 +9,6 @@ import axios from "axios";
 import { getIntrospectionQuery } from "graphql";
 import { server_defaults } from "../../default.js";
 import { logMessage } from "../../utils/logs.js";
-import { composeUrl } from "../../utils/helpers.js";
 import { DocumentationConfig, DocumentationFetchingStrategy } from "../types.js";
 
 export class GraphQLStrategy implements DocumentationFetchingStrategy {
@@ -54,22 +53,21 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
   }
 
   async tryFetch(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string | null> {
-    if (!config.urlHost?.startsWith("http")) return null;
-    const endpointUrl = composeUrl(config.urlHost, config.urlPath);
+    if (!config.url?.startsWith("http")) return null;
 
-    const urlIsLikelyGraphQL = this.isLikelyGraphQL(endpointUrl, config);
+    const urlIsLikelyGraphQL = this.isLikelyGraphQL(config.url, config);
     const docUrlIsLikelyGraphQL = this.isLikelyGraphQL(config.documentationUrl, config);
 
     if (!urlIsLikelyGraphQL && !docUrlIsLikelyGraphQL) return null;
 
-    const url = urlIsLikelyGraphQL ? endpointUrl : config.documentationUrl;
-    if (!url) {
+    const targetUrl = urlIsLikelyGraphQL ? config.url : config.documentationUrl;
+    if (!targetUrl) {
       return null;
     }
 
-    const schema = await this.fetchGraphQLSchema(url, config, metadata);
+    const schema = await this.fetchGraphQLSchema(targetUrl, config, metadata);
     if (schema) {
-      logMessage("info", `Successfully fetched GraphQL schema from ${url}.`, metadata);
+      logMessage("info", `Successfully fetched GraphQL schema from ${targetUrl}.`, metadata);
       return JSON.stringify(schema);
     }
     return null;

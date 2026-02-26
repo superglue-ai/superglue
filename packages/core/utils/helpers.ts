@@ -65,23 +65,6 @@ export function applyAuthFormat(format: string, credentials: Record<string, stri
   });
 }
 
-export function composeUrl(host: string, path: string) {
-  // Handle empty/undefined inputs
-  if (!host) host = "";
-  if (!path) path = "";
-
-  // Add https:// if protocol is missing
-  if (!/^(https?|postgres(ql)?|ftp(s)?|sftp|file):\/\//i.test(host)) {
-    host = `https://${host}`;
-  }
-
-  // Trim slashes in one pass
-  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
-  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-
-  return `${cleanHost}/${cleanPath}`;
-}
-
 export async function replaceVariables(
   template: string,
   payload: Record<string, any>,

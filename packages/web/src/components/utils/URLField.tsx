@@ -2,7 +2,6 @@
 
 import { Badge } from "@/src/components/ui/badge";
 import { Input } from "@/src/components/ui/input";
-import { splitUrl } from "@/src/lib/client-utils";
 import { cn, getSimpleIcon } from "@/src/lib/general-utils";
 import { systems as systemTemplates } from "@superglue/shared";
 import { Link } from "lucide-react";
@@ -10,7 +9,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 
 interface URLFieldProps {
   url: string;
-  onUrlChange: (urlHost: string, urlPath: string, queryParams: Record<string, string>) => void;
+  onUrlChange: (url: string, queryParams: Record<string, string>) => void;
   placeholder?: string;
   className?: string;
   error?: boolean;
@@ -89,9 +88,8 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
       }
 
       setIconName(getIconForUrl(newUrl));
-      const { urlHost, urlPath } = splitUrl(newUrl);
       const queryParams = extractQueryParams(newUrl);
-      onUrlChange(urlHost, urlPath, queryParams);
+      onUrlChange(newUrl, queryParams);
     },
     [onUrlChange],
   );
@@ -112,7 +110,7 @@ export const URLField = forwardRef<URLFieldHandle, URLFieldProps>(function URLFi
     setUrl("");
     setIsValid(null);
     setIconName(null);
-    onUrlChange("", "", {});
+    onUrlChange("", {});
   }, [onUrlChange]);
 
   useEffect(() => {

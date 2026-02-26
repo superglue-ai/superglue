@@ -1,12 +1,10 @@
-import { ConfirmationAction, Message, ToolCall } from "@superglue/shared";
+import { Message, ToolCall } from "@superglue/shared";
 import { Conversation } from "../ConversationHistory";
 import { AgentType } from "@/src/lib/agent/registry/agents";
-import { UserAction } from "@/src/lib/agent/agent-types";
+import { DraftLookup, UserAction, ExecutionMode } from "@/src/lib/agent/agent-types";
 
 export interface ToolConfirmationMetadata {
-  timing: "before" | "after";
-  validActions: ConfirmationAction[];
-  shouldAutoExecute?: boolean;
+  executionMode: ExecutionMode;
 }
 
 export interface UploadedFile {
@@ -61,6 +59,7 @@ export interface UseAgentRequestReturn {
   ) => Promise<void>;
   bufferAction: (action: UserAction) => void;
   actionBufferRef: React.MutableRefObject<UserAction[]>;
+  resetFileTracking: () => void;
 }
 
 export interface UseAgentFileUploadReturn {
@@ -90,23 +89,12 @@ export interface UseAgentConversationReturn {
   startNewConversation: () => void;
 }
 
-export interface PlaygroundToolContext {
-  toolId: string;
-  instruction: string;
-  steps: any[];
-  finalTransform: string;
-  inputSchema: string | null;
-  responseSchema: string | null;
-  systemIds: string[];
-  executionSummary: string;
-  initialError?: string;
-  currentPayload?: string;
-}
-
 export interface AgentConfig {
   agentId: AgentType;
-  agentParams?: Record<string, any>;
   hiddenContextBuilder?: () => string;
+  initialMessages?: Message[];
   chatEndpoint?: string;
   getAuthToken?: () => string;
+  onToolComplete?: (toolName: string, toolId: string, output: any) => void;
+  playgroundDraftBuilder?: () => DraftLookup | null;
 }

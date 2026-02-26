@@ -1,6 +1,5 @@
 import { PostHog } from "posthog-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolvers } from "../graphql/graphql.js";
 import * as telemetryModule from "./telemetry.js";
 
 // Mock PostHog

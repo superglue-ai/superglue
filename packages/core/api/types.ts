@@ -1,32 +1,32 @@
-import {
-  OpenAPIPagination,
-  OpenAPITool,
-  OpenAPIToolStep,
-  ServiceMetadata,
-  UserRole,
-} from "@superglue/shared";
+import { Pagination, ServiceMetadata, Tool, ToolStep, UserRole } from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
 import type { DataStore } from "../datastore/types.js";
 import type { WorkerPools } from "../worker/types.js";
-import type { DocumentationFiles, FileStatus } from "@superglue/shared";
+import type {
+  DocumentationFiles,
+  FileStatus,
+  MultiTenancyMode,
+  PatchSystemBody,
+} from "@superglue/shared";
+export type { PatchSystemBody };
 
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
-  authInfo: {
-    orgId: string;
-    userId?: string;
-    userEmail?: string;
-    userName?: string;
-    orgName?: string;
-    orgRole?: UserRole;
-    // EE: API key permission fields
-    isRestricted?: boolean;
-    allowedTools?: string[];
-  };
+  authInfo: AuthInfo;
   datastore: DataStore;
   workerPools: WorkerPools;
 
   toMetadata: () => ServiceMetadata;
+}
+
+export interface AuthInfo {
+  orgId: string;
+  userId?: string;
+  orgName?: string;
+  orgRole?: UserRole;
+  // EE: Effective permissions (intersection of API key + end user scopes)
+  isRestricted?: boolean;
+  allowedSystems?: string[] | null; // null or ['*'] means all systems allowed
 }
 
 export interface RouteHandler {
@@ -38,7 +38,7 @@ export interface RoutePermission {
   type: "read" | "write" | "execute" | "delete";
   resource: string;
   allowRestricted?: boolean; // Can restricted API keys access this route? (default: false)
-  checkResourceId?: "toolId"; // Which param needs allowedTools validation?
+  checkResourceId?: "toolId"; // Which param needs permission validation?
 }
 
 export interface RouteConfig {
@@ -54,8 +54,8 @@ export interface ApiModule {
   routes: RouteConfig[];
 }
 
-// Re-export OpenAPI types from shared for convenience
-export type { OpenAPIPagination, OpenAPITool, OpenAPIToolStep };
+// Re-export types from shared for convenience
+export type { Pagination, Tool, ToolStep };
 
 export interface OpenAPIStepResult {
   stepId: string;
@@ -73,7 +73,7 @@ export interface OpenAPIRunMetadata {
 export interface OpenAPIRun {
   runId: string;
   toolId: string;
-  tool?: Record<string, unknown>;
+  tool?: Tool; // Full tool config
   status: "running" | "success" | "failed" | "aborted";
   toolPayload?: Record<string, unknown>;
   data?: Record<string, unknown>;
@@ -82,6 +82,8 @@ export interface OpenAPIRun {
   options?: Record<string, unknown>;
   requestSource?: string;
   traceId?: string;
+  resultStorageUri?: string; // S3 URI where full results are stored (EE feature)
+  userId?: string; // User or end user who triggered this run
   metadata: OpenAPIRunMetadata;
 }
 
@@ -91,7 +93,7 @@ export interface RunToolRequestOptions {
   timeout?: number;
   webhookUrl?: string;
   traceId?: string;
-  // Optional source of the request; currently only 'mcp' is honored; Other sources are derived from the request context.x
+  // Optional source of the request; 'frontend' and 'mcp' are honored; Other sources are derived from the request context.
   requestSource?: string;
 }
 
@@ -105,7 +107,10 @@ export interface RunToolRequestBody {
 // For manual run creation (e.g., playground execution records)
 export interface CreateRunRequestBody {
   toolId: string;
-  toolConfig: Record<string, unknown>;
+  toolConfig: Tool;
+  toolResult?: unknown;
+  stepResults?: Array<{ stepId: string; success: boolean; data?: unknown; error?: string }>;
+  toolPayload?: Record<string, unknown>;
   status: "success" | "failed" | "aborted";
   error?: string;
   startedAt: string;
@@ -113,25 +118,28 @@ export interface CreateRunRequestBody {
 }
 
 export interface CreateSystemBody {
+  id?: string;
   name: string;
-  urlHost: string;
+  url: string;
   credentials?: Record<string, any>;
   specificInstructions?: string;
   templateName?: string;
+  multiTenancyMode?: MultiTenancyMode;
   documentationFiles?: DocumentationFiles;
   icon?: string;
   metadata?: Record<string, any>;
+  tunnel?: { tunnelId: string; targetName: string };
 }
 
-export interface UpdateSystemBody {
-  name: string;
-  urlHost: string;
-  specificInstructions?: string;
-  icon?: string;
-  credentials?: Record<string, any>;
-  metadata?: Record<string, any>;
-  templateName?: string;
-  documentationFiles?: DocumentationFiles;
+export interface UploadDocumentationBody {
+  files: Array<{
+    fileName: string;
+    metadata?: {
+      contentType?: string;
+      contentLength?: number;
+      [key: string]: any;
+    };
+  }>;
 }
 
 export interface ScrapeRequestBody {
@@ -146,5 +154,6 @@ export interface DocumentationFileResponse {
   fileName: string;
   sourceUrl?: string;
   error?: string;
-  content?: string;
+  createdAt?: string;
+  contentLength?: number;
 }

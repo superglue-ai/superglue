@@ -5,9 +5,9 @@ import * as jsonpatch from "fast-json-patch";
 export type DiffTargetType =
   | "step"
   | "newStep"
-  | "finalTransform"
+  | "outputTransform"
   | "inputSchema"
-  | "responseSchema"
+  | "outputSchema"
   | "instruction"
   | "toolInput"
   | "responseFilters"
@@ -52,11 +52,9 @@ const stringify = (v: any): string =>
         : JSON.stringify(v, null, 2);
 
 const TOP_LEVEL_TARGETS: Record<string, DiffTargetType> = {
-  finalTransform: "finalTransform",
-  outputTransform: "finalTransform", // OpenAPI alias
+  outputTransform: "outputTransform",
   inputSchema: "inputSchema",
-  responseSchema: "responseSchema",
-  outputSchema: "responseSchema", // OpenAPI alias
+  outputSchema: "outputSchema",
   instruction: "instruction",
   responseFilters: "responseFilters",
   folder: "folder",
@@ -68,9 +66,9 @@ const TOP_LEVEL_TARGETS: Record<string, DiffTargetType> = {
 const TARGET_LABELS: Record<DiffTargetType, string> = {
   step: "",
   newStep: "New Step",
-  finalTransform: "Final Transform",
+  outputTransform: "Output Transform",
   inputSchema: "Input Schema",
-  responseSchema: "Response Schema",
+  outputSchema: "Output Schema",
   instruction: "Instruction",
   toolInput: "Tool Input",
   responseFilters: "Response Filters",
@@ -80,6 +78,8 @@ const TARGET_LABELS: Record<DiffTargetType, string> = {
   unknown: "Unknown",
   archived: "Archived",
 };
+
+const HIDDEN_DIFF_TARGETS: Set<DiffTargetType> = new Set(["archived"]);
 
 // Exported functions
 export function getValueAtPath(obj: any, path: string): any {
@@ -107,6 +107,8 @@ export function parsePathToTarget(path: string): DiffTarget {
     let detail: string | undefined;
     if (subPath.startsWith("/apiConfig")) {
       detail = subPath.replace("/apiConfig", "").replace(/^\//, "") || "apiConfig";
+    } else if (subPath.startsWith("/config")) {
+      detail = subPath.replace("/config", "").replace(/^\//, "") || "config";
     } else if (subPath) {
       detail = subPath.replace(/^\//, "");
     }
@@ -191,38 +193,81 @@ export function buildUnifiedDiff(oldValue: any, newValue: any, op: string): Diff
 export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool): EnrichedDiff[] {
   if (!diffs?.length) return [];
 
-  return diffs.map((diff) => {
+  const filteredDiffs = diffs.filter((d) => {
+    const target = parsePathToTarget(d.path);
+    return !HIDDEN_DIFF_TARGETS.has(target.type);
+  });
+
+  const normalizedConfig = originalConfig ? normalizeToolSchemas(originalConfig) : undefined;
+
+  return filteredDiffs.map((diff) => {
     const target = parsePathToTarget(diff.path);
-    const oldValue = originalConfig ? getValueAtPath(originalConfig, diff.path) : undefined;
+    const oldValue = normalizedConfig ? getValueAtPath(normalizedConfig, diff.path) : undefined;
 
     // Determine context path
-    const stepApiMatch = diff.path.match(/^(\/steps\/\d+\/apiConfig)(\/.*)?$/);
+    const stepConfigMatch = diff.path.match(/^(\/steps\/\d+\/config)(\/.*)?$/);
     const stepMatch = diff.path.match(/^(\/steps\/\d+)(\/.*)?$/);
     const topMatch = diff.path.match(
-      /^(\/(?:finalTransform|outputTransform|inputSchema|responseSchema|outputSchema|instruction|responseFilters|folder|name|id))(\/.*)?$/,
+      /^(\/(?:outputTransform|inputSchema|outputSchema|instruction|responseFilters|folder|name|id))(\/.*)?$/,
     );
 
     let contextPath: string;
-    if (stepApiMatch) {
-      contextPath = stepApiMatch[1];
+    if (stepConfigMatch) {
+      contextPath = stepConfigMatch[1];
     } else if (stepMatch) {
       // For OpenAPI format, no apiConfig wrapper - use step path directly
       const stepPath = stepMatch[1];
-      const hasApiConfig = originalConfig
-        ? getValueAtPath(originalConfig, stepPath + "/apiConfig") !== undefined
-        : false;
-      contextPath = hasApiConfig ? stepPath + "/apiConfig" : stepPath;
+      const subPath = stepMatch[2] || "";
+      // If removing/adding an entire step (no subpath), use the step path directly
+      if (!subPath && (diff.op === "remove" || diff.op === "add")) {
+        contextPath = stepPath;
+      } else if (subPath.startsWith("/apiConfig")) {
+        contextPath = stepPath + "/apiConfig";
+      } else if (subPath.startsWith("/config")) {
+        contextPath = stepPath + "/config";
+      } else {
+        contextPath = stepPath;
+      }
     } else if (topMatch) {
       contextPath = topMatch[1];
     } else {
       contextPath = diff.path;
     }
 
-    const contextOldObj = originalConfig ? getValueAtPath(originalConfig, contextPath) : undefined;
+    const contextOldObj = normalizedConfig
+      ? getValueAtPath(normalizedConfig, contextPath)
+      : undefined;
 
     // Apply diff to get new context
     let contextNewObj = contextOldObj;
-    if (contextOldObj !== undefined && diff.value !== undefined) {
+    if (diff.op === "remove" && contextOldObj !== undefined) {
+      // For remove operations, determine what the new value should be
+      const relativePath = diff.path.replace(contextPath, "") || "/";
+      const parts = relativePath.split("/").filter(Boolean);
+      if (parts.length === 0) {
+        // Removing the entire context object (e.g., removing a whole step)
+        contextNewObj = undefined;
+      } else {
+        // Removing a property within the context object
+        let result = JSON.parse(JSON.stringify(contextOldObj));
+        let current = result;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (current[parts[i]] === undefined || current[parts[i]] === null) {
+            break;
+          }
+          current = current[parts[i]];
+        }
+        const lastKey = parts[parts.length - 1];
+        // Use splice for array indices to properly shift elements (JSON Patch remove semantics)
+        // Using delete would leave a hole that serializes to null
+        if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
+          current.splice(parseInt(lastKey, 10), 1);
+        } else {
+          delete current[lastKey];
+        }
+        contextNewObj = result;
+      }
+    } else if (contextOldObj !== undefined && diff.value !== undefined) {
       const relativePath = diff.path.replace(contextPath, "") || "/";
       let result = contextOldObj === null ? {} : JSON.parse(JSON.stringify(contextOldObj));
       const parts = relativePath.split("/").filter(Boolean);
@@ -237,8 +282,16 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
           current = current[parts[i]];
         }
         const lastKey = parts[parts.length - 1];
-        if (diff.op === "remove") delete current[lastKey];
-        else current[lastKey] = diff.value;
+        if (diff.op === "remove") {
+          // Use splice for array indices to properly shift elements (JSON Patch remove semantics)
+          if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
+            current.splice(parseInt(lastKey, 10), 1);
+          } else {
+            delete current[lastKey];
+          }
+        } else {
+          current[lastKey] = diff.value;
+        }
         contextNewObj = result;
       }
     } else if (diff.value !== undefined) {
@@ -249,11 +302,14 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
     if (
       target.type === "step" &&
       target.stepIndex !== undefined &&
-      originalConfig?.steps?.[target.stepIndex]
+      normalizedConfig?.steps?.[target.stepIndex]
     ) {
-      const step = originalConfig.steps[target.stepIndex];
+      const step = normalizedConfig.steps[target.stepIndex];
       target.stepId = step.id;
-      target.systemId = step.systemId;
+      // systemId is now on step.config for request steps
+      if (step.config && "systemId" in step.config) {
+        target.systemId = step.config.systemId;
+      }
     }
 
     return {

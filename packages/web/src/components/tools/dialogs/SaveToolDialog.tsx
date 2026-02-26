@@ -59,14 +59,14 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
     }
 
     const existingTool = tools.find((t) => t.id === trimmedName);
-    if (existingTool) {
+    if (existingTool && trimmedName !== tool.id) {
       setError("A tool with this name already exists");
       return;
     }
 
     try {
       setIsSaving(true);
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
 
       const toolToSave = { ...tool, id: trimmedName, folder: selectedFolder || undefined };
       const saved = await client.upsertWorkflow(trimmedName, toolToSave as any);
@@ -135,7 +135,13 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Folder className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{selectedFolder || UNCATEGORIZED}</span>
+                    {selectedFolder ? (
+                      <span className="truncate font-normal">{selectedFolder}</span>
+                    ) : (
+                      <span className="truncate text-muted-foreground/50 font-normal">
+                        No folder
+                      </span>
+                    )}
                   </div>
                   <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>

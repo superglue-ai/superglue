@@ -2,7 +2,7 @@
 
 import { Message } from "@superglue/shared";
 import { useCallback, useRef } from "react";
-import type { AgentConfig, UseAgentStreamingReturn, ToolConfirmationMetadata } from "./types";
+import type { AgentConfig, UseAgentStreamingReturn } from "./types";
 
 interface UseAgentStreamingOptions {
   config: AgentConfig;
@@ -101,26 +101,32 @@ export function useAgentStreaming({
         return assistantMessage;
       };
 
-      // Buffer for incomplete SSE lines that span multiple chunks
       let lineBuffer = "";
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            // Flush the decoder to get any remaining bytes from incomplete multi-byte characters
             const finalChunk = decoder.decode();
             lineBuffer += finalChunk;
 
-            // Process any remaining buffered data as a final line
             if (lineBuffer.trim() && lineBuffer.startsWith("data: ")) {
               const rawData = lineBuffer.slice(6);
               try {
                 const data = JSON.parse(rawData);
                 const msg = ensureMessage();
-                // Handle the final event same as in the loop
                 if (data.type === "tool_call_complete") {
                   updateToolCompletion(data.toolCall.id, data);
+
+                  let parsedOutput: any = null;
+                  try {
+                    parsedOutput =
+                      typeof data.toolCall.output === "string"
+                        ? JSON.parse(data.toolCall.output)
+                        : data.toolCall.output;
+                  } catch {}
+
+                  config.onToolComplete?.(data.toolCall.name, data.toolCall.id, parsedOutput);
                 } else if (data.type !== "content") {
                   setMessages((prev) => prev.map((m) => updateMessageWithData(m, data, msg)));
                 }
@@ -137,22 +143,53 @@ export function useAgentStreaming({
           }
 
           const chunk = decoder.decode(value, { stream: true });
-          // Combine with any leftover from previous chunk
           const combined = lineBuffer + chunk;
           const lines = combined.split("\n");
 
-          // The last element might be incomplete (no trailing newline), save it for next iteration
           lineBuffer = lines.pop() || "";
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+
+                if (data.type === "system_message") {
+                  const sysMsg: Message = {
+                    id: data.systemMessage.id,
+                    role: "system",
+                    content: data.systemMessage.content,
+                    timestamp: new Date(),
+                  };
+                  setMessages((prev) => [sysMsg, ...prev]);
+                  continue;
+                }
+
                 const msg = ensureMessage();
 
                 if (data.type === "content") {
                   streamDripBufferRef.current += data.content;
                   startDrip(msg.id);
+                  continue;
+                }
+
+                if (data.type === "error") {
+                  // Add error as a special content part with error details
+                  setMessages((prev) =>
+                    prev.map((m) => {
+                      if (m.id !== msg.id) return m;
+                      const errorPart = {
+                        type: "error" as const,
+                        content: data.content,
+                        errorDetails: data.errorDetails,
+                        id: `error-${Date.now()}`,
+                      };
+                      return {
+                        ...m,
+                        parts: [...(m.parts || []), errorPart],
+                        isStreaming: false,
+                      };
+                    }),
+                  );
                   continue;
                 }
 
@@ -180,27 +217,12 @@ export function useAgentStreaming({
                     );
                   }
 
-                  const confirmation = data.confirmation as ToolConfirmationMetadata | undefined;
-                  const alreadyConfirmed = parsedOutput?.confirmationState !== undefined;
-                  const hasConfirmableContent =
-                    parsedOutput?.diffs?.length > 0 || parsedOutput?.newPayload;
-
-                  const needsPostExecConfirmation =
-                    !alreadyConfirmed &&
-                    confirmation?.timing === "after" &&
-                    parsedOutput?.success === true &&
-                    hasConfirmableContent;
-
-                  const isPendingUserConfirmation =
-                    parsedOutput?.confirmationState === "PENDING_USER_CONFIRMATION";
-
-                  if (needsPostExecConfirmation || isPendingUserConfirmation) {
-                    setMessages((prev) =>
-                      prev.map((m) => (m.id === msg.id ? { ...m, isStreaming: false } : m)),
-                    );
-                    currentStreamControllerRef.current?.abort();
-                    return;
-                  }
+                  config.onToolComplete?.(data.toolCall.name, data.toolCall.id, parsedOutput);
+                } else if (data.type === "paused") {
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === msg.id ? { ...m, isStreaming: false } : m)),
+                  );
+                  return;
                 } else {
                   setMessages((prev) => prev.map((m) => updateMessageWithData(m, data, msg)));
                 }
@@ -260,7 +282,7 @@ export function useAgentStreaming({
         stopDrip();
       }
     },
-    [setMessages, startDrip, stopDrip, updateMessageWithData, updateToolCompletion],
+    [setMessages, startDrip, stopDrip, updateMessageWithData, updateToolCompletion, config],
   );
 
   return {

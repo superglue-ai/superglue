@@ -1,12 +1,12 @@
 import { logMessage } from "../utils/logs.js";
 
 export function validateEnvironment() {
-  if (!process.env.API_PORT) {
-    logMessage("warn", "API_PORT is not set defaulting to 3002.");
+  if (!process.env.START_SCHEDULER_SERVER) {
+    logMessage("warn", "START_SCHEDULER_SERVER is not set defaulting to false.");
   }
 
-  if (!process.env.GRAPHQL_PORT) {
-    logMessage("warn", "GRAPHQL_PORT is not set defaulting to 3000.");
+  if (!process.env.API_PORT) {
+    logMessage("warn", "API_PORT is not set defaulting to 3002.");
   }
 
   if (process.env.LLM_PROVIDER?.toUpperCase() !== "OPENAI" && !process.env.OPENAI_API_KEY) {
@@ -19,6 +19,17 @@ export function validateEnvironment() {
 
   if (process.env.LLM_PROVIDER?.toUpperCase() === "ANTHROPIC" && !process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not set.");
+  }
+
+  if (
+    process.env.LLM_PROVIDER?.toUpperCase() === "VERTEX" &&
+    !process.env.VERTEX_API_KEY &&
+    !(process.env.VERTEX_CLIENT_EMAIL && process.env.VERTEX_PRIVATE_KEY) &&
+    !process.env.GOOGLE_APPLICATION_CREDENTIALS
+  ) {
+    throw new Error(
+      "Vertex AI requires one of: VERTEX_API_KEY (Gemini only), VERTEX_CLIENT_EMAIL + VERTEX_PRIVATE_KEY, or GOOGLE_APPLICATION_CREDENTIALS.",
+    );
   }
 
   if (!process.env.TAVILY_API_KEY) {

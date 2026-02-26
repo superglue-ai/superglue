@@ -1,6 +1,6 @@
-import { assertValidArrowFunction, sampleResultObject } from "@superglue/shared";
+import { assertValidArrowFunction, composeUrl, sampleResultObject } from "@superglue/shared";
 import { describe, expect, it, vi } from "vitest";
-import { applyAuthFormat, composeUrl, replaceVariables, transformData } from "./helpers.js";
+import { applyAuthFormat, replaceVariables, transformData } from "./helpers.js";
 import { maskCredentials } from "@superglue/shared";
 
 vi.mock("axios");
@@ -116,7 +116,7 @@ describe("tools utility functions", () => {
       expect(result).toBe("(sourceData) => {\n  return sourceData;\n}");
     });
 
-    it("should return empty object function for empty string (for loopSelector)", () => {
+    it("should return empty object function for empty string (for dataSelector)", () => {
       const result = assertValidArrowFunction("");
       expect(result).toBe("(sourceData) => {\n  return {};\n}");
     });

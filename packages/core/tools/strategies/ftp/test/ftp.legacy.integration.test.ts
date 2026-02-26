@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, RequestOptions } from "@superglue/shared";
+import { RequestStepConfig, HttpMethod, RequestOptions } from "@superglue/shared";
 import { ChildProcess, spawn } from "child_process";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -13,11 +13,10 @@ const SERVER_STARTUP_DELAY_MS = 2000;
 describe("FTP File Extraction", () => {
   let ftpServerProcess: ChildProcess | null = null;
 
-  const ftpConfig: ApiConfig = {
+  const ftpConfig: RequestStepConfig = {
     id: "ftp-test",
     instruction: "Test FTP server",
-    urlHost: "ftp://testuser:testpass@127.0.0.1:2121",
-    urlPath: "/",
+    url: "ftp://testuser:testpass@127.0.0.1:2121",
     method: HttpMethod.POST,
     body: "",
   };
@@ -111,7 +110,7 @@ describe("FTP File Extraction", () => {
 
   describe("list operation", () => {
     it("should list files in FTP directory", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "list",
@@ -146,7 +145,7 @@ describe("FTP File Extraction", () => {
 
   describe("get operation - CSV", () => {
     it("should download and parse CSV file correctly", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "get",
@@ -186,7 +185,7 @@ describe("FTP File Extraction", () => {
 
   describe("get operation - XML", () => {
     it("should download and parse XML file correctly", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "get",
@@ -238,7 +237,7 @@ describe("FTP File Extraction", () => {
 
   describe("get operation - JSON", () => {
     it("should download and parse JSON file correctly", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "get",
@@ -294,7 +293,7 @@ describe("FTP File Extraction", () => {
 
   describe("get operation - Text", () => {
     it("should download text file correctly", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "get",
@@ -318,7 +317,7 @@ describe("FTP File Extraction", () => {
 
   describe("exists operation", () => {
     it("should check if file exists", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "exists",
@@ -339,7 +338,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should return false for non-existent file", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "exists",
@@ -362,7 +361,7 @@ describe("FTP File Extraction", () => {
 
   describe("stat operation", () => {
     it("should get file metadata", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "stat",
@@ -388,7 +387,7 @@ describe("FTP File Extraction", () => {
 
   describe("multiple operations (batch)", () => {
     it("should execute multiple operations in sequence and return array of results", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify([
           { operation: "exists", path: "/customers.csv" },
@@ -420,7 +419,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should execute multiple get operations and parse different file types", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify([
           { operation: "get", path: "/test.txt" },
@@ -447,7 +446,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should handle mixed read and check operations efficiently", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify([
           { operation: "list", path: "/" },
@@ -476,7 +475,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should return single result for single operation (not array)", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "exists",
@@ -498,7 +497,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should fail entire batch if one operation has invalid operation type", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify([
           { operation: "list", path: "/" },
@@ -517,7 +516,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should fail if operation in batch is missing required path", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify([{ operation: "exists", path: "/test.txt" }, { operation: "get" }]),
       };
@@ -535,7 +534,7 @@ describe("FTP File Extraction", () => {
 
   describe("error handling", () => {
     it("should handle invalid operation", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "invalid",
@@ -554,7 +553,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should handle missing path for get operation", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "get",
@@ -572,7 +571,7 @@ describe("FTP File Extraction", () => {
     });
 
     it("should handle non-existent file for get operation", async () => {
-      const config: ApiConfig = {
+      const config: RequestStepConfig = {
         ...ftpConfig,
         body: JSON.stringify({
           operation: "get",

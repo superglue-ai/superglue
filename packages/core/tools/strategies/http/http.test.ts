@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, PaginationType } from "@superglue/shared";
+import { RequestStepConfig, HttpMethod, PaginationTypeValue } from "@superglue/shared";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server_defaults } from "../../../default.js";
@@ -78,12 +78,9 @@ describe("API Utilities", () => {
   });
 
   describe("runStepConfig", () => {
-    const testEndpoint: ApiConfig = {
-      urlHost: "https://api.example.com",
-      urlPath: "v1/test",
+    const testEndpoint: RequestStepConfig = {
+      url: "https://api.example.com/v1/test",
       method: HttpMethod.GET,
-      id: "test-endpoint-id",
-      instruction: "Test API call",
     };
     const testPayload = { query: "test" };
     const testCredentials = { api_key: "secret-key" };
@@ -114,10 +111,10 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.PAGE_BASED,
+          type: "pageBased" as PaginationTypeValue,
           pageSize: "2",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponses = [
         {
@@ -161,10 +158,10 @@ describe("API Utilities", () => {
           limit: "<<limit>>",
         },
         pagination: {
-          type: PaginationType.OFFSET_BASED,
+          type: "offsetBased" as PaginationTypeValue,
           pageSize: "2",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponses = [
         {
@@ -214,12 +211,12 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.CURSOR_BASED,
+          type: "cursorBased" as PaginationTypeValue,
           pageSize: "2",
           cursorPath: "meta.next_cursor",
           stopCondition: "!response.data.meta.next_cursor",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponses = [
         {
@@ -270,10 +267,10 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.PAGE_BASED,
+          type: "pageBased" as PaginationTypeValue,
           pageSize: "2",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const sameResponse = {
         status: 200,
@@ -301,13 +298,13 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.OFFSET_BASED,
+          type: "offsetBased" as PaginationTypeValue,
           pageSize: "1",
         },
         headers: {
           "x-superglue-test": "<<offset>>",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       for (let i = 0; i < 505; i++) {
         (axios as any).mockResolvedValueOnce({
@@ -332,13 +329,13 @@ describe("API Utilities", () => {
       const config = {
         ...testEndpoint,
         pagination: {
-          type: PaginationType.OFFSET_BASED,
+          type: "offsetBased" as PaginationTypeValue,
           pageSize: "1",
         },
         headers: {
           "x-superglue-test": "<<offset>>",
         },
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const mockResponse = {
         status: 200,
@@ -387,7 +384,7 @@ describe("API Utilities", () => {
         ...testEndpoint,
         method: HttpMethod.POST,
         body: "query { test }",
-      } as ApiConfig;
+      } as RequestStepConfig;
 
       const graphqlErrorResponse = {
         status: 200,
@@ -636,12 +633,9 @@ describe("API Utilities", () => {
   });
 
   describe("Error Detection Modes", () => {
-    const testEndpoint: ApiConfig = {
-      urlHost: "https://api.example.com",
-      urlPath: "v1/test",
+    const testEndpoint: RequestStepConfig = {
+      url: "https://api.example.com/v1/test",
       method: HttpMethod.GET,
-      id: "test-endpoint-id",
-      instruction: "Test API call",
     };
 
     it("SMART mode should detect JSON error keys in 200 response", async () => {
@@ -832,26 +826,35 @@ describe("API Utilities", () => {
 
   describe("HttpStepExecutionStrategy", () => {
     const strategy = new HttpStepExecutionStrategy();
+    const mockInput = {} as any;
 
     describe("shouldExecute", () => {
       it("should return true for http:// URLs", () => {
-        expect(strategy.shouldExecute("http://api.example.com")).toBe(true);
+        expect(strategy.shouldExecute(mockInput, { resolvedUrl: "http://api.example.com" })).toBe(
+          true,
+        );
       });
 
       it("should return true for https:// URLs", () => {
-        expect(strategy.shouldExecute("https://api.example.com")).toBe(true);
+        expect(strategy.shouldExecute(mockInput, { resolvedUrl: "https://api.example.com" })).toBe(
+          true,
+        );
       });
 
       it("should return false for postgres:// URLs", () => {
-        expect(strategy.shouldExecute("postgres://user:pass@localhost:5432")).toBe(false);
+        expect(
+          strategy.shouldExecute(mockInput, { resolvedUrl: "postgres://user:pass@localhost:5432" }),
+        ).toBe(false);
       });
 
       it("should return false for ftp:// URLs", () => {
-        expect(strategy.shouldExecute("ftp://files.example.com")).toBe(false);
+        expect(strategy.shouldExecute(mockInput, { resolvedUrl: "ftp://files.example.com" })).toBe(
+          false,
+        );
       });
 
       it("should return false for empty URL", () => {
-        expect(strategy.shouldExecute("")).toBe(false);
+        expect(strategy.shouldExecute(mockInput, { resolvedUrl: "" })).toBe(false);
       });
     });
   });

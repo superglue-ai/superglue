@@ -1,4 +1,4 @@
-import { type ApiConfig, HttpMethod } from "@superglue/shared";
+import { type RequestStepConfig, HttpMethod } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
 import { callHttp } from "../tools/strategies/http/http.js";
 import { MockServerFactory } from "./test-utils.js";
@@ -29,10 +29,9 @@ describe("Rate Limit Integration Test with real server", () => {
   it("should successfully retry after a 429 response", async () => {
     requestCount = 0;
 
-    const config: ApiConfig = {
+    const config: RequestStepConfig = {
       id: "test-rate-limit-integration",
-      urlHost: mockServer.getBaseUrl(),
-      urlPath: "api/test-rate-limit",
+      url: `${mockServer.getBaseUrl()}/api/test-rate-limit`,
       method: HttpMethod.GET,
       instruction: "Test rate limit integration",
       // maxRateLimitWaitSec: 5,
@@ -53,10 +52,9 @@ describe("Rate Limit Integration Test with real server", () => {
 
   it("should fail when rate limit wait time exceeds maximum", async () => {
     // Modify the server to return a retry time that exceeds the hardcoded 60s limit
-    const config: ApiConfig = {
+    const config: RequestStepConfig = {
       id: "test-always-rate-limited",
-      urlHost: mockServer.getBaseUrl(),
-      urlPath: "api/always-rate-limited",
+      url: `${mockServer.getBaseUrl()}/api/always-rate-limited`,
       method: HttpMethod.GET,
       instruction: "Test always rate limited",
       createdAt: new Date(),

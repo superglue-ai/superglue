@@ -1,5 +1,4 @@
 import type {
-  ApiConfig,
   DiscoveryRun,
   FileReference,
   FileStatus,
@@ -35,15 +34,8 @@ export type PrometheusRunMetrics = {
 };
 
 export interface DataStore {
-  // API Config Methods
-  getApiConfig(params: { id: string; orgId?: string }): Promise<ApiConfig | null>;
-  listApiConfigs(params?: {
-    limit?: number;
-    offset?: number;
-    orgId?: string;
-  }): Promise<{ items: ApiConfig[]; total: number }>;
-  upsertApiConfig(params: { id: string; config: ApiConfig; orgId?: string }): Promise<ApiConfig>;
-  deleteApiConfig(params: { id: string; orgId?: string }): Promise<boolean>;
+  // Initialization
+  ready(): Promise<void>;
 
   // Run Methods
   getRun(params: { id: string; orgId?: string }): Promise<Run | null>;
@@ -54,6 +46,8 @@ export interface DataStore {
     status?: RunStatus;
     requestSources?: RequestSource[];
     orgId?: string;
+    userId?: string;
+    systemId?: string;
   }): Promise<{ items: Run[]; total: number }>;
   createRun(params: { run: Run; orgId?: string }): Promise<Run>;
   updateRun(params: { id: string; orgId: string; updates: Partial<Run> }): Promise<Run>;
@@ -74,7 +68,6 @@ export interface DataStore {
     workflow: Tool;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
   renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool>;
@@ -86,7 +79,6 @@ export interface DataStore {
     version: number;
     orgId?: string;
     userId?: string;
-    userEmail?: string;
   }): Promise<Tool>;
 
   // Tenant Information Methods
@@ -101,6 +93,12 @@ export interface DataStore {
     includeDocs?: boolean;
     orgId?: string;
   }): Promise<{ items: System[]; total: number }>;
+  createSystem(params: { system: System; orgId?: string }): Promise<System>;
+  updateSystem(params: {
+    id: string;
+    system: Partial<System>;
+    orgId?: string;
+  }): Promise<System | null>;
   upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System>;
   deleteSystem(params: { id: string; orgId?: string }): Promise<boolean>;
   getManySystems(params: {
@@ -174,6 +172,29 @@ export interface DataStore {
     orgId: string;
     settings: Partial<OrgSettings>;
   }): Promise<OrgSettings>;
+  listAllOrgSettings(): Promise<OrgSettings[]>;
+
+  // Run Methods for Notification Summaries
+  listRunsForPeriod(params: {
+    orgId: string;
+    startTime: Date;
+    endTime: Date;
+    requestSources?: RequestSource[];
+  }): Promise<{ items: Run[]; total: number }>;
+
+  // API Key Methods
+  listApiKeys(params: { orgId: string }): Promise<ApiKeyRecord[]>;
+  getApiKeyByKey(params: { key: string }): Promise<ApiKeyRecord | null>;
+  createApiKey(params: CreateApiKeyParams): Promise<ApiKeyRecord>;
+  updateApiKey(params: {
+    id: string;
+    orgId: string;
+    isActive?: boolean;
+    isRestricted?: boolean;
+    userId?: string;
+  }): Promise<ApiKeyRecord | null>;
+  deleteApiKey(params: { id: string; orgId: string }): Promise<boolean>;
+  deleteApiKeysByUserId(params: { userId: string; orgId: string }): Promise<void>;
 }
 
 export type ToolScheduleInternal = ToolSchedule & {
@@ -184,6 +205,28 @@ export type ToolHistoryEntry = {
   version: number;
   createdAt: Date;
   createdByUserId?: string;
-  createdByEmail?: string;
   tool: Tool;
 };
+
+// API Key types
+export interface ApiKeyRecord {
+  id: string;
+  orgId: string;
+  key: string;
+  userId?: string; // For end-user keys
+  createdByUserId?: string; // Who created this key
+  mode: "frontend" | "backend";
+  isActive: boolean;
+  isRestricted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateApiKeyParams {
+  orgId: string;
+  createdByUserId: string;
+  isRestricted: boolean;
+  key?: string; // Optional - will be generated if not provided
+  userId?: string;
+  mode?: "frontend" | "backend";
+}

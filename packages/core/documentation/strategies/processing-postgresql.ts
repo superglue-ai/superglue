@@ -4,21 +4,20 @@
  * Generates database schema documentation for PostgreSQL connections.
  */
 
-import { ApiConfig, ServiceMetadata } from "@superglue/shared";
+import { RequestStepConfig, ServiceMetadata } from "@superglue/shared";
 import { callPostgres } from "../../tools/strategies/postgres/postgres.js";
-import { composeUrl } from "../../utils/helpers.js";
 import { logMessage } from "../../utils/logs.js";
-import { DocumentationProcessingStrategy } from "../types.js";
+import { DocumentationConfig, DocumentationProcessingStrategy } from "../types.js";
 
 export class PostgreSqlStrategy implements DocumentationProcessingStrategy {
   async tryProcess(
     content: string,
-    config: ApiConfig,
+    config: DocumentationConfig,
     metadata: ServiceMetadata,
     credentials?: Record<string, any>,
   ): Promise<string | null> {
-    if (config.urlHost?.startsWith("postgres://") || config.urlHost?.startsWith("postgresql://")) {
-      const url = composeUrl(config.urlHost, config.urlPath);
+    if (config.url?.startsWith("postgres://") || config.url?.startsWith("postgresql://")) {
+      const url = config.url;
 
       const schemaQuery = {
         query: `SELECT 
@@ -32,8 +31,16 @@ WHERE table_schema = 'public'
 ORDER BY table_name, ordinal_position;`,
       };
 
+      // Build a RequestStepConfig with required url field
+      const endpoint: RequestStepConfig = {
+        url,
+        headers: config.headers,
+        queryParams: config.queryParams,
+        body: JSON.stringify(schemaQuery),
+      };
+
       const schemaResponse = await callPostgres({
-        endpoint: { ...config, body: JSON.stringify(schemaQuery) },
+        endpoint,
         payload: {},
         credentials,
         options: null,

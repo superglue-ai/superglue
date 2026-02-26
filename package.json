@@ -2,9 +2,7 @@
   "name": "superglue",
   "private": true,
   "workspaces": [
-    "packages/core",
-    "packages/shared",
-    "packages/web"
+    "packages/*"
   ],
   "packageManager": "npm@11.0.0",
   "scripts": {
@@ -16,18 +14,21 @@
     "test:coverage": "turbo run test:coverage",
     "test:evals": "npx tsx eval/tool-evals/index.ts",
     "test:integration-evals": "npx tsx eval/integration-evals/index.ts",
-    "test:sdk": "cd eval/sdk-test && npm install && node run-with-server.js",
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "npx prettier --check \"packages/**/*.{ts,tsx,js,jsx,json,md,mdx}\" --ignore-path .gitignore",
     "lint:fix": "npx prettier --write \"packages/**/*.{ts,tsx,js,jsx,json,md,mdx}\" --ignore-path .gitignore",
     "clean": "turbo run clean",
-    "generate-ranking": "tsc && node --max-old-space-size=12288 --expose-gc dist/eval/api-ranking/generate-api-ranking.js"
+    "type-check": "turbo run type-check",
+    "type-check-strict": "turbo run type-check-strict"
   },
   "dependencies": {
-    "@playwright/test": "^1.55.0",
+    "@types/node": "^20.0.0",
+    "d3-time": "^3.1.0",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0",
-    "idb": "^8.0.3"
+    "posthog-js": "^1.354.0",
+    "superglue": "github:superglue-ai/superglue#main",
+    "typescript": "^5.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
@@ -39,11 +40,14 @@
     "secretlint": "^11.2.5",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
-    "turbo": "^2.7.4",
+    "turbo": "^2.7.2",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },
   "prettier": {
     "printWidth": 100
+  },
+  "overrides": {
+    "fast-xml-parser": "^5.3.7"
   }
 }

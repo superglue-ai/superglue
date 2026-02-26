@@ -2,51 +2,51 @@ import type { ServiceMetadata } from "@superglue/shared";
 import { JSONSchema, RequestOptions } from "@superglue/shared";
 import { transformData, validateSchema } from "../utils/helpers.js";
 
-export interface ExecuteAndEvaluateFinalTransformInput {
-  finalTransform: string;
-  responseSchema: JSONSchema;
+export interface ExecuteOutputTransformInput {
+  outputTransform: string;
+  outputSchema: JSONSchema;
   aggregatedStepData: Record<string, unknown>;
   instruction: string;
   options: RequestOptions;
   metadata: ServiceMetadata;
 }
 
-export interface ExecuteAndEvaluateFinalTransformOutput {
+export interface ExecuteOutputTransformOutput {
   success: boolean;
   transformedData?: any;
-  finalTransform: string;
+  outputTransform: string;
   error?: string;
 }
 
-export async function executeAndEvaluateFinalTransform(
-  input: ExecuteAndEvaluateFinalTransformInput,
-): Promise<ExecuteAndEvaluateFinalTransformOutput> {
-  const { finalTransform, responseSchema, aggregatedStepData, instruction, options, metadata } =
+export async function executeOutputTransform(
+  input: ExecuteOutputTransformInput,
+): Promise<ExecuteOutputTransformOutput> {
+  const { outputTransform, outputSchema, aggregatedStepData, instruction, options, metadata } =
     input;
 
   try {
-    const finalResult = await transformData(aggregatedStepData, finalTransform);
+    const result = await transformData(aggregatedStepData, outputTransform);
 
-    if (responseSchema) {
-      const validatedResult = await validateSchema(finalResult.data, responseSchema);
+    if (outputSchema) {
+      const validatedResult = await validateSchema(result.data, outputSchema);
       if (!validatedResult.success) {
         throw new Error(validatedResult.error);
       }
     }
-    if (!finalResult.success) {
-      throw new Error(finalResult.error);
+    if (!result.success) {
+      throw new Error(result.error);
     }
 
     return {
       success: true,
-      transformedData: finalResult.data,
-      finalTransform: finalResult.code,
+      transformedData: result.data,
+      outputTransform: result.code,
     };
   } catch (transformError) {
     return {
       success: false,
       error: transformError instanceof Error ? transformError.message : String(transformError),
-      finalTransform: finalTransform,
+      outputTransform: outputTransform,
     };
   }
 }

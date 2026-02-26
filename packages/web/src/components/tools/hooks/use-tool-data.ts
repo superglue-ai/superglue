@@ -1,7 +1,9 @@
 import { useConfig } from "@/src/app/config-context";
+import { useTools } from "@/src/app/tools-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createSuperglueClient } from "@/src/lib/client-utils";
-import { ExecutionStep, Tool } from "@superglue/shared";
+import { deleteAllDrafts } from "@/src/lib/storage";
+import { Tool } from "@superglue/shared";
 import { useEffect, useState } from "react";
 import { useExecution, useToolConfig } from "../context";
 
@@ -17,6 +19,7 @@ export function useToolData(options: UseToolDataOptions) {
   const { id, initialTool, initialInstruction, embedded, onSave } = options;
 
   const config = useConfig();
+  const { refreshTools } = useTools();
   const { toast } = useToast();
   const {
     tool,
@@ -25,8 +28,8 @@ export function useToolData(options: UseToolDataOptions) {
     responseFilters,
     setToolId,
     setSteps,
-    setFinalTransform,
-    setResponseSchema,
+    setOutputTransform,
+    setOutputSchema,
     setInputSchema,
     setInstruction,
     setPayloadText,
@@ -39,8 +42,8 @@ export function useToolData(options: UseToolDataOptions) {
 
   const toolId = tool.id;
   const folder = tool.folder;
-  const finalTransform = tool.finalTransform || "";
-  const responseSchema = tool.responseSchema ? JSON.stringify(tool.responseSchema) : "";
+  const outputTransform = tool.outputTransform || "";
+  const outputSchema = tool.outputSchema ? JSON.stringify(tool.outputSchema) : "";
   const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
@@ -48,16 +51,19 @@ export function useToolData(options: UseToolDataOptions) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [lastToolId, setLastToolId] = useState<string | undefined>(initialTool?.id);
 
   const loadTool = async (idToLoad: string) => {
     try {
       if (!idToLoad) return;
       setLoading(true);
-      const client = createSuperglueClient(config.superglueEndpoint);
+      setNotFound(false);
+      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
       const loadedTool = await client.getWorkflow(idToLoad);
       if (!loadedTool) {
-        throw new Error(`Tool with ID "${idToLoad}" not found.`);
+        setNotFound(true);
+        return;
       }
       setToolId(loadedTool.id || "");
       setFolder(loadedTool.folder);
@@ -65,11 +71,10 @@ export function useToolData(options: UseToolDataOptions) {
       setSteps(
         loadedTool?.steps?.map((step) => ({
           ...step,
-          apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
         })) || [],
       );
-      setFinalTransform(
-        loadedTool.finalTransform ||
+      setOutputTransform(
+        loadedTool.outputTransform ||
           `(sourceData) => {
         return {
           result: sourceData
@@ -78,8 +83,8 @@ export function useToolData(options: UseToolDataOptions) {
       );
 
       setInstruction(loadedTool.instruction || "");
-      setResponseSchema(
-        loadedTool.responseSchema ? JSON.stringify(loadedTool.responseSchema, null, 2) : "",
+      setOutputSchema(
+        loadedTool.outputSchema ? JSON.stringify(loadedTool.outputSchema, null, 2) : "",
       );
 
       setInputSchema(
@@ -87,6 +92,12 @@ export function useToolData(options: UseToolDataOptions) {
       );
       setResponseFilters(loadedTool.responseFilters || []);
     } catch (error: any) {
+      // Check if this is a "not found" error
+      const errorMsg = error?.message?.toLowerCase() || "";
+      if (errorMsg.includes("not found") || errorMsg.includes("workflow not found")) {
+        setNotFound(true);
+        return;
+      }
       console.error("Error loading tool:", error);
       toast({
         title: "Error loading tool",
@@ -100,27 +111,27 @@ export function useToolData(options: UseToolDataOptions) {
 
   useEffect(() => {
     if (initialTool && initialTool.id !== lastToolId) {
+      setNotFound(false);
       setToolId(initialTool.id || "");
       setFolder(initialTool.folder);
       setIsArchived(initialTool.archived || false);
       setSteps(
         initialTool.steps?.map((step) => ({
           ...step,
-          apiConfig: { ...step.apiConfig, id: step.apiConfig.id || step.id },
         })) || [],
       );
-      setFinalTransform(
-        initialTool.finalTransform ||
+      setOutputTransform(
+        initialTool.outputTransform ||
           `(sourceData) => {
   return {
     result: sourceData
   }
 }`,
       );
-      const schemaString = initialTool.responseSchema
-        ? JSON.stringify(initialTool.responseSchema, null, 2)
+      const schemaString = initialTool.outputSchema
+        ? JSON.stringify(initialTool.outputSchema, null, 2)
         : "";
-      setResponseSchema(schemaString);
+      setOutputSchema(schemaString);
       setInputSchema(
         initialTool.inputSchema ? JSON.stringify(initialTool.inputSchema, null, 2) : null,
       );
@@ -134,8 +145,8 @@ export function useToolData(options: UseToolDataOptions) {
     initialInstruction,
     setToolId,
     setSteps,
-    setFinalTransform,
-    setResponseSchema,
+    setOutputTransform,
+    setOutputSchema,
     setInputSchema,
     setInstruction,
     setFolder,
@@ -147,17 +158,19 @@ export function useToolData(options: UseToolDataOptions) {
     if (!embedded && id) {
       loadTool(id);
     } else if (!embedded && !id && !initialTool) {
+      // Clear notFound when switching to new tool path
+      setNotFound(false);
       setToolId("");
       setFolder(undefined);
       setIsArchived(false);
       setSteps([]);
       setInstruction("");
-      setFinalTransform(`(sourceData) => {
+      setOutputTransform(`(sourceData) => {
   return {
     result: sourceData
   }
 }`);
-      setResponseSchema("");
+      setOutputSchema("");
       setInputSchema(null);
       setResponseFilters([]);
       setPayloadText("{}");
@@ -168,7 +181,7 @@ export function useToolData(options: UseToolDataOptions) {
   const saveTool = async (): Promise<boolean> => {
     try {
       try {
-        JSON.parse(responseSchema || "{}");
+        JSON.parse(outputSchema || "{}");
       } catch (e) {
         throw new Error("Invalid response schema JSON");
       }
@@ -188,17 +201,10 @@ export function useToolData(options: UseToolDataOptions) {
 
       const toolToSave: Tool = {
         id: effectiveToolId,
-        steps: stepsToSave.map((step: ExecutionStep) => ({
-          ...step,
-          apiConfig: {
-            id: step.apiConfig.id || step.id,
-            ...step.apiConfig,
-            pagination: step.apiConfig.pagination || null,
-          },
-        })),
-        responseSchema: responseSchema && responseSchema.trim() ? JSON.parse(responseSchema) : null,
+        steps: stepsToSave,
+        outputSchema: outputSchema && outputSchema.trim() ? JSON.parse(outputSchema) : null,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-        finalTransform,
+        outputTransform,
         instruction: instructions,
         folder: folder ?? null,
         responseFilters: responseFilters.length > 0 ? responseFilters : undefined,
@@ -207,15 +213,25 @@ export function useToolData(options: UseToolDataOptions) {
       if (embedded && onSave) {
         await onSave(toolToSave, computedPayload);
       } else {
-        const client = createSuperglueClient(config.superglueEndpoint);
+        const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
         const savedTool = await client.upsertWorkflow(effectiveToolId, toolToSave as any);
 
         if (!savedTool) {
           throw new Error("Failed to save tool");
         }
         setToolId(savedTool.id);
-        setFinalTransform(savedTool.finalTransform);
+        setOutputTransform(savedTool.outputTransform);
         setSteps(savedTool.steps);
+
+        // Clear all drafts after successful save
+        await deleteAllDrafts(savedTool.id).catch((err) => {
+          console.warn("Failed to delete drafts after save:", err);
+        });
+
+        // Refresh tools context so sidebar updates
+        await refreshTools().catch((err) => {
+          console.warn("Failed to refresh tools after save:", err);
+        });
       }
 
       setJustSaved(true);
@@ -241,6 +257,7 @@ export function useToolData(options: UseToolDataOptions) {
     loading,
     saving,
     justSaved,
+    notFound,
     loadTool,
     saveTool,
     setLoading,

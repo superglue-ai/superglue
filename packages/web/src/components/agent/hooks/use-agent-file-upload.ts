@@ -43,7 +43,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         const newPayloads: Record<string, any> = {};
 
         const client = new SuperglueClient({
-          endpoint: config.superglueEndpoint,
+          endpoint: config.apiEndpoint,
           apiKey: tokenRegistry.getToken(),
           apiEndpoint: config.apiEndpoint,
         });
@@ -59,8 +59,16 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
               ...newFiles.map((f) => f.key),
             ]);
 
+            const displayName =
+              key !== baseKey
+                ? (() => {
+                    const ext = file.name.match(/\.[^/.]+$/)?.[0] || "";
+                    return `${key}${ext}`;
+                  })()
+                : file.name;
+
             const fileInfo: UploadedFile = {
-              name: file.name,
+              name: displayName,
               size: file.size,
               key,
               status: "processing",
@@ -115,7 +123,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         setIsProcessingFiles(false);
       }
     },
-    [allFiles, filePayloads, config.superglueEndpoint, toast],
+    [allFiles, filePayloads, config.apiEndpoint, toast],
   );
 
   const handlePendingFileRemove = useCallback((key: string) => {

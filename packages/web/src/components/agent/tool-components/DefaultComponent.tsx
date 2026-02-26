@@ -4,6 +4,7 @@ import { ToolCall } from "@superglue/shared";
 import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
+import { ErrorMessage } from "@/src/components/ui/error-message";
 
 interface DefaultComponentProps {
   tool: ToolCall;
@@ -99,7 +100,7 @@ export function DefaultComponent({ tool, onInputChange }: DefaultComponentProps)
                 >
                   <Copy className="w-4 h-4" />
                 </button>
-                <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-64 pr-8">
+                <pre className="text-xs font-mono overflow-x-auto max-h-64 pr-8">
                   {(() => {
                     // If output is a string, try to parse and prettify JSON
                     if (typeof tool.output === "string") {
@@ -121,12 +122,12 @@ export function DefaultComponent({ tool, onInputChange }: DefaultComponentProps)
         )}
 
         {tool.error && (
-          <div>
-            <div className="text-sm font-medium text-destructive mb-2">Error</div>
-            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm">
-              {typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)}
-            </div>
-          </div>
+          <ErrorMessage
+            title="Found Issue"
+            message={
+              typeof tool.error === "string" ? tool.error : JSON.stringify(tool.error, null, 2)
+            }
+          />
         )}
       </div>
     </ToolCallWrapper>

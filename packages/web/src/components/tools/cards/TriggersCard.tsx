@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/src/components/ui/button";
 import { ScrollArea } from "@/src/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Calendar, Code, ExternalLink, Info, Webhook, Zap } from "lucide-react";
@@ -11,8 +12,30 @@ import { cn } from "@/src/lib/general-utils";
 interface TriggersCardProps {
   toolId: string;
   payload: Record<string, any>;
-  /** Compact mode for embedding in gallery (no scroll area wrapper) */
   compact?: boolean;
+}
+
+function EnterpriseBanner({ feature }: { feature: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
+      <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+      <div>
+        <p className="text-sm font-medium">{feature} is an Enterprise feature</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Upgrade to superglue Enterprise to use {feature.toLowerCase()}s. Visit{" "}
+          <a
+            href="https://superglue.cloud"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            superglue.ai
+          </a>{" "}
+          to learn more.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function TriggersCard({ toolId, payload, compact = false }: TriggersCardProps) {
@@ -34,100 +57,38 @@ export function TriggersCard({ toolId, payload, compact = false }: TriggersCardP
     );
   }
 
-  const enterpriseInfoBox = (
-    <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 p-3">
-      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-      <div className="text-xs">
-        <p className="font-medium text-blue-900 dark:text-blue-100">Enterprise Feature</p>
-        <p className="text-blue-700 dark:text-blue-300 mt-1">
-          This feature is available on our Enterprise plan.{" "}
-          <a
-            href="https://cal.com/superglue/superglue-demo"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-blue-900 dark:hover:text-blue-100 inline-flex items-center gap-1"
-          >
-            Book a demo
-            <ExternalLink className="h-3 w-3" />
-          </a>{" "}
-          to learn more.
-        </p>
-      </div>
-    </div>
-  );
-
   const content = (
     <div className={compact ? "space-y-4" : "p-4 space-y-4"}>
-      {/* Schedule Section */}
-      {activeSection === "schedule" && (
-        <>
-          <p className="text-xs text-muted-foreground">
-            Automate this tool by scheduling it to run at specific times or intervals.
-          </p>
-          {enterpriseInfoBox}
-          <div className="text-xs text-muted-foreground pt-2">
-            <a
-              href="https://docs.superglue.cloud/guides/deploying-a-tool#scheduled-execution"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 hover:underline"
-            >
-              Learn more about scheduling
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-        </>
-      )}
+      <div className={activeSection === "schedule" ? "" : "hidden"}>
+        <EnterpriseBanner feature="Scheduling" />
+      </div>
 
-      {/* Webhook Section */}
-      {activeSection === "webhook" && (
-        <>
-          <p className="text-xs text-muted-foreground">
-            Trigger this tool from external services like Stripe, GitHub, or any system that can
-            send HTTP POST requests. The request body becomes the tool's input.
-          </p>
-          {enterpriseInfoBox}
-          <div className="text-xs text-muted-foreground pt-2">
-            <a
-              href="https://docs.superglue.cloud/api/overview#webhooks"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 hover:underline"
-            >
-              Learn more about webhooks
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-        </>
-      )}
+      <div className={activeSection === "webhook" ? "" : "hidden"}>
+        <EnterpriseBanner feature="Webhooks" />
+      </div>
 
-      {/* SDK/API Section */}
-      {activeSection === "sdk" && (
-        <>
-          <p className="text-xs text-muted-foreground">
-            Call this tool programmatically using our SDK or REST API.
-          </p>
-          <SdkAccordion
-            typescriptCode={snippets.typescriptCode}
-            pythonCode={snippets.pythonCode}
-            curlCommand={snippets.curlCommand}
-            variant="card"
-          />
-        </>
-      )}
+      <div className={activeSection === "sdk" ? "" : "hidden"}>
+        <p className="text-xs text-muted-foreground">
+          Call this tool programmatically using our SDK or REST API.
+        </p>
+        <SdkAccordion
+          typescriptCode={snippets.typescriptCode}
+          pythonCode={snippets.pythonCode}
+          curlCommand={snippets.curlCommand}
+          variant="card"
+        />
+      </div>
     </div>
   );
 
   return (
     <div className={compact ? "bg-card border rounded-lg shadow-md p-4" : "flex flex-col h-full"}>
-      {/* Header */}
       {compact && (
         <div className="flex items-center gap-2 mb-4">
           <Zap className="h-4 w-4 text-amber-500" />
           <h3 className="text-lg font-semibold">Triggers</h3>
         </div>
       )}
-      {/* Section tabs */}
       <Tabs
         value={activeSection}
         onValueChange={(v) => setActiveSection(v as "schedule" | "webhook" | "sdk")}

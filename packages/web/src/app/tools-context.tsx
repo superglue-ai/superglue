@@ -1,7 +1,7 @@
 import { Tool } from "@superglue/shared";
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { useConfig } from "./config-context";
-import { loadFromCache, saveToCache } from "@/src/lib/cache-utils";
+import { loadFromCacheAsync, saveToCache } from "@/src/lib/cache-utils";
 import { createSuperglueClient } from "../lib/client-utils";
 
 interface ToolsContext {
@@ -22,13 +22,13 @@ const ToolsContext = createContext<ToolsContext | null>(null);
 export function ToolsProvider({ children }: { children: ReactNode }) {
   const config = useConfig();
   const [tools, setTools] = useState<Tool[]>([]);
-  const [isInitiallyLoading, setIsInitiallyLoading] = useState(false);
+  const [isInitiallyLoading, setIsInitiallyLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshTools = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const client = createSuperglueClient(config.superglueEndpoint);
+      const client = createSuperglueClient(config.apiEndpoint, config.apiEndpoint);
       const result = await client.listWorkflows(1000, 0);
       setTools(result.items);
 
@@ -44,19 +44,20 @@ export function ToolsProvider({ children }: { children: ReactNode }) {
       setIsInitiallyLoading(false);
       setIsRefreshing(false);
     }
-  }, [config.superglueEndpoint]);
+  }, [config.apiEndpoint, config.apiEndpoint]);
 
   useEffect(() => {
-    const cachedTools = loadFromCache<CachedTools>(CACHE_PREFIX);
-    if (cachedTools) {
-      setTools(cachedTools.tools);
-      setIsInitiallyLoading(false);
-    } else {
+    const init = async () => {
       setIsInitiallyLoading(true);
-    }
-
-    refreshTools();
-  }, [config.superglueEndpoint]);
+      const cachedTools = await loadFromCacheAsync<CachedTools>(CACHE_PREFIX);
+      if (cachedTools) {
+        setTools(cachedTools.tools);
+        setIsInitiallyLoading(false);
+      }
+      refreshTools();
+    };
+    init();
+  }, [config.apiEndpoint]);
 
   const context = {
     tools,
@@ -75,4 +76,8 @@ export function useTools(): ToolsContext {
   }
 
   return context;
+}
+
+export function useToolsOptional(): ToolsContext | null {
+  return useContext(ToolsContext);
 }

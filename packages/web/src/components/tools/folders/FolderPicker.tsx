@@ -143,14 +143,12 @@ export function FolderPicker({
   };
 
   const defaultTrigger = (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-8 gap-2 text-muted-foreground hover:text-foreground max-w-full focus-visible:ring-0 focus-visible:ring-offset-0"
-    >
+    <Button variant="glass" size="sm" className="h-8 gap-2 rounded-full">
       <Folder className="h-3.5 w-3.5" />
-      {value && value !== UNCATEGORIZED && (
+      {value && value !== UNCATEGORIZED ? (
         <span className="truncate text-xs max-w-[250px]">{value}</span>
+      ) : (
+        <span className="truncate text-xs max-w-[250px] text-muted-foreground/50">No folder</span>
       )}
     </Button>
   );

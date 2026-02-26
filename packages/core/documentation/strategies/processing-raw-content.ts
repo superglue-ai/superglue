@@ -4,15 +4,14 @@
  * Returns raw content as final fallback when no other processor can handle it.
  */
 
-import { ApiConfig } from "@superglue/shared";
 import { ServiceMetadata } from "@superglue/shared";
 import { logMessage } from "../../utils/logs.js";
-import { DocumentationProcessingStrategy } from "../types.js";
+import { DocumentationConfig, DocumentationProcessingStrategy } from "../types.js";
 
 export class RawPageContentStrategy implements DocumentationProcessingStrategy {
   async tryProcess(
     content: string,
-    config: ApiConfig,
+    config: DocumentationConfig,
     metadata: ServiceMetadata,
   ): Promise<string | null> {
     if (content) {

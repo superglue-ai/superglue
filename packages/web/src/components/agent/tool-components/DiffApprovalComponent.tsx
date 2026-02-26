@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/src/components/ui/button";
+import { ErrorMessage } from "@/src/components/ui/error-message";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
   DropdownMenu,
@@ -21,7 +22,6 @@ import {
   Plus,
   Square,
   X,
-  XCircle,
 } from "lucide-react";
 import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -40,10 +40,10 @@ function getTargetIcon(type: DiffTargetType) {
   switch (type) {
     case "newStep":
       return <Plus className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />;
-    case "finalTransform":
+    case "outputTransform":
       return <FilePlay className="h-3.5 w-3.5 text-primary flex-shrink-0" />;
     case "inputSchema":
-    case "responseSchema":
+    case "outputSchema":
       return <FileJson className="h-3.5 w-3.5 text-primary flex-shrink-0" />;
     case "instruction":
       return <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />;
@@ -147,13 +147,17 @@ function DiffApprovalItem({
   const { target, lines } = enrichedDiff;
   const targetInfo = formatTargetLabel(target);
 
-  // Calculate starting line number (find first changed line)
-  const firstChangeIndex = lines.findIndex((l) => l.type !== "context");
-  const startLineNum = Math.max(1, firstChangeIndex > 0 ? firstChangeIndex : 1);
-
-  const previewLines = lines.slice(0, 2);
-  const remainingLines = lines.slice(2);
-  const hasMore = remainingLines.length > 0;
+  const previewSize = 3;
+  const firstChangeIndexRaw = lines.findIndex((l) => l.type !== "context");
+  const firstChangeIndex = firstChangeIndexRaw === -1 ? 0 : firstChangeIndexRaw;
+  const maxPreviewStart = Math.max(0, lines.length - previewSize);
+  const previewStart = Math.max(0, Math.min(firstChangeIndex - 1, maxPreviewStart));
+  const previewEnd = Math.min(lines.length, previewStart + previewSize);
+  const previewLines = lines.slice(previewStart, previewEnd);
+  const hiddenCount = Math.max(0, lines.length - previewLines.length);
+  const hasMore = hiddenCount > 0;
+  const displayLines = isExpanded ? lines : previewLines;
+  const displayStart = isExpanded ? 0 : previewStart;
 
   const stateStyles = {
     pending: "border-green-300 dark:border-green-700 bg-green-50/30 dark:bg-green-900/10",
@@ -226,15 +230,9 @@ function DiffApprovalItem({
           )}
         >
           <div className="min-w-max">
-            {previewLines.map((line, i) => (
-              <DiffLineDisplay key={i} line={line} lineNumber={startLineNum + i} />
+            {displayLines.map((line, i) => (
+              <DiffLineDisplay key={i} line={line} lineNumber={displayStart + i + 1} />
             ))}
-
-            {/* Expanded lines */}
-            {isExpanded &&
-              remainingLines.map((line, i) => (
-                <DiffLineDisplay key={i + 2} line={line} lineNumber={startLineNum + 2 + i} />
-              ))}
           </div>
         </div>
       ) : (
@@ -250,7 +248,7 @@ function DiffApprovalItem({
           className="w-full px-2 py-0.5 text-center text-muted-foreground hover:bg-muted/50 border-t flex items-center justify-center gap-1 text-[10px]"
         >
           <ChevronDown className={cn("w-3 h-3 transition-transform", isExpanded && "rotate-180")} />
-          {isExpanded ? "Show less" : `${remainingLines.length} more lines`}
+          {isExpanded ? "Show less" : `${hiddenCount} more lines`}
         </button>
       )}
     </div>
@@ -387,92 +385,95 @@ export function DiffApprovalComponent({
         ))}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2 pt-1">
-        {approvedCount > 0 &&
-          onRunWithDiffs &&
-          (isRunning ? (
+      <div className="flex flex-wrap gap-2 pt-1">
+        {approvedCount > 0 && onRunWithDiffs ? (
+          isRunning ? (
             <Button
               size="sm"
-              variant="outline"
+              variant="glass"
               onClick={onAbortTest}
-              className="h-7 text-xs text-orange-600 border-orange-300 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-900/20"
+              className="h-9 text-xs text-orange-600 dark:text-orange-400 flex-1 basis-[140px]"
             >
               <Square className="w-3 h-3 mr-1" />
               Stop
             </Button>
           ) : (
-            <DropdownMenu>
-              <div className="flex">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleRunWithApproved}
-                  className="h-7 text-xs rounded-r-none"
-                >
-                  <Play className="w-3 h-3 mr-1" />
-                  Test {approvedCount} change{approvedCount !== 1 ? "s" : ""}
-                </Button>
-                <DropdownMenuTrigger asChild>
+            <div className="flex flex-1 basis-[140px]">
+              <DropdownMenu>
+                <div className="flex w-full">
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="h-7 px-1.5 text-xs rounded-l-none border-l-0"
+                    variant="glass"
+                    onClick={handleRunWithApproved}
+                    className="h-9 text-xs rounded-r-none flex-1"
                   >
-                    <ChevronDown className="w-3 h-3" />
+                    <Play className="w-3 h-3 mr-1" />
+                    Test {approvedCount} change{approvedCount !== 1 ? "s" : ""}
                   </Button>
-                </DropdownMenuTrigger>
-              </div>
-              <DropdownMenuContent align="start" className="w-[400px] p-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Test Payload</span>
-                    {payloadError && <span className="text-xs text-red-500">(Invalid JSON)</span>}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Edit the payload to test with different inputs.
-                  </p>
-                  <JsonCodeEditor
-                    value={editablePayload}
-                    onChange={(val) => {
-                      setHasUserEdited(true);
-                      setEditablePayload(val || "");
-                      try {
-                        if (val?.trim()) {
-                          JSON.parse(val);
-                          setPayloadError(null);
-                        } else {
-                          setPayloadError(null);
-                        }
-                      } catch (e) {
-                        setPayloadError((e as Error).message);
-                      }
-                    }}
-                    readOnly={false}
-                    maxHeight="200px"
-                    resizable={true}
-                    showValidation={true}
-                  />
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="glass"
+                      className="h-9 px-2 text-xs rounded-l-none border-l-0"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
                 </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ))}
+                <DropdownMenuContent align="start" className="w-[400px] p-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Test Payload</span>
+                      {payloadError && <span className="text-xs text-red-500">(Invalid JSON)</span>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Edit the payload to test with different inputs.
+                    </p>
+                    <JsonCodeEditor
+                      value={editablePayload}
+                      onChange={(val) => {
+                        setHasUserEdited(true);
+                        setEditablePayload(val || "");
+                        try {
+                          if (val?.trim()) {
+                            JSON.parse(val);
+                            setPayloadError(null);
+                          } else {
+                            setPayloadError(null);
+                          }
+                        } catch (e) {
+                          setPayloadError((e as Error).message);
+                        }
+                      }}
+                      readOnly={false}
+                      maxHeight="200px"
+                      resizable={true}
+                      showValidation={true}
+                    />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        ) : null}
         <Button
           size="sm"
-          variant="outline"
+          variant="glass"
           onClick={handleRejectAll}
-          className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+          className="h-9 text-xs flex-1 basis-[140px]"
         >
           <X className="w-3 h-3 mr-1" />
           Reject all
         </Button>
         <Button
           size="sm"
+          variant="glass-primary"
           onClick={handleConfirm}
           disabled={approvedCount === 0}
-          className="h-7 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50"
+          className="h-9 text-xs flex-1 basis-[140px]"
         >
           <Check className="w-3 h-3 mr-1" />
-          Apply {approvedCount} change{approvedCount !== 1 ? "s" : ""}
+          Confirm {approvedCount} change{approvedCount !== 1 ? "s" : ""}
         </Button>
       </div>
 
@@ -514,14 +515,7 @@ export function DiffApprovalComponent({
                   />
                 </div>
               ) : (
-                <div className="flex items-start gap-2 p-2 bg-red-50/50 dark:bg-red-950/20 rounded border border-red-200/60 dark:border-red-900/40">
-                  <XCircle className="w-3 h-3 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-[11px] text-red-600/80 dark:text-red-400/80 break-words">
-                    {testResult.error && testResult.error.length > 300
-                      ? `${testResult.error.slice(0, 300)}...`
-                      : testResult.error}
-                  </div>
-                </div>
+                <ErrorMessage message={testResult.error || ""} truncateAt={300} className="p-2" />
               )}
             </div>
           )}

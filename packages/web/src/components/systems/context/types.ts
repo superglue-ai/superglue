@@ -17,8 +17,7 @@ export interface OAuthFields {
 export interface SystemDefinition {
   id: string;
   name?: string;
-  urlHost: string;
-  urlPath: string;
+  url: string;
   templateName?: string;
   icon?: string;
   createdAt?: Date;
@@ -32,14 +31,12 @@ export interface AuthState {
   apiKeyCredentials: string;
   isOAuthConfigured: boolean;
   useSuperglueOAuth: boolean;
+  multiTenancyMode: "disabled" | "enabled";
 }
 
 export interface ContextState {
-  documentationUrl: string;
-  documentation: string;
   specificInstructions: string;
-  hasUploadedFile: boolean;
-  isDocumentationPending: boolean;
+  docFileCount: number;
 }
 
 export type SystemSection = "configuration" | "authentication" | "context";
@@ -78,8 +75,7 @@ export interface SystemConfigContextValue {
 
   setSystemId: (id: string) => void;
   setSystemName: (name: string) => void;
-  setUrlHost: (host: string) => void;
-  setUrlPath: (path: string) => void;
+  setUrl: (url: string) => void;
   setTemplateName: (name: string) => void;
   setIcon: (icon: string) => void;
 
@@ -88,11 +84,10 @@ export interface SystemConfigContextValue {
   setOAuthFields: (fields: Partial<OAuthFields>) => void;
   setApiKeyCredentials: (credentials: string) => void;
   setUseSuperglueOAuth: (use: boolean) => void;
+  setMultiTenancyMode: (mode: "disabled" | "enabled") => void;
 
-  setDocumentationUrl: (url: string) => void;
-  setDocumentation: (doc: string) => void;
   setSpecificInstructions: (instructions: string) => void;
-  setHasUploadedFile: (has: boolean) => void;
+  setDocFileCount: (count: number) => void;
 
   setActiveSection: (section: SystemSection) => void;
 
@@ -105,14 +100,10 @@ export interface SystemConfigContextValue {
 
 export interface SystemContextForAgent {
   systemId: string;
-  urlHost: string;
-  urlPath: string;
+  url: string;
   templateName?: string;
   authType: "none" | "oauth" | "apikey";
   credentialKeys: string[];
-  hasDocumentation: boolean;
-  hasUploadedFile: boolean;
-  documentationUrl: string;
   specificInstructions: string;
   sectionStatuses: {
     configuration: { isComplete: boolean; label: string };

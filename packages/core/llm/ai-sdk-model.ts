@@ -1,14 +1,6 @@
-import { getDateMessage, getModelContextLength, initializeAIModel } from "@superglue/shared/utils";
-import {
-  AssistantModelMessage,
-  TextPart,
-  Tool,
-  ToolCallPart,
-  ToolResultPart,
-  generateText,
-  jsonSchema,
-  tool,
-} from "ai";
+import { getDateMessage, getModelContextLength } from "@superglue/shared/utils";
+import { initializeAIModel } from "@superglue/shared/utils/ai-model-init";
+import { Tool, generateText, jsonSchema, tool } from "ai";
 import { server_defaults } from "../default.js";
 import { logMessage } from "../utils/logs.js";
 import {
@@ -210,13 +202,7 @@ export class AiSdkModel implements LLM {
       temperature,
     });
 
-    const updatedMessages = [
-      ...messages,
-      {
-        role: "assistant" as const,
-        content: result.text,
-      } as LLMMessage,
-    ];
+    const updatedMessages = [...messages, ...(result.response.messages as LLMMessage[])];
 
     return {
       response: result.text,
@@ -298,60 +284,19 @@ export class AiSdkModel implements LLM {
           }
         }
 
-        if (result.text.trim().length > 0) {
-          conversationMessages.push({
-            role: "assistant" as const,
-            content: [{ type: "text", text: result.text } as TextPart],
-          } as LLMMessage);
-        }
-
         for (const toolCall of result.toolCalls) {
           toolUsageCounts.set(toolCall.toolName, (toolUsageCounts.get(toolCall.toolName) ?? 0) + 1);
-
-          conversationMessages.push({
-            role: "assistant",
-            content: [
-              {
-                type: "tool-call",
-                toolCallId: toolCall.toolCallId,
-                toolName: toolCall.toolName,
-                input: toolCall.input ?? {},
-              } as ToolCallPart,
-            ],
-          } as AssistantModelMessage);
-
           const toolResult = result.toolResults.find((tr) => tr.toolCallId === toolCall.toolCallId);
-
           if (toolResult) {
             logToolExecution(toolCall.toolName, toolCall.input, toolResult.output, input.metadata);
-
-            conversationMessages.push({
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: toolResult.toolCallId,
-                  toolName: toolResult.toolName,
-                  output: { type: "text", value: toolResult.output?.toString() ?? "" },
-                } as ToolResultPart,
-              ],
-            });
-          } else {
-            conversationMessages.push({
-              role: "tool",
-              content: [
-                {
-                  type: "tool-result",
-                  toolCallId: toolCall.toolCallId,
-                  toolName: toolCall.toolName,
-                  output: { type: "text", value: "Tool did not output anything" },
-                } as ToolResultPart,
-              ],
-            });
           }
         }
 
-        if (!finalResult && result.toolCalls.length === 0) {
+        conversationMessages.push(...(result.response.messages as LLMMessage[]));
+
+        if (finalResult) break;
+
+        if (result.toolCalls.length === 0) {
           throw new Error("No tool calls received from the model");
         }
       }

@@ -1,15 +1,45 @@
 import { System } from "./types.js";
 import { toJsonSchema } from "./json-schema.js";
 import { UserRole } from "./types.js";
+import { PatchSystemBody } from "./types.js";
 
 // Re-export cron utilities
 export * from "./utils/cron.js";
 
-// Re-export AI model initialization utilities
-export * from "./utils/ai-model-init.js";
-
 // Re-export model context length utilities
 export * from "./utils/model-context-length.js";
+
+// Re-export token counting utilities
+export * from "./utils/token-count.js";
+
+export type ConnectionProtocol = "http" | "postgres" | "sftp" | "smb";
+
+export const getConnectionProtocol = (url: string): ConnectionProtocol => {
+  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
+  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
+    return "sftp";
+  if (url.startsWith("smb://")) return "smb";
+  return "http";
+};
+
+export function validateExternalUrl(raw: string): URL {
+  const parsed = new URL(raw);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0" ||
+    host.startsWith("169.254.") ||
+    host.endsWith(".internal")
+  ) {
+    throw new Error(`URL target is not allowed: ${host}`);
+  }
+  return parsed;
+}
 
 export const ALLOWED_FILE_EXTENSIONS = [
   ".json",
@@ -342,18 +372,88 @@ export function assertValidArrowFunction(code: string | undefined | null): strin
   throw new Error(`Invalid arrow function: ${text}. Expected a valid arrow function.`);
 }
 
+const NON_SENSITIVE_CREDENTIAL_KEYS = new Set([
+  "client_id",
+  "auth_url",
+  "token_url",
+  "scopes",
+  "grant_type",
+  "redirect_uri",
+  "audience",
+  "host",
+  "port",
+  "database",
+  "username",
+  "region",
+]);
+
+export const isSensitiveCredentialKey = (key: string): boolean => {
+  return !NON_SENSITIVE_CREDENTIAL_KEYS.has(key.toLowerCase().trim());
+};
+
+export const maskSystemCredentials = (
+  credentials: Record<string, any> | undefined,
+): Record<string, any> | undefined => {
+  if (!credentials) return undefined;
+  return Object.fromEntries(
+    Object.entries(credentials).map(([key, value]) => [
+      key,
+      isSensitiveCredentialKey(key) ? `<<masked_${key}>>` : value,
+    ]),
+  );
+};
+
+export function isMaskedValue(value: any): boolean {
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  if (v.startsWith("<<") && v.endsWith(">>")) return true;
+  if (v.startsWith("{masked_") && v.endsWith("}")) return true;
+  return false;
+}
+
+export function mergeCredentials(
+  incoming: Record<string, any> | null | undefined,
+  existing: Record<string, any> | null | undefined,
+): Record<string, any> {
+  if (!incoming || Object.keys(incoming).length === 0) {
+    return existing || {};
+  }
+  if (!existing || Object.keys(existing).length === 0) {
+    return Object.fromEntries(
+      Object.entries(incoming).filter(([_, v]) => !isMaskedValue(v) && v !== true),
+    );
+  }
+
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (isMaskedValue(value)) continue;
+    if (value === true) continue;
+    merged[key] = value;
+  }
+  return merged;
+}
+
 export function maskCredentials(message: string, credentials?: Record<string, string>): string {
   if (!credentials) {
     return message;
   }
   let maskedMessage = message;
-  Object.entries(credentials).forEach(([key, value]) => {
-    const valueString = String(value);
-    if (value && valueString) {
-      const regex = new RegExp(valueString.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
-      maskedMessage = maskedMessage.replace(regex, `{masked_${key}}`);
-    }
-  });
+  const tokenMap: [string, string][] = [];
+  let tokenIndex = 0;
+  Object.entries(credentials)
+    .sort(([, a], [, b]) => String(b).length - String(a).length)
+    .forEach(([key, value]) => {
+      const valueString = String(value);
+      if (value && valueString) {
+        const token = `\x00MASK_${tokenIndex++}\x00`;
+        tokenMap.push([token, `{masked_${key}}`]);
+        const regex = new RegExp(valueString.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+        maskedMessage = maskedMessage.replace(regex, token);
+      }
+    });
+  for (const [token, masked] of tokenMap) {
+    maskedMessage = maskedMessage.split(token).join(masked);
+  }
   return maskedMessage;
 }
 
@@ -397,19 +497,24 @@ export function sampleResultObject(value: any, sampleSize = 10, seen = new WeakS
   );
 }
 
-export function safeStringify(value: any): string {
+export function safeStringify(value: any, indent: number = 2): string {
   const seen = new WeakSet<object>();
   try {
     return JSON.stringify(
       value,
       (key, val) => {
+        // Handle circular references
         if (typeof val === "object" && val !== null) {
           if (seen.has(val)) return "[Circular]";
           seen.add(val);
         }
+        // Handle BigInt
+        if (typeof val === "bigint") return val.toString();
+        // Handle functions
+        if (typeof val === "function") return "[Function]";
         return val;
       },
-      2,
+      indent,
     );
   } catch (err) {
     // As a last resort, coerce to string
@@ -493,12 +598,12 @@ export function normalizeToolDiff<T extends { op: string; path: string; value?: 
 
   const shouldAlwaysBeObject =
     diff.path === "/inputSchema" ||
-    diff.path === "/responseSchema" ||
+    diff.path === "/outputSchema" ||
     diff.path.startsWith("/inputSchema/properties/") ||
-    diff.path.startsWith("/responseSchema/properties/") ||
-    diff.path.match(/^\/steps\/\d+\/apiConfig\/pagination$/) ||
-    diff.path.match(/^\/steps\/\d+\/apiConfig\/headers$/) ||
-    diff.path.match(/^\/steps\/\d+\/apiConfig\/queryParams$/);
+    diff.path.startsWith("/outputSchema/properties/") ||
+    diff.path.match(/^\/steps\/\d+\/config\/pagination$/) ||
+    diff.path.match(/^\/steps\/\d+\/config\/headers$/) ||
+    diff.path.match(/^\/steps\/\d+\/config\/queryParams$/);
 
   if (shouldAlwaysBeObject) {
     try {
@@ -516,3 +621,128 @@ export function normalizeToolDiffs<T extends { op: string; path: string; value?:
 ): T[] {
   return diffs.map((diff) => normalizeToolDiff(diff));
 }
+
+export function composeUrl(host: string, path: string) {
+  // Handle empty/undefined inputs
+  if (!host) host = "";
+  if (!path) path = "";
+
+  // Add https:// if protocol is missing
+  if (!/^(https?|postgres(ql)?|ftp(s)?|sftp|smb|file):\/\//i.test(host)) {
+    host = `https://${host}`;
+  }
+
+  // Trim slashes in one pass
+  const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+  return `${cleanHost}/${cleanPath}`;
+}
+
+// ============================================================================
+// System Auth Status
+// ============================================================================
+
+export type SystemAuthType = "none" | "oauth" | "apikey";
+
+export interface SystemAuthStatus {
+  authType: SystemAuthType;
+  isComplete: boolean;
+  label: string;
+}
+
+/**
+ * Detect the authentication type from system credentials
+ */
+export const detectSystemAuthType = (
+  credentials: Record<string, any> | undefined,
+): SystemAuthType => {
+  if (!credentials || Object.keys(credentials).length === 0) return "none";
+
+  const oauthFields = [
+    "auth_url",
+    "token_url",
+    "client_id",
+    "client_secret",
+    "access_token",
+    "refresh_token",
+  ];
+  const hasOAuthFields = oauthFields.some((field) => field in credentials);
+
+  if (hasOAuthFields) return "oauth";
+  return "apikey";
+};
+
+/**
+ * Get the authentication status for a system.
+ * Handles both normal mode and multi-tenancy mode.
+ */
+export const getSystemAuthStatus = (system: {
+  credentials?: Record<string, any>;
+  multiTenancyMode?: string;
+}): SystemAuthStatus => {
+  const creds = system.credentials || {};
+  const authType = detectSystemAuthType(creds);
+  const isMultiTenancy = system.multiTenancyMode === "enabled";
+
+  if (authType === "none") {
+    return { authType: "none", isComplete: true, label: "No auth" };
+  }
+
+  if (authType === "oauth") {
+    // In multi-tenancy mode, check for OAuth template fields (not tokens)
+    if (isMultiTenancy) {
+      const hasAuthUrl = Boolean(creds.auth_url);
+      const hasTokenUrl = Boolean(creds.token_url);
+      const hasClientId = Boolean(creds.client_id);
+      const isComplete = hasAuthUrl && hasTokenUrl && hasClientId;
+      return {
+        authType: "oauth",
+        isComplete,
+        label: isComplete ? "Ready for end users" : "OAuth template incomplete",
+      };
+    }
+
+    // Normal mode: check for access token
+    const grantType = creds.grant_type || "authorization_code";
+    const hasAccessToken = Boolean(creds.access_token);
+    const hasRefreshToken = Boolean(creds.refresh_token);
+    const isComplete =
+      grantType === "client_credentials" ? hasAccessToken : hasAccessToken && hasRefreshToken;
+
+    return {
+      authType: "oauth",
+      isComplete,
+      label: isComplete ? "OAuth configured" : "OAuth incomplete",
+    };
+  }
+
+  // API Key mode
+  const hasKeys = Object.keys(creds).length > 0;
+  if (isMultiTenancy) {
+    return {
+      authType: "apikey",
+      isComplete: hasKeys,
+      label: hasKeys ? "Ready for end users" : "No credential fields",
+    };
+  }
+
+  return {
+    authType: "apikey",
+    isComplete: hasKeys,
+    label: hasKeys ? "API Key configured" : "No credentials",
+  };
+};
+
+export const ALLOWED_PATCH_SYSTEM_FIELDS: (keyof PatchSystemBody)[] = [
+  "name",
+  "url",
+  "specificInstructions",
+  "icon",
+  "credentials",
+  "metadata",
+  "templateName",
+  "multiTenancyMode",
+  "documentationFiles",
+  "tunnel",
+];

@@ -15,18 +15,40 @@
       "cache": false,
       "persistent": true
     },
+    "start-local": {
+      "cache": false,
+      "persistent": true
+    },
     "test": {
-      "dependsOn": ["@superglue/core#build"],
+      "dependsOn": [
+        "^build",
+        "build"
+      ],
       "outputs": []
     },
     "test:coverage": {
-      "dependsOn": ["@superglue/core#build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "^build",
+        "build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "type-check": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "type-check-strict": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
     }
   },
   "globalEnv": [
-    "GRAPHQL_ENDPOINT",
-    "GRAPHQL_PORT",
     "SUPERGLUE_APP_URL",
     "WEB_PORT",
     "DATASTORE_TYPE",
@@ -42,6 +64,7 @@
     "OPENAI_API_VERSION",
     "NEXT_PUBLIC_SUPERGLUE_ENDPOINT",
     "NEXT_PUBLIC_SUPERGLUE_API_KEY",
+    "NEXT_PUBLIC_API_ENDPOINT",
     "POSTGRES_HOST",
     "POSTGRES_PORT",
     "POSTGRES_USERNAME",
@@ -58,7 +81,6 @@
     "AI_GATEWAY_MODEL",
     "AI_GATEWAY_API_KEY",
     "FRONTEND_LLM_PROVIDER",
-    "FRONTEND_LLM_MODEL",
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "OPENAI_API_BASE_URL",
@@ -68,20 +90,48 @@
     "START_SCHEDULER_SERVER",
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_MODEL",
+    "TAVILY_API_KEY",
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
     "AZURE_OPENAI_ENDPOINT",
     "MASTER_ENCRYPTION_KEY",
     "DISABLE_TELEMETRY",
-    "AZURE_API_KEY",
     "AZURE_MODEL",
+    "AZURE_API_KEY",
     "AZURE_RESOURCE_NAME",
     "AZURE_BASE_URL",
     "AZURE_API_VERSION",
     "AZURE_USE_DEPLOYMENT_BASED_URLS",
+    "AZURE_MODEL",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_REGION",
     "AWS_SESSION_TOKEN",
     "BEDROCK_MODEL",
-    "AWS_BASE_URL"
+    "AWS_BASE_URL",
+    "VERTEX_API_KEY",
+    "VERTEX_MODEL",
+    "VERTEX_PROJECT",
+    "VERTEX_LOCATION",
+    "VERTEX_CLIENT_EMAIL",
+    "VERTEX_PRIVATE_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "FILE_STORAGE_PROVIDER",
+    "AWS_BUCKET_NAME",
+    "AWS_BUCKET_PREFIX",
+    "S3_ENDPOINT",
+    "S3_PUBLIC_ENDPOINT",
+    "MINIO_ROOT_USER",
+    "MINIO_ROOT_PASSWORD",
+    "MINIO_BUCKET_NAME",
+    "MINIO_API_PORT",
+    "MINIO_CONSOLE_PORT",
+    "MINIO_BUCKET_PREFIX",
+    "MINIO_WEBHOOK_AUTH_TOKEN",
+    "EVENTBRIDGE_ORG_ID",
+    "LANGFUSE_TRACING_ENVIRONMENT",
+    "LANGFUSE_SECRET_KEY",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_BASE_URL"
   ]
 }

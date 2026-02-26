@@ -5,12 +5,15 @@ import { UserAction } from "@/src/lib/agent/agent-types";
 import {
   AuthenticateOAuthComponent,
   BackgroundToolIndicator,
+  BuildToolComponent,
   CallSystemComponent,
   CreateSystemComponent,
   DefaultComponent,
   EditPayloadComponent,
+  EditToolComponent,
   ModifySystemComponent,
-  ToolBuilderComponent,
+  RunResultsComponent,
+  RunToolComponent,
 } from "./tool-components";
 
 interface ToolCallComponentProps {
@@ -46,10 +49,8 @@ export function ToolCallComponent({
   switch (tool.name) {
     case "build_tool":
       return (
-        <ToolBuilderComponent
+        <BuildToolComponent
           tool={tool}
-          mode="build"
-          onInputChange={onInputChange}
           sendAgentRequest={sendAgentRequest}
           bufferAction={bufferAction}
           isPlayground={isPlayground}
@@ -58,10 +59,8 @@ export function ToolCallComponent({
       );
     case "edit_tool":
       return (
-        <ToolBuilderComponent
+        <EditToolComponent
           tool={tool}
-          mode="fix"
-          onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}
           sendAgentRequest={sendAgentRequest}
           bufferAction={bufferAction}
@@ -72,23 +71,29 @@ export function ToolCallComponent({
         />
       );
     case "run_tool":
-      return (
-        <ToolBuilderComponent
-          tool={tool}
-          mode="run"
-          onInputChange={onInputChange}
-          sendAgentRequest={sendAgentRequest}
-          bufferAction={bufferAction}
-          isPlayground={isPlayground}
-          filePayloads={filePayloads}
-        />
-      );
+      return <RunToolComponent tool={tool} isPlayground={isPlayground} />;
 
     // System tools
     case "create_system":
-      return <CreateSystemComponent tool={tool} onInputChange={onInputChange} />;
-    case "modify_system":
-      return <ModifySystemComponent tool={tool} onInputChange={onInputChange} />;
+      return (
+        <CreateSystemComponent
+          tool={tool}
+          onInputChange={onInputChange}
+          onToolUpdate={onToolUpdate}
+          sendAgentRequest={sendAgentRequest}
+          onAbortStream={onAbortStream}
+        />
+      );
+    case "edit_system":
+      return (
+        <ModifySystemComponent
+          tool={tool}
+          onInputChange={onInputChange}
+          onToolUpdate={onToolUpdate}
+          sendAgentRequest={sendAgentRequest}
+          onAbortStream={onAbortStream}
+        />
+      );
     case "authenticate_oauth":
       return (
         <AuthenticateOAuthComponent
@@ -122,12 +127,15 @@ export function ToolCallComponent({
       );
 
     case "get_runs":
+      return <RunResultsComponent tool={tool} onInputChange={onInputChange} />;
+
     case "find_system_templates":
     case "web_search":
     case "search_documentation":
     case "find_tool":
     case "find_system":
     case "save_tool":
+    case "read_skill":
       return <BackgroundToolIndicator tool={tool} />;
 
     default:

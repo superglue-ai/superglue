@@ -1,4 +1,16 @@
-import { System, Tool } from "@superglue/shared";
+import { ALLOWED_PATCH_SYSTEM_FIELDS, Message, System, Tool } from "@superglue/shared";
+import * as jsonpatch from "fast-json-patch";
+import { ToolExecutionContext } from "./agent-types";
+import { SKILL_INDEX } from "./skills/index";
+
+// Re-export from shared for backwards compatibility
+export { getConnectionProtocol, type ConnectionProtocol } from "@superglue/shared";
+// Alias for backwards compatibility
+export { getConnectionProtocol as getProtocol } from "@superglue/shared";
+
+export const needsSystemMessage = (messages: Message[]): boolean => {
+  return !messages.some((m) => m.role === "system");
+};
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
   return {
@@ -11,13 +23,15 @@ export const stripLegacyToolFields = (tool: Tool): Tool => {
 };
 
 export const filterSystemFields = (system: System) => {
-  const { openApiSchema, documentation, credentials, ...filtered } = system;
-
-  const maskedCredentials = credentials
-    ? Object.fromEntries(Object.keys(credentials).map((key) => [key, `<<masked_${key}>>`]))
-    : undefined;
-
-  return { ...filtered, credentials: maskedCredentials };
+  const credentialKeys = Object.keys(system.credentials || {});
+  const credentialPlaceholders = credentialKeys.map((key) => `<<${system.id}_${key}>>`);
+  return {
+    id: system.id,
+    name: system.name,
+    url: system.url,
+    specificInstructions: system.specificInstructions,
+    credentialPlaceholders: credentialPlaceholders,
+  };
 };
 
 export function resolveFileReferences(
@@ -149,7 +163,7 @@ export type FileResolutionError = {
   success: false;
   error: string;
   availableFiles: string[];
-  suggestion: string;
+  next_step: string;
 };
 
 export function resolvePayloadWithFiles(
@@ -163,7 +177,7 @@ export function resolvePayloadWithFiles(
       success: false,
       error: `File references not found: ${validation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
       availableFiles: validation.availableKeys.map((k) => `file::${k}`),
-      suggestion:
+      next_step:
         validation.availableKeys.length > 0
           ? `Available file keys: ${validation.availableKeys.map((k) => `file::${k}`).join(", ")}`
           : "No files are currently available. Ask the user to upload the required files.",
@@ -181,7 +195,7 @@ export function resolvePayloadWithFiles(
       success: false,
       error: error.message,
       availableFiles: Object.keys(filePayloads || {}).map((k) => `file::${k}`),
-      suggestion:
+      next_step:
         "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
@@ -190,12 +204,12 @@ export function resolvePayloadWithFiles(
 export function validateDraftOrToolId(
   draftId?: string,
   toolId?: string,
-): { valid: true } | { valid: false; error: string; suggestion?: string } {
+): { valid: true } | { valid: false; error: string; next_step?: string } {
   if (!draftId && !toolId) {
     return {
       valid: false,
       error: "Either draftId or toolId is required",
-      suggestion: "Provide draftId (from build_tool) or toolId (for saved tools)",
+      next_step: "Provide draftId (from build_tool) or toolId (for saved tools)",
     };
   }
   if (draftId && toolId) {
@@ -229,6 +243,69 @@ export function resolveDocumentationFiles(
   }
 }
 
+export function buildScrapeInput(
+  scrapeUrl?: string,
+  scrapeKeywords?: string | string[],
+): { url: string; keywords?: string[] } | null {
+  if (!scrapeUrl || typeof scrapeUrl !== "string" || scrapeUrl.trim().length === 0) {
+    return null;
+  }
+
+  let keywords: string[] | undefined;
+  if (typeof scrapeKeywords === "string") {
+    const parsed = scrapeKeywords.split(/\s+/).filter((k) => k.length > 0);
+    if (parsed.length > 0) keywords = parsed;
+  } else if (Array.isArray(scrapeKeywords)) {
+    const parsed = scrapeKeywords
+      .filter((k) => typeof k === "string")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+    if (parsed.length > 0) keywords = parsed;
+  }
+
+  return { url: scrapeUrl.trim(), ...(keywords ? { keywords } : {}) };
+}
+
+export function extractFilePayloadsForUpload(
+  filesInput: string | undefined,
+  filePayloads: Record<string, any> | undefined,
+):
+  | { files: Array<{ fileName: string; content: string; contentType?: string }> }
+  | { error: string } {
+  if (!filesInput || !filePayloads || Object.keys(filePayloads).length === 0) {
+    return { files: [] };
+  }
+
+  const hasFileReference = typeof filesInput === "string" && filesInput.includes("file::");
+  if (!hasFileReference) {
+    return { files: [] };
+  }
+
+  const fileRefs = filesInput.split(",").map((ref) => ref.trim().replace(/^file::/, ""));
+  const availableKeys = Object.keys(filePayloads);
+  const files: Array<{ fileName: string; content: string; contentType?: string }> = [];
+
+  for (const ref of fileRefs) {
+    const fileData = filePayloads[ref];
+    if (fileData === undefined) {
+      return {
+        error:
+          `File reference 'file::${ref}' could not be resolved.\n` +
+          `Available file keys: ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}`,
+      };
+    }
+    const content = typeof fileData === "string" ? fileData : JSON.stringify(fileData);
+    const fileName = ref.includes(".") ? ref : `${ref}.txt`;
+    files.push({
+      fileName,
+      content,
+      contentType: "text/plain",
+    });
+  }
+
+  return { files };
+}
+
 const MAX_RESPONSE_DATA_LENGTH = 25_000;
 
 export const truncateResponseData = (result: any): any => {
@@ -253,9 +330,147 @@ export const truncateResponseData = (result: any): any => {
   return result;
 };
 
-export const getProtocol = (url: string): "http" | "postgres" | "sftp" => {
-  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
-  if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
-    return "sftp";
-  return "http";
+export const resolveBodyFileReferences = (
+  body: string | undefined,
+  filePayloads: Record<string, any> | undefined,
+): { success: true; body: string | undefined } | { success: false; error: string } => {
+  if (!body || !filePayloads || Object.keys(filePayloads).length === 0) {
+    if (body?.includes("file::")) {
+      return {
+        success: false,
+        error: `Body contains file references but no files are available: ${body}`,
+      };
+    }
+    return { success: true, body };
+  }
+
+  try {
+    const parsed = JSON.parse(body);
+    const fileResult = resolvePayloadWithFiles(parsed, filePayloads, true);
+    if (fileResult.success === false) return { success: false, error: fileResult.error };
+    return { success: true, body: JSON.stringify(fileResult.resolved) };
+  } catch {
+    const fileResult = resolvePayloadWithFiles(body, filePayloads, true);
+    if (fileResult.success === false) return { success: false, error: fileResult.error };
+    return {
+      success: true,
+      body:
+        typeof fileResult.resolved === "string"
+          ? fileResult.resolved
+          : JSON.stringify(fileResult.resolved),
+    };
+  }
+};
+
+export function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as Record<string, unknown>).message);
+  }
+  return String(err);
+}
+
+export function hasPatchableSystemFields(payload: Record<string, unknown>): boolean {
+  return ALLOWED_PATCH_SYSTEM_FIELDS.some((k) => payload[k] !== undefined);
+}
+
+export async function tryTriggerScrapeJob(
+  ctx: ToolExecutionContext,
+  systemId: string,
+  scrapeInput: { url: string; keywords?: string[] } | null,
+): Promise<string | null> {
+  if (!scrapeInput) return null;
+  try {
+    await ctx.superglueClient.triggerSystemDocumentationScrapeJob(systemId, scrapeInput);
+    return null;
+  } catch (error: any) {
+    return `Documentation scrape failed to start: ${error.message}`;
+  }
+}
+
+export const skillIndexDescription = Object.entries(SKILL_INDEX)
+  .map(([name, desc]) => `- ${name}: ${desc}`)
+  .join("\n");
+
+export const validatePatches = (
+  patches: jsonpatch.Operation[],
+): { valid: boolean; error?: string } => {
+  for (let i = 0; i < patches.length; i++) {
+    const patch = patches[i];
+    if (!patch.op) {
+      return { valid: false, error: `Patch ${i + 1}: missing 'op' field` };
+    }
+    if (!patch.path || typeof patch.path !== "string") {
+      return { valid: false, error: `Patch ${i + 1}: 'path' must be a string` };
+    }
+    if (["add", "replace", "test"].includes(patch.op) && !("value" in patch)) {
+      return {
+        valid: false,
+        error: `Patch ${i + 1}: '${patch.op}' operation requires 'value' field`,
+      };
+    }
+    if (["move", "copy"].includes(patch.op) && !("from" in patch)) {
+      return {
+        valid: false,
+        error: `Patch ${i + 1}: '${patch.op}' operation requires 'from' field`,
+      };
+    }
+    if (!patch.path.startsWith("/")) {
+      return {
+        valid: false,
+        error: `Patch ${i + 1}: path must start with '/' (RFC 6902), got '${patch.path}'`,
+      };
+    }
+  }
+  return { valid: true };
+};
+
+export const validateToolStructure = (
+  tool: any,
+  options?: { systemIds?: string[] },
+): { valid: boolean; error?: string } => {
+  if (!tool.id || typeof tool.id !== "string") {
+    return { valid: false, error: "Tool must have a valid 'id' string" };
+  }
+  if (!Array.isArray(tool.steps)) {
+    return { valid: false, error: "Tool must have a 'steps' array" };
+  }
+  if (tool.steps.length === 0 && !tool.outputTransform) {
+    return { valid: false, error: "Tool must have at least one step or an outputTransform" };
+  }
+  for (let i = 0; i < tool.steps.length; i++) {
+    const step = tool.steps[i];
+    if (!step.id) {
+      return { valid: false, error: `Step ${i + 1}: missing 'id'` };
+    }
+    if (!step.config) {
+      return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'config'` };
+    }
+    if (step.config.type === "transform") {
+      if (!step.config.transformCode) {
+        return {
+          valid: false,
+          error: `Step ${i + 1} (${step.id}): transform step missing 'transformCode'`,
+        };
+      }
+    } else {
+      if (!step.config.systemId) {
+        return {
+          valid: false,
+          error: `Step ${i + 1} (${step.id}): request step missing 'systemId'`,
+        };
+      }
+      if (!step.config.url) {
+        return { valid: false, error: `Step ${i + 1} (${step.id}): request step missing 'url'` };
+      }
+      if (options?.systemIds && !options.systemIds.includes(step.config.systemId)) {
+        return {
+          valid: false,
+          error: `Step ${i + 1} (${step.id}): systemId '${step.config.systemId}' not in provided systemIds [${options.systemIds.join(", ")}]`,
+        };
+      }
+    }
+  }
+  return { valid: true };
 };

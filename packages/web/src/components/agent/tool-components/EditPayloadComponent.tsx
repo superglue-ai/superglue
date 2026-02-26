@@ -93,10 +93,10 @@ export function EditPayloadComponent({
     sendAgentRequest(undefined, {
       userActions: [
         {
-          type: "tool_confirmation",
+          type: "tool_event",
           toolCallId: tool.id,
           toolName: "edit_payload",
-          action: "confirmed",
+          event: "confirmed",
         },
       ],
     });
@@ -112,10 +112,10 @@ export function EditPayloadComponent({
     sendAgentRequest(undefined, {
       userActions: [
         {
-          type: "tool_confirmation",
+          type: "tool_event",
           toolCallId: tool.id,
           toolName: "edit_payload",
-          action: "declined",
+          event: "declined",
         },
       ],
     });
@@ -144,7 +144,7 @@ export function EditPayloadComponent({
                 className="h-8 bg-green-600 hover:bg-green-700"
               >
                 <Check className="w-3 h-3 mr-1" />
-                Apply Changes
+                Confirm
               </Button>
             </div>
           )}

@@ -1,27 +1,44 @@
-import { ConfirmationAction, Message } from "@superglue/shared";
-import { SuperglueClient } from "@superglue/shared";
-import { z } from "zod";
-import { GraphQLSubscriptionClient } from "../graphql-subscriptions";
+import { ConfirmationAction, Message, ConnectionProtocol, Tool } from "@superglue/shared";
+import { SSESubscriptionClient } from "../sse-subscriptions";
 import { AgentType } from "./registry/agents";
+import { EESuperglueClient } from "../ee-superglue-client";
+import { TextStreamPart, ToolSet } from "ai";
 
-export const CALL_SYSTEM_CONFIRMATION = {
-  PENDING: "PENDING_USER_CONFIRMATION",
-  CONFIRMED: "USER_CONFIRMED",
-  DECLINED: "USER_CANCELLED",
-} as const;
+export interface PlaygroundToolContext {
+  toolId: string;
+  instruction: string;
+  steps: any[];
+  outputTransform: string;
+  inputSchema: string | null;
+  outputSchema: string | null;
+  systemIds: string[];
+  executionSummary: string;
+  initialError?: string;
+  currentPayload?: string;
+}
 
-export const EDIT_TOOL_CONFIRMATION = {
-  PENDING: "PENDING_DIFF_APPROVAL",
-  CONFIRMED: "DIFFS_APPROVED",
-  DECLINED: "DIFFS_REJECTED",
-  PARTIAL: "DIFFS_PARTIALLY_APPROVED",
-} as const;
+export interface DraftLookup {
+  config: Tool;
+  systemIds: string[];
+  instruction: string;
+  executionResults?: Record<
+    string,
+    {
+      status: string;
+      result?: string;
+      error?: string;
+    }
+  >;
+}
 
-export const SYSTEM_UPSERT_CONFIRMATION = {
-  PENDING: "PENDING_CREDENTIALS",
-  CONFIRMED: "CREDENTIALS_PROVIDED",
-  DECLINED: "CREDENTIALS_DECLINED",
-} as const;
+// Type helpers for AI SDK stream parts - Extract specific part types from the union
+export type StreamPart = TextStreamPart<ToolSet>;
+export type TextDeltaPart = Extract<StreamPart, { type: "text-delta" }>;
+export type ToolCallPart = Extract<StreamPart, { type: "tool-call" }>;
+export type ToolInputStartPart = Extract<StreamPart, { type: "tool-input-start" }>;
+export type ToolResultPart = Extract<StreamPart, { type: "tool-result" }>;
+export type ToolErrorPart = Extract<StreamPart, { type: "tool-error" }>;
+export type ErrorPart = Extract<StreamPart, { type: "error" }>;
 
 export type ExecutionMode = "auto" | "confirm_before_execution" | "confirm_after_execution";
 
@@ -30,6 +47,25 @@ export interface ToolPolicy {
   userModeOptions?: ExecutionMode[];
   computeModeFromInput?: (input: any, policies?: Record<string, any>) => ExecutionMode | null;
   buildPendingOutput?: (input: any) => any;
+}
+
+export type ToolEventStatus =
+  | "pending"
+  | "declined"
+  | "completed"
+  | "awaiting_confirmation"
+  | "running"
+  | "stopped"
+  | "failed"
+  | "error";
+
+export interface EventDefinition {
+  message: string;
+  statusUpdate?: ToolEventStatus;
+}
+
+export interface ToolEvents {
+  [toolName: string]: Record<string, EventDefinition>;
 }
 
 export type ToolExecutionPolicies = Record<string, Record<string, any>>;
@@ -47,20 +83,18 @@ export interface ToolDefinition {
 }
 
 export interface ToolExecutionContext {
-  superglueClient: SuperglueClient;
+  superglueClient: EESuperglueClient;
   filePayloads: Record<string, any>;
   messages: Message[];
-  orgId: string;
   logCallback?: (message: string) => void;
-  subscriptionClient?: GraphQLSubscriptionClient;
+  subscriptionClient?: SSESubscriptionClient;
   abortSignal?: AbortSignal;
   toolExecutionPolicies?: ToolExecutionPolicies;
+  playgroundDraft?: DraftLookup;
 }
 
 export interface ToolConfirmationConfig {
-  timing: "before" | "after";
   validActions: ConfirmationAction[];
-  states: Partial<Record<ConfirmationAction, string>>;
   processConfirmation: (
     input: any,
     output: any,
@@ -75,63 +109,31 @@ export interface ToolRegistryEntry {
   confirmation?: ToolConfirmationConfig;
 }
 
+export interface SystemPromptResult {
+  content: string;
+}
+
 export interface AgentDefinition {
   id: string;
-  systemPrompt: string | ((params: Record<string, any>) => string);
   toolSet: string[];
-  initialContextGenerator?: (
-    ctx: ToolExecutionContext,
-    agentParams?: Record<string, any>,
-  ) => Promise<string>;
-  agentParamsSchema?: z.ZodSchema;
+  systemPromptGenerator: (ctx: ToolExecutionContext) => Promise<SystemPromptResult>;
 }
 
-export type UserAction = ToolConfirmationAction | ToolExecutionFeedback | FileUploadAction;
-
-export interface ToolConfirmationAction {
-  type: "tool_confirmation";
+export interface ToolEventAction {
+  type: "tool_event";
   toolCallId: string;
   toolName: string;
-  action: "confirmed" | "declined" | "partial";
-  data?: {
-    appliedChanges?: any[];
-    rejectedChanges?: any[];
-    systemConfig?: any;
-    userProvidedCredentials?: Record<string, string>;
-  };
+  event: string;
+  payload?: Record<string, unknown>;
 }
 
-export interface ToolExecutionFeedback {
-  type: "tool_execution_feedback";
-  toolCallId: string;
-  toolName: string;
-  feedback:
-    | "manual_run"
-    | "manual_run_success"
-    | "manual_run_failure"
-    | "request_fix"
-    | "save_success"
-    | "oauth_success"
-    | "oauth_failure";
-  data?:
-    | {
-        toolId?: string;
-        result?: any;
-        error?: string;
-        appliedChanges?: number;
-        payload?: any;
-      }
-    | any;
+export interface GlobalEventAction {
+  type: "global_event";
+  event: string;
+  payload?: Record<string, unknown>;
 }
 
-export interface FileUploadAction {
-  type: "file_upload";
-  files: Array<{
-    key: string;
-    name: string;
-    contentPreview: string;
-  }>;
-}
+export type UserAction = ToolEventAction | GlobalEventAction;
 
 export interface AgentRequest {
   agentId: AgentType;
@@ -140,8 +142,9 @@ export interface AgentRequest {
   userActions?: UserAction[];
   filePayloads?: Record<string, { name: string; content: any }>;
   hiddenContext?: string;
-  agentParams?: Record<string, any>;
   toolExecutionPolicies?: ToolExecutionPolicies;
+  conversationId?: string;
+  playgroundDraft?: DraftLookup;
 }
 
 export interface ValidatedAgentRequest {
@@ -151,9 +154,10 @@ export interface ValidatedAgentRequest {
   userActions?: UserAction[];
   filePayloads?: Record<string, { name: string; content: any }>;
   hiddenContext?: string;
-  agentParams?: Record<string, any>;
   toolExecutionPolicies?: ToolExecutionPolicies;
+  conversationId?: string;
   agent: AgentDefinition;
+  playgroundDraft?: DraftLookup;
 }
 
 export interface CallSystemArgs {
@@ -166,10 +170,11 @@ export interface CallSystemArgs {
 
 export interface CallSystemResult {
   success: boolean;
-  protocol: "http" | "postgres" | "sftp";
+  protocol: ConnectionProtocol;
   status?: number;
   statusText?: string;
   headers?: Record<string, string>;
   data?: any;
   error?: string;
+  next_step?: string;
 }

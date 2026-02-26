@@ -1,4 +1,4 @@
-import { ApiConfig, HttpMethod, Run, RunStatus, System, Tool } from "@superglue/shared";
+import { HttpMethod, Run, RunStatus, System, Tool } from "@superglue/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PostgresService } from "./postgres.js";
 import { ToolScheduleInternal } from "./types.js";
@@ -59,62 +59,9 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
       }
     });
 
-    describe("API Config", () => {
-      const testApiConfig: ApiConfig = {
-        id: "test-id",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        urlHost: "https://test.com",
-        method: HttpMethod.GET,
-        headers: {},
-        queryParams: {},
-        instruction: "Test API",
-      };
-
-      it("should store and retrieve API configs", async () => {
-        await store.upsertApiConfig({
-          id: testApiConfig.id,
-          config: testApiConfig,
-          orgId: testOrgId,
-        });
-        const retrieved = await store.getApiConfig({ id: testApiConfig.id, orgId: testOrgId });
-        expect(retrieved).toEqual(testApiConfig);
-      });
-
-      it("should list API configs", async () => {
-        await store.upsertApiConfig({
-          id: testApiConfig.id,
-          config: testApiConfig,
-          orgId: testOrgId,
-        });
-        const { items, total } = await store.listApiConfigs({
-          limit: 10,
-          offset: 0,
-          orgId: testOrgId,
-        });
-        expect(items).toHaveLength(1);
-        expect(total).toBe(1);
-        expect(items[0]).toEqual(testApiConfig);
-      });
-
-      it("should delete API configs", async () => {
-        await store.upsertApiConfig({
-          id: testApiConfig.id,
-          config: testApiConfig,
-          orgId: testOrgId,
-        });
-        await store.deleteApiConfig({ id: testApiConfig.id, orgId: testOrgId });
-        const retrieved = await store.getApiConfig({ id: testApiConfig.id, orgId: testOrgId });
-        expect(retrieved).toBeNull();
-      });
-    });
-
     describe("Run Results", () => {
-      const testApiConfig: ApiConfig = {
-        id: "test-api-id",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        urlHost: "https://test.com",
+      const testStepConfig = {
+        url: "https://test.com",
         method: HttpMethod.GET,
         headers: {},
         queryParams: {},
@@ -125,7 +72,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         runId: "test-run-id",
         toolId: "test-api-id",
         status: RunStatus.SUCCESS,
-        tool: { id: "test-api-id", steps: [{ id: "step1", apiConfig: testApiConfig }] },
+        tool: { id: "test-api-id", steps: [{ id: "step1", config: testStepConfig }] },
         metadata: {
           startedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
@@ -255,7 +202,7 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
       const testSystem: System = {
         id: "test-system-id",
         name: "Test System",
-        urlHost: "https://system.test",
+        url: "https://system.test",
         credentials: { apiKey: "secret" },
         templateName: "slack",
         createdAt: new Date(),
@@ -426,7 +373,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
           workflow: testWorkflow,
           orgId: testOrgId,
           userId: "user-1",
-          userEmail: "user1@test.com",
         });
 
         // Second save with changes
@@ -436,7 +382,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
           workflow: updatedWorkflow,
           orgId: testOrgId,
           userId: "user-2",
-          userEmail: "user2@test.com",
         });
 
         // Check history
@@ -449,7 +394,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         expect(history[0].version).toBe(1);
         expect(history[0].tool.instruction).toBe("Test workflow v1");
         expect(history[0].createdByUserId).toBe("user-2");
-        expect(history[0].createdByEmail).toBe("user2@test.com");
       });
 
       it("should return empty history for new tool", async () => {
@@ -502,7 +446,6 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
           version: 1,
           orgId: testOrgId,
           userId: "restorer",
-          userEmail: "restorer@test.com",
         });
 
         expect(restored.instruction).toBe("Original");

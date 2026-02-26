@@ -1,4 +1,4 @@
-const DEFAULT_CONTEXT_LENGTH = 128_000;
+const DEFAULT_CONTEXT_LENGTH = 150_000;
 
 export function getModelContextLength(modelId: string): number {
   return DEFAULT_CONTEXT_LENGTH;
@@ -23,6 +23,9 @@ export function getConfiguredModelContextLength(): number {
       break;
     case "bedrock":
       modelId = process.env.BEDROCK_MODEL;
+      break;
+    case "vertex":
+      modelId = process.env.VERTEX_MODEL;
       break;
   }
 
