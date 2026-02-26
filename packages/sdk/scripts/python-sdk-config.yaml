@@ -1,0 +1,5 @@
+# Configuration for openapi-python-client
+# https://github.com/openapi-generators/openapi-python-client
+
+project_name_override: superglue-client
+package_name_override: superglue_client
