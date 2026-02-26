@@ -7,6 +7,7 @@ import {
   BatchFileUploadResponse,
 } from "@superglue/shared";
 import { getFileService } from "../filestore/file-service.js";
+import { FILE_STORAGE_DEFAULT_ORG } from "../filestore/s3-file-service.js";
 import { logMessage } from "../utils/logs.js";
 import { server_defaults } from "../default.js";
 
@@ -354,24 +355,22 @@ async function processFileByKey(
   const fileId = filename.split(".")[0];
   const orgIdFromKey = key.split("/")[0];
 
-  // Allow the EventBridge/S3 webhook org to process files for any org
-  const eventBridgeOrgId = process.env.EVENTBRIDGE_ORG_ID;
-  if (!authReq.authInfo.orgId) {
-    return reply.code(403).send({
-      success: false,
-      error: "Missing organization context",
-    });
-  }
-  if (authReq.authInfo.orgId !== orgIdFromKey && authReq.authInfo.orgId !== eventBridgeOrgId) {
-    logMessage(
-      "warn",
-      `processFileByKey: Org mismatch - auth=${authReq.authInfo.orgId} key=${orgIdFromKey} eventBridgeOrgId=${eventBridgeOrgId}`,
-      serviceMetadata,
-    );
-    return reply.code(403).send({
-      success: false,
-      error: "Not authorized to process files for this organization",
-    });
+  const isSingleTenant = !authReq.authInfo.orgId;
+  const datastoreOrgId = orgIdFromKey === FILE_STORAGE_DEFAULT_ORG ? "" : orgIdFromKey;
+
+  if (!isSingleTenant) {
+    const eventBridgeOrgId = process.env.EVENTBRIDGE_ORG_ID;
+    if (authReq.authInfo.orgId !== orgIdFromKey && authReq.authInfo.orgId !== eventBridgeOrgId) {
+      logMessage(
+        "warn",
+        `processFileByKey: Org mismatch - auth=${authReq.authInfo.orgId} key=${orgIdFromKey} eventBridgeOrgId=${eventBridgeOrgId}`,
+        serviceMetadata,
+      );
+      return reply.code(403).send({
+        success: false,
+        error: "Not authorized to process files for this organization",
+      });
+    }
   }
 
   if (!fileId) {
@@ -383,7 +382,7 @@ async function processFileByKey(
 
   const fileRef = await authReq.datastore.getFileReference({
     id: fileId,
-    orgId: orgIdFromKey,
+    orgId: datastoreOrgId,
   });
 
   if (!fileRef) {
@@ -402,7 +401,7 @@ async function processFileByKey(
         status: FileStatus.FAILED,
         error: `File size ${fileSize} exceeds maximum allowed size ${maxFileSize}`,
       },
-      orgId: orgIdFromKey,
+      orgId: datastoreOrgId,
     });
     return reply.code(400).send({
       success: false,
@@ -413,7 +412,7 @@ async function processFileByKey(
   await authReq.datastore.updateFileReference({
     id: fileId,
     updates: { status: FileStatus.PROCESSING },
-    orgId: orgIdFromKey,
+    orgId: datastoreOrgId,
   });
 
   try {
@@ -429,7 +428,7 @@ async function processFileByKey(
           completedAt: new Date().toISOString(),
         },
       },
-      orgId: orgIdFromKey,
+      orgId: datastoreOrgId,
     });
 
     logMessage(
@@ -455,7 +454,7 @@ async function processFileByKey(
           failedAt: new Date().toISOString(),
         },
       },
-      orgId: orgIdFromKey,
+      orgId: datastoreOrgId,
     });
     logMessage(
       "error",

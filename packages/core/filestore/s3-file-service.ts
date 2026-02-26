@@ -12,6 +12,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as Minio from "minio";
 import type { FileService } from "./file-service.js";
 
+export const FILE_STORAGE_DEFAULT_ORG = "default";
+
 export class S3FileService implements FileService {
   private s3Client: S3Client;
   private minioClient?: Minio.Client;
@@ -124,16 +126,20 @@ export class S3FileService implements FileService {
     });
   }
 
+  private resolveOrgId(orgId: string): string {
+    return orgId || FILE_STORAGE_DEFAULT_ORG;
+  }
+
   buildStorageUri(orgId: string, path: string): string {
-    return `s3://${this.bucketName}/${orgId}/${path}`;
+    return `s3://${this.bucketName}/${this.resolveOrgId(orgId)}/${path}`;
   }
 
   buildRawStorageUri(orgId: string, filename: string): string {
-    return `s3://${this.bucketName}/${orgId}/${this.bucketPrefix}${filename}`;
+    return `s3://${this.bucketName}/${this.resolveOrgId(orgId)}/${this.bucketPrefix}${filename}`;
   }
 
   buildProcessedStorageUri(orgId: string, filename: string): string {
-    return `s3://${this.bucketName}/${orgId}/processed/${filename}`;
+    return `s3://${this.bucketName}/${this.resolveOrgId(orgId)}/processed/${filename}`;
   }
 
   async generateUploadUrl(
@@ -142,10 +148,7 @@ export class S3FileService implements FileService {
     serviceMetadata: ServiceMetadata,
     metadata?: Record<string, any>,
   ): Promise<{ uploadUrl: string; expiresIn: number; storageUri: string }> {
-    const orgId = serviceMetadata.orgId || "";
-    if (!orgId) {
-      throw new Error("orgId is required in serviceMetadata");
-    }
+    const orgId = this.resolveOrgId(serviceMetadata.orgId || "");
 
     // Extract file extension from original filename
     const lastDotIndex = originalFileName.lastIndexOf(".");
