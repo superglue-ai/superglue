@@ -356,8 +356,13 @@ async function processFileByKey(
 
   // Allow the EventBridge/S3 webhook org to process files for any org
   const eventBridgeOrgId = process.env.EVENTBRIDGE_ORG_ID;
+  if (!authReq.authInfo.orgId) {
+    return reply.code(403).send({
+      success: false,
+      error: "Missing organization context",
+    });
+  }
   if (
-    authReq.authInfo.orgId &&
     authReq.authInfo.orgId !== orgIdFromKey &&
     authReq.authInfo.orgId !== eventBridgeOrgId
   ) {

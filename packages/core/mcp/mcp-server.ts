@@ -178,7 +178,7 @@ export const createMcpServer = async (apiKey: string) => {
   });
 
   // Track registered tool names to handle collisions
-  const registeredNames = new Set<string>();
+  const registeredNames = new Set<string>(["authenticate"]);
 
   // Register each superglue tool as a native MCP tool
   for (const tool of activeTools) {

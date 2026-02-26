@@ -53,7 +53,8 @@ export class GraphQLStrategy implements DocumentationFetchingStrategy {
   }
 
   async tryFetch(config: DocumentationConfig, metadata: ServiceMetadata): Promise<string | null> {
-    if (!config.url?.startsWith("http")) return null;
+    if (!config.url?.startsWith("http") && !config.documentationUrl?.startsWith("http"))
+      return null;
 
     const urlIsLikelyGraphQL = this.isLikelyGraphQL(config.url, config);
     const docUrlIsLikelyGraphQL = this.isLikelyGraphQL(config.documentationUrl, config);

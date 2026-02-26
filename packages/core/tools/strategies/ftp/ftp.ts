@@ -73,7 +73,7 @@ function resolveOperationPaths(operations: FTPOperation[], basePath?: string): F
     p.startsWith(basePath + "/") || p === basePath ? p : `${basePath}/${p.replace(/^\//, "")}`;
   return operations.map((op) => ({
     ...op,
-    path: op.path ? resolve(op.path) : basePath,
+    path: op.path ? resolve(op.path) : op.operation === "list" ? basePath : op.path,
     ...(op.newPath ? { newPath: resolve(op.newPath) } : {}),
   }));
 }

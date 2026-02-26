@@ -368,7 +368,7 @@ export class S3FileService implements FileService {
       commandParams.ContentType = options.contentType;
     }
 
-    if (options?.contentLength) {
+    if (options?.contentLength !== undefined) {
       commandParams.ContentLength = options.contentLength;
     }
 

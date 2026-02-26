@@ -174,6 +174,7 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
     const raw = request.raw as any;
     raw.body = request.body;
     raw.authInfo = { ...request.authInfo, token: extractTokenFromFastifyRequest(request) };
+    reply.hijack();
     await mcpHandler(raw, reply.raw);
   };
   fastify.post("/mcp", mcpRouteHandler);

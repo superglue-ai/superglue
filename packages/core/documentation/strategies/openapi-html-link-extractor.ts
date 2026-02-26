@@ -60,7 +60,7 @@ export class HtmlLinkExtractorStrategy implements OpenApiFetchingStrategy {
 
     // Convert relative URL to absolute if needed
     let absoluteOpenApiUrl = openApiUrl;
-    if (openApiUrl.startsWith("/")) {
+    if (!openApiUrl.startsWith("http")) {
       try {
         const baseUrl = new URL(sourceUrl).origin;
         absoluteOpenApiUrl = new URL(openApiUrl, baseUrl).href;
