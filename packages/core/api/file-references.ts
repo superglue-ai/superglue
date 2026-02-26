@@ -362,10 +362,7 @@ async function processFileByKey(
       error: "Missing organization context",
     });
   }
-  if (
-    authReq.authInfo.orgId !== orgIdFromKey &&
-    authReq.authInfo.orgId !== eventBridgeOrgId
-  ) {
+  if (authReq.authInfo.orgId !== orgIdFromKey && authReq.authInfo.orgId !== eventBridgeOrgId) {
     logMessage(
       "warn",
       `processFileByKey: Org mismatch - auth=${authReq.authInfo.orgId} key=${orgIdFromKey} eventBridgeOrgId=${eventBridgeOrgId}`,
