@@ -356,6 +356,13 @@ const runTool: RouteHandler = async (request, reply) => {
       onToolChain: createToolChainCallback(authReq, metadata),
     });
 
+    (authReq as any)._telemetry = {
+      toolId: params.toolId,
+      stepCount: tool.steps?.length,
+      requestSource,
+      isAsync: true,
+    };
+
     return sendResponse(
       202,
       buildRunResponse({
@@ -383,6 +390,14 @@ const runTool: RouteHandler = async (request, reply) => {
   });
 
   const status = result.success ? RunStatus.SUCCESS : RunStatus.FAILED;
+
+  (authReq as any)._telemetry = {
+    toolId: params.toolId,
+    toolSuccess: result.success,
+    stepCount: tool.steps?.length,
+    requestSource,
+    isAsync: false,
+  };
 
   return sendResponse(
     200,
@@ -463,6 +478,12 @@ const runToolConfig: RouteHandler = async (request, reply) => {
     createRun: false,
     runId: internalRunId,
   });
+
+  (authReq as any)._telemetry = {
+    toolSuccess: result.success,
+    stepCount: tool.steps?.length,
+    requestSource: RequestSource.API,
+  };
 
   // Return the client-facing runId (without orgId prefix)
   return addTraceHeader(reply, traceId)

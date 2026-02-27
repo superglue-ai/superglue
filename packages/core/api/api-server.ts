@@ -4,6 +4,7 @@ import { registerAllRoutes } from "../api/index.js";
 import { extractTokenFromFastifyRequest, validateToken } from "../auth/auth.js";
 import { mcpHandler } from "../mcp/mcp-server.js";
 import { logMessage } from "../utils/logs.js";
+import { registerTelemetryHook } from "../utils/telemetry-hook.js";
 import { generateTraceId } from "../utils/trace-id.js";
 import type { WorkerPools } from "../worker/types.js";
 import { getRoutePermission } from "./registry.js";
@@ -160,6 +161,9 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
     const metadata = authenticatedRequest.toMetadata();
     logMessage("debug", `(REST API) ${request.method} ${request.url}`, metadata);
   });
+
+  // Telemetry: track all API requests via PostHog
+  registerTelemetryHook(fastify);
 
   // Register all API routes from modules
   await registerAllRoutes(fastify);
