@@ -1,51 +1,43 @@
 # Docker Build Process
 
-This project supports two Docker deployment approaches:
-
-1. Monolithic - Single container with both web and server
-2. Microservices - Separate containers for web and server
-
 ## Quick Start
 
-## Option 1: Monolithic Deployment
+### Option 1: All-in-One (Web + API)
 
-Single container running both web and server services:
+Single container running both the web dashboard and API server:
 
 ```bash
-# Build the image
+# Using docker compose (starts just superglue, bring your own postgres)
+docker compose up
+
+# With bundled postgres + minio
+docker compose --profile infra up
+
+# Or build and run manually
 docker build -t superglue:latest -f docker/Dockerfile .
-
-# Quick testing (data lost on restart)
-docker run -p 3000:3000 -p 3001:3001 -p 3002:3002 --env-file .env superglue:latest
-
-# Production/Development with data persistence
-docker run -p 3000:3000 -p 3001:3001 -p 3002:3002 -v superglue_data:/data --env-file .env superglue:latest
+docker run -p 3001:3001 -p 3002:3002 --env-file .env superglue:latest
 ```
 
-## Option 2: Microservices Deployment
+### Option 2: Server Only (API without Web UI)
 
-Separate containers for better scalability and resource management:
+Lighter container running only the API server:
 
 ```bash
-# Build and run both services
-docker-compose up
-
-# Build and run in background
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+docker build -t superglue-server:latest -f docker/Dockerfile.server .
+docker run -p 3002:3002 --env-file .env superglue-server:latest
 ```
 
-## CI/CD Integration
+## Ports
 
-1. **Nightly Base Image Workflow** (`.github/workflows/nightly-base-image.yml`):
-   - Builds a multi-architecture base image daily (2am UTC)
-   - Pushes to DockerHub as `superglueai/superglue-base:latest`
+| Port | Service |
+|------|---------|
+| 3001 | Web dashboard (Next.js) |
+| 3002 | REST API |
 
-2. **Application Image Workflow** (`.github/workflows/docker-publish.yml`):
-   - Triggered on pushes to main, updates dependencies from base image
-   - Pushes to DockerHub as `superglueai/superglue:latest`
+## Docker Compose Profiles
+
+| Command | What starts |
+|---------|------------|
+| `docker compose up` | superglue only |
+| `docker compose --profile infra up` | superglue + postgres + minio |
+| `docker compose --profile all up` | same as infra |
