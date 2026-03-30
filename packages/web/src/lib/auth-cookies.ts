@@ -10,8 +10,12 @@ const API_URL_COOKIE = "superglue_api_url";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
 export function setAuthCookies(credentials: AuthCredentials): void {
-  document.cookie = `${API_KEY_COOKIE}=${encodeURIComponent(credentials.apiKey)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Strict`;
-  document.cookie = `${API_URL_COOKIE}=${encodeURIComponent(credentials.apiUrl)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Strict`;
+  // Add Secure flag on HTTPS to prevent transmission over plain HTTP
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
+  const secureFlag = isSecure ? "; Secure" : "";
+
+  document.cookie = `${API_KEY_COOKIE}=${encodeURIComponent(credentials.apiKey)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Strict${secureFlag}`;
+  document.cookie = `${API_URL_COOKIE}=${encodeURIComponent(credentials.apiUrl)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Strict${secureFlag}`;
 }
 
 export function getAuthCookies(): AuthCredentials | null {

@@ -18,10 +18,10 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 }> {
   try {
     // Use sendmail - just like PHP times!
+    // nodemailer will automatically find sendmail in standard paths
     const transporter = nodemailer.createTransport({
       sendmail: true,
       newline: "unix",
-      path: "/usr/sbin/sendmail",
     });
 
     await transporter.sendMail({

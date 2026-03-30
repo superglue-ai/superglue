@@ -16,10 +16,15 @@ export async function authenticateNextJSApiRequest(
   const cookieApiUrl = request.cookies.get("superglue_api_url")?.value;
   if (cookieApiUrl) {
     // Cookie-based auth: use URL and token from user's cookies
-    return {
-      token,
-      backendUrl: decodeURIComponent(cookieApiUrl),
-    };
+    try {
+      return {
+        token,
+        backendUrl: decodeURIComponent(cookieApiUrl),
+      };
+    } catch (error) {
+      // Malformed cookie value - treat as unauthenticated
+      return null;
+    }
   }
 
   // Server-managed auth: validate token against AUTH_TOKEN (server-side only, never exposed to browser)
