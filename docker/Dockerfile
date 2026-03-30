@@ -34,6 +34,7 @@ COPY packages/core/package*.json ./packages/core/
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
 
+# Install system dependencies first
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -41,8 +42,10 @@ RUN apt-get update && \
         sendmail \
         fontconfig fontconfig-config libfontconfig1 \
         libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 libpixman-1-0 && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
+# Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
     ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
@@ -51,7 +54,9 @@ RUN npm ci --omit=dev && \
         npm install --save-optional @napi-rs/canvas-linux-arm64-gnu; \
     fi && \
     npm install -g next turbo cross-env && \
-    npx playwright install --with-deps chromium
+    npx playwright install --with-deps chromium && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
 COPY --from=builder /usr/src/app/packages/web/.next ./packages/web/.next
