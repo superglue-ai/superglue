@@ -46,14 +46,14 @@ export default function RootLayout({
     process.env.API_ENDPOINT || "http://localhost:" + (process.env.API_PORT || 3002);
 
   const config = {
-    superglueApiKey: process.env.NEXT_PUBLIC_SUPERGLUE_API_KEY || process.env.AUTH_TOKEN,
+    // Never expose any env-based API keys to the browser
+    // Users must authenticate via the popup
+    superglueApiKey: null,
     apiEndpoint,
     postHogKey: nextConfig.env?.NEXT_PUBLIC_POSTHOG_KEY,
     postHogHost: nextConfig.env?.NEXT_PUBLIC_POSTHOG_HOST,
   };
-  if (!config.superglueApiKey) {
-    throw new Error("AUTH_TOKEN is not set and no other authentication provider is configured.");
-  }
+  // Users will authenticate via popup modal (cookie-based auth)
 
   return (
     <html

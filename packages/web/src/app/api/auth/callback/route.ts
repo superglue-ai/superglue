@@ -358,7 +358,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const endpoint = process.env.API_ENDPOINT || "http://localhost:3002";
+    // Determine backend endpoint from cookie or env
+    const cookieApiUrl = request.cookies.get("superglue_api_url")?.value;
+    const endpoint = cookieApiUrl
+      ? decodeURIComponent(cookieApiUrl)
+      : process.env.API_ENDPOINT || "http://localhost:3002";
 
     // Get OAuth session from cookie (set during OAuth init)
     const oauthSessionCookie = request.cookies.get("oauth_session")?.value;
@@ -398,9 +402,9 @@ export async function GET(request: NextRequest) {
       };
     } else if (portalToken) {
       // Portal flow - fetch credentials from backend using portal token
-      const apiEndpoint = process.env.API_ENDPOINT || "http://localhost:3002";
+      // Use same endpoint as determined above
       const oauthConfigResponse = await fetch(
-        `${apiEndpoint}/v1/portal/systems/${systemId}/oauth-config`,
+        `${endpoint}/v1/portal/systems/${systemId}/oauth-config`,
         {
           headers: {
             Authorization: `Bearer ${portalToken}`,
@@ -429,7 +433,7 @@ export async function GET(request: NextRequest) {
       const client = new SuperglueClient({
         endpoint,
         apiKey: apiKey,
-        apiEndpoint: process.env.API_ENDPOINT,
+        apiEndpoint: endpoint,
       });
       resolved = await client.getOAuthClientCredentials({
         templateId,

@@ -38,6 +38,7 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         curl \
+        sendmail \
         fontconfig fontconfig-config libfontconfig1 \
         libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 libpixman-1-0 && \
     rm -rf /var/lib/apt/lists/*

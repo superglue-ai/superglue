@@ -3,7 +3,7 @@ import { createContext, useContext, ReactNode, useEffect, useRef } from "react";
 import { tokenRegistry } from "../lib/token-registry";
 
 interface Config {
-  superglueApiKey: string;
+  superglueApiKey: string | null;
   apiEndpoint: string;
   postHogKey: string;
   postHogHost: string;
@@ -15,7 +15,7 @@ const ConfigContext = createContext<ConfigWithoutApiKey | null>(null);
 
 export function ConfigProvider({ children, config }: { children: ReactNode; config: Config }) {
   const isInitialTokenSetRef = useRef<boolean>(false);
-  if (!isInitialTokenSetRef.current) {
+  if (!isInitialTokenSetRef.current && config.superglueApiKey) {
     tokenRegistry.setToken(config.superglueApiKey);
     isInitialTokenSetRef.current = true;
   }
