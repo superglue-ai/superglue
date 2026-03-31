@@ -57,7 +57,12 @@ RUN apt-get update && \
 
 # Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
-    npm install --save-optional @napi-rs/canvas-linux-x64-gnu && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        npm install --save-optional @napi-rs/canvas-linux-x64-gnu; \
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        npm install --save-optional @napi-rs/canvas-linux-arm64-gnu; \
+    fi && \
     npx playwright install --with-deps chromium
 
 # Install @superglue/client in both core and shared packages for runtime
