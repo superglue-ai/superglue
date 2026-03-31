@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
   let client: AgentClient | null = null;
 
   try {
-    const token = await authenticateNextJSApiRequest(request);
-    if (!token) {
+    const authContext = await authenticateNextJSApiRequest(request);
+    if (!authContext) {
       return NextResponse.json(
         { error: "Unauthorized: Invalid or missing API key" },
         { status: 401 },
@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     client = new AgentClient({
-      token,
-      apiEndpoint: process.env.API_ENDPOINT || "http://localhost:3002",
+      token: authContext.token,
+      apiEndpoint: authContext.backendUrl,
       abortSignal: request.signal,
     });
 

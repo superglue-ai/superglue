@@ -1,5 +1,5 @@
-import { Resend } from "resend";
 import { logMessage } from "./logs.js";
+import nodemailer from "nodemailer";
 
 interface SendEmailParams {
   to: string;
@@ -9,27 +9,23 @@ interface SendEmailParams {
 }
 
 /**
- * Send an email using Resend
- * Requires RESEND_API_KEY env var
+ * Send an email using sendmail (like PHP mail() function)
+ * Just works - no configuration needed!
  */
 export async function sendEmail(params: SendEmailParams): Promise<{
   success: boolean;
   error?: string;
 }> {
   try {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      return {
-        success: false,
-        error: "RESEND_API_KEY not configured",
-      };
-    }
+    // Use sendmail - just like PHP times!
+    // nodemailer will automatically find sendmail in standard paths
+    const transporter = nodemailer.createTransport({
+      sendmail: true,
+      newline: "unix",
+    });
 
-    const resend = new Resend(apiKey);
-    const fromEmail = params.from || process.env.RESEND_FROM_EMAIL || "noreply@superglue.cloud";
-
-    await resend.emails.send({
-      from: fromEmail,
+    await transporter.sendMail({
+      from: params.from || "noreply@superglue.cloud",
       to: params.to,
       subject: params.subject,
       html: params.html,
@@ -37,11 +33,30 @@ export async function sendEmail(params: SendEmailParams): Promise<{
 
     return { success: true };
   } catch (error) {
+    logMessage("error", `Failed to send email: ${error}`, {});
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+/**
+ * Notify stefan@superglue.ai when a new self-hosted user signs up
+ */
+export async function sendSelfHostedSignupNotification(
+  email: string,
+): Promise<{ success: boolean; error?: string }> {
+  return sendEmail({
+    to: "stefan@superglue.ai",
+    subject: "New Self-Hosted Superglue Signup",
+    html: `
+      <h2>New Self-Hosted User Signup</h2>
+      <p>A new user has signed up on a self-hosted Superglue instance and wants to receive security updates:</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Time:</strong> ${new Date().toISOString()}</p>
+    `,
+  });
 }
 
 /**
