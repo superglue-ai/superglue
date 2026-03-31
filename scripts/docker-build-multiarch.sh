@@ -8,13 +8,13 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-PLATFORMS="linux/amd64,linux/arm64"
+PLATFORMS="linux/amd64"
 COMMIT_SHA=$(git rev-parse HEAD)
 SHORT_SHA=$(git rev-parse --short HEAD)
 
-echo -e "${GREEN}=== Superglue Multi-Architecture Docker Build ===${NC}"
+echo -e "${GREEN}=== Superglue Docker Build ===${NC}"
 echo "Commit: $SHORT_SHA"
-echo "Platforms: $PLATFORMS"
+echo "Platform: $PLATFORMS"
 echo ""
 
 # Check if logged in to Docker Hub
@@ -106,4 +106,4 @@ case $choice in
         ;;
 esac
 echo ""
-echo "Platforms: linux/amd64, linux/arm64"
+echo "Platform: linux/amd64"

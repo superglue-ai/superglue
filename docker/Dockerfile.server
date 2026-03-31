@@ -3,22 +3,34 @@ FROM node:22-slim AS builder
 
 WORKDIR /usr/src/app
 
+# Copy package files first to leverage layer caching
 COPY package*.json ./
 COPY turbo.json ./
 
+# Copy all package.json files
 COPY packages/core/package*.json ./packages/core/
 COPY packages/shared/package*.json ./packages/shared/
 
+# Copy tsconfig files
 COPY tsconfig.json ./
 COPY packages/core/tsconfig.json ./packages/core/
 COPY packages/shared/tsconfig.json ./packages/shared/
 
+# Install dependencies and build tools
 RUN npm install && \
     npm install -g typescript turbo
 
+# Copy source code
 COPY packages/core ./packages/core
 COPY packages/shared ./packages/shared
 
+# Install workspace dependencies specifically
+RUN npm install
+
+# Install @superglue/client specifically in shared package for TypeScript resolution
+RUN cd packages/shared && npm install @superglue/client
+
+# Build core and shared packages
 RUN npx turbo run build --filter=@superglue/core --filter=@superglue/shared
 
 
@@ -27,8 +39,11 @@ FROM node:22-slim
 
 WORKDIR /usr/src/app
 
+# Copy package files
 COPY package*.json ./
 COPY turbo.json ./
+
+# Copy relevant package.json files
 COPY packages/core/package*.json ./packages/core/
 COPY packages/shared/package*.json ./packages/shared/
 
@@ -36,12 +51,9 @@ COPY packages/shared/package*.json ./packages/shared/
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        curl \
         sendmail \
         fontconfig fontconfig-config libfontconfig1 \
-        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 libpixman-1-0 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 libpixman-1-0
 
 # Install production dependencies and Playwright
 RUN npm ci --omit=dev && \
@@ -51,14 +63,18 @@ RUN npm ci --omit=dev && \
     elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
         npm install --save-optional @napi-rs/canvas-linux-arm64-gnu; \
     fi && \
-    npm install -g turbo cross-env && \
-    npx playwright install --with-deps chromium && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+    npx playwright install --with-deps chromium
 
+# Install @superglue/client in both core and shared packages for runtime
+RUN cd packages/core && npm install @superglue/client
+RUN cd packages/shared && npm install @superglue/client
+
+# Copy built files from builder stage
 COPY --from=builder /usr/src/app/packages/core/dist ./packages/core/dist
 COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
 
-EXPOSE 3002
+# Expose ports for both servers
+EXPOSE 3000 3002
 
+# Start the server
 CMD ["npx", "turbo", "run", "start", "--filter=@superglue/core"]

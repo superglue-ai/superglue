@@ -33,7 +33,8 @@ COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
 
 # Install minimal system dependencies (no sendmail, no playwright deps)
-RUN apt-get update && \
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    (apt-get update -o Acquire::Check-Valid-Until=false || apt-get update || true) && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y curl && \
     apt-get clean && \
