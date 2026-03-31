@@ -1,5 +1,4 @@
-import { Tool } from "@superglue/shared";
-import { normalizeTool } from "@superglue/core/datastore/migrations/migration";
+import { Tool, normalizeTool } from "@superglue/shared";
 import toolTemplates from "./tool-templates.json";
 
 export interface ToolTemplate extends Tool {
