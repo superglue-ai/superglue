@@ -46,6 +46,11 @@ registerApiModule({
       method: "POST",
       path: "/extract",
       handler: extractHandler,
+      permissions: {
+        type: "execute",
+        resource: "extract",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
   ],
 });

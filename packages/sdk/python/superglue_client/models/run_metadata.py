@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -17,22 +15,22 @@ T = TypeVar("T", bound="RunMetadata")
 class RunMetadata:
     """
     Attributes:
-        started_at (datetime.datetime | Unset):
-        completed_at (datetime.datetime | Unset): Only present when run has finished (success, failed, or aborted)
-        duration_ms (int | Unset):  Example: 5234.
+        started_at (Union[Unset, datetime.datetime]):
+        completed_at (Union[Unset, datetime.datetime]): Only present when run has finished (success, failed, or aborted)
+        duration_ms (Union[Unset, int]):  Example: 5234.
     """
 
-    started_at: datetime.datetime | Unset = UNSET
-    completed_at: datetime.datetime | Unset = UNSET
-    duration_ms: int | Unset = UNSET
+    started_at: Union[Unset, datetime.datetime] = UNSET
+    completed_at: Union[Unset, datetime.datetime] = UNSET
+    duration_ms: Union[Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        started_at: str | Unset = UNSET
+        started_at: Union[Unset, str] = UNSET
         if not isinstance(self.started_at, Unset):
             started_at = self.started_at.isoformat()
 
-        completed_at: str | Unset = UNSET
+        completed_at: Union[Unset, str] = UNSET
         if not isinstance(self.completed_at, Unset):
             completed_at = self.completed_at.isoformat()
 
@@ -54,14 +52,14 @@ class RunMetadata:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
         _started_at = d.pop("startedAt", UNSET)
-        started_at: datetime.datetime | Unset
+        started_at: Union[Unset, datetime.datetime]
         if isinstance(_started_at, Unset):
             started_at = UNSET
         else:
             started_at = isoparse(_started_at)
 
         _completed_at = d.pop("completedAt", UNSET)
-        completed_at: datetime.datetime | Unset
+        completed_at: Union[Unset, datetime.datetime]
         if isinstance(_completed_at, Unset):
             completed_at = UNSET
         else:

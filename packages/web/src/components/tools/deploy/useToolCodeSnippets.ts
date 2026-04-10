@@ -3,12 +3,9 @@ import { useMemo } from "react";
 import { safeStringify } from "@superglue/shared";
 
 export interface ToolCodeSnippets {
-  webhookUrl: string;
-  webhookCurl: string;
   typescriptCode: string;
   pythonCode: string;
   curlCommand: string;
-  outgoingWebhookExample: string;
   mcpConfig: string;
 }
 
@@ -19,12 +16,6 @@ export function useToolCodeSnippets(
   const config = useConfig();
 
   return useMemo(() => {
-    const webhookUrl = `${config.apiEndpoint}/v1/hooks/${toolId}?token=YOUR_API_KEY`;
-
-    const webhookCurl = `curl -X POST "${config.apiEndpoint}/v1/hooks/${toolId}?token=YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '${safeStringify(payload, 2)}'`;
-
     const typescriptCode = `import { configure, runTool } from '@superglue/client';
 
 configure({
@@ -65,20 +56,6 @@ with client as client:
   -H "Authorization: Bearer <YOUR_SUPERGLUE_API_KEY>" \\
   -d '${safeStringify({ inputs: payload })}'`;
 
-    const outgoingWebhookExample = `import { configure, runTool } from '@superglue/client';
-
-configure({
-  apiKey: "<YOUR_SUPERGLUE_API_KEY>",
-  baseUrl: "${config.apiEndpoint}/v1"
-});
-
-await runTool("${toolId}", {
-  inputs: ${safeStringify(payload, 2)},
-  options: {
-    webhookUrl: "https://your-app.com/webhook"
-  }
-});`;
-
     const mcpConfig = `{
   "mcpServers": {
     "superglue": {
@@ -97,12 +74,9 @@ await runTool("${toolId}", {
 }`;
 
     return {
-      webhookUrl,
-      webhookCurl,
       typescriptCode,
       pythonCode,
       curlCommand,
-      outgoingWebhookExample,
       mcpConfig,
     };
   }, [config.apiEndpoint, config.apiEndpoint, toolId, payload]);

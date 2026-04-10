@@ -1,13 +1,21 @@
 "use client";
 
 import { systems, SystemConfig } from "@superglue/shared";
-import { cn, getSimpleIcon, searchSimpleIcons, SimpleIconEntry } from "@/src/lib/general-utils";
+import {
+  cn,
+  getSimpleIcon,
+  searchSimpleIcons,
+  SimpleIconEntry,
+  formatLabel,
+} from "@/src/lib/general-utils";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { Input } from "@/src/components/ui/input";
 import { Button } from "@/src/components/ui/button";
-import { Search, Blocks, Plus } from "lucide-react";
+import { Search, Blocks, Plus, CloudOff } from "lucide-react";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useAgentModal } from "@/src/components/agent/AgentModalContext";
+import { Dialog, DialogContent, DialogTitle } from "@/src/components/ui/dialog";
+import { OnPremWizard } from "./onprem";
 
 interface TemplateOption {
   key: string;
@@ -18,13 +26,6 @@ interface TemplateOption {
 }
 
 const HUES = [0, 15, 30, 45, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
-
-function formatLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
-}
 
 function hashStringToHue(str: string): number {
   let hash = 0;
@@ -169,6 +170,51 @@ function NewSystemCard({ onClick, className }: { onClick: () => void; className?
           </h3>
           <p className="text-[10px] text-muted-foreground/70 group-hover:text-muted-foreground/80 transition-colors">
             Connect any API or data source
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function OnPremSystemCard({ onClick, className }: { onClick: () => void; className?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative w-full text-left p-4 rounded-2xl transition-all duration-300",
+        "bg-gradient-to-br from-muted/30 to-muted/20 dark:from-muted/20 dark:to-muted/10",
+        "backdrop-blur-sm border-2 border-dashed border-border/40",
+        "shadow-sm",
+        "hover:shadow-md hover:border-border/60",
+        "hover:scale-[1.02] active:scale-[0.98]",
+        "overflow-hidden",
+        "min-h-[100px]",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300",
+          "bg-gradient-to-br from-muted/20 via-transparent to-transparent",
+        )}
+      />
+      <div className="relative flex items-center gap-4">
+        <div
+          className={cn(
+            "relative w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+            "bg-muted/50 dark:bg-muted/30",
+            "transition-transform duration-300 group-hover:scale-105",
+          )}
+        >
+          <CloudOff className="w-5 h-5 text-muted-foreground" />
+        </div>
+        <div className="space-y-0.5 min-w-0">
+          <h3 className="font-medium text-sm text-foreground/90 group-hover:text-foreground transition-colors">
+            Private System
+          </h3>
+          <p className="text-[10px] text-muted-foreground/70 group-hover:text-muted-foreground/80 transition-colors">
+            Connect via secure gateway
           </p>
         </div>
       </div>
@@ -354,6 +400,7 @@ export function SystemTemplatePicker({
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [newSystemFormExpanded, setNewSystemFormExpanded] = useState(false);
+  const [onPremWizardOpen, setOnPremWizardOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -388,33 +435,34 @@ export function SystemTemplatePicker({
     );
   }, [debouncedSearch, allOptions]);
 
-  const buildHiddenContext = useCallback((config: SystemConfig) => {
-    const context = {
-      templateInfo: {
-        apiUrl: config.apiUrl,
-        docsUrl: config.docsUrl,
-        openApiUrl: config.openApiUrl,
-        preferredAuthType: config.preferredAuthType,
-        hasOAuth: !!config.oauth,
-        systemSpecificInstructions: config.systemSpecificInstructions,
-      },
-    };
-    return JSON.stringify(context);
+  const buildStarterMessage = useCallback((config: SystemConfig) => {
+    const lines = ["The user selected a system template."];
+    if (config.apiUrl) lines.push(`Suggested API URL: ${config.apiUrl}`);
+    if (config.docsUrl) lines.push(`Documentation URL: ${config.docsUrl}`);
+    if (config.openApiUrl) lines.push(`OpenAPI URL: ${config.openApiUrl}`);
+    if (config.preferredAuthType) {
+      lines.push(`Suggested auth type: ${config.preferredAuthType}`);
+    }
+    lines.push(`OAuth available: ${config.oauth ? "yes" : "no"}`);
+    if (config.systemSpecificInstructions) {
+      lines.push(`Template-specific instructions: ${config.systemSpecificInstructions}`);
+    }
+    return lines.join("\n");
   }, []);
 
   const handleTemplateSelect = useCallback(
     (option: TemplateOption) => {
       const prompt = `I want to set up ${option.label}`;
-      const hiddenContext = option.config ? buildHiddenContext(option.config) : "";
+      const hiddenStarterMessage = option.config ? buildStarterMessage(option.config) : "";
 
       openAgentModal({
         userPrompt: prompt,
-        systemPrompt: hiddenContext,
+        hiddenStarterMessage,
         chatTitle: option.label,
         chatIcon: option.icon,
       });
     },
-    [openAgentModal, buildHiddenContext],
+    [openAgentModal, buildStarterMessage],
   );
 
   const handleNewSystemSubmit = useCallback(
@@ -422,17 +470,13 @@ export function SystemTemplatePicker({
       const prompt = `I want to set up a system called "${name}"`;
       const resolvedIcon = tryResolveIconFromName(name);
 
-      const hiddenContext = JSON.stringify({
-        customSystemInfo: {
-          name,
-          endpoint: null,
-          authType: "apikey",
-        },
-      });
+      const hiddenStarterMessage = `The user wants to set up a custom system.
+Name: ${name}
+Suggested auth type: apikey`;
 
       openAgentModal({
         userPrompt: prompt,
-        systemPrompt: hiddenContext,
+        hiddenStarterMessage,
         chatTitle: name,
         chatIcon: resolvedIcon || undefined,
       });
@@ -444,18 +488,14 @@ export function SystemTemplatePicker({
     (icon: SimpleIconEntry) => {
       const prompt = `I want to set up ${icon.title}`;
 
-      const hiddenContext = JSON.stringify({
-        customSystemInfo: {
-          name: icon.title,
-          icon: icon.slug,
-          endpoint: null,
-          authType: "apikey",
-        },
-      });
+      const hiddenStarterMessage = `The user wants to set up a custom system.
+Name: ${icon.title}
+Suggested icon: ${icon.slug}
+Suggested auth type: apikey`;
 
       openAgentModal({
         userPrompt: prompt,
-        systemPrompt: hiddenContext,
+        hiddenStarterMessage,
         chatTitle: icon.title,
         chatIcon: icon.slug,
       });
@@ -528,6 +568,8 @@ export function SystemTemplatePicker({
             <NewSystemCard onClick={() => setNewSystemFormExpanded(true)} />
           )}
 
+          <OnPremSystemCard onClick={() => setOnPremWizardOpen(true)} />
+
           {filteredOptions.map((option) => (
             <TemplateCard
               key={option.key}
@@ -562,6 +604,14 @@ export function SystemTemplatePicker({
           </div>
         )}
       </div>
+
+      {/* Private System Wizard Dialog */}
+      <Dialog open={onPremWizardOpen} onOpenChange={setOnPremWizardOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col overflow-y-auto">
+          <DialogTitle className="sr-only">Connect to Private System</DialogTitle>
+          <OnPremWizard onClose={() => setOnPremWizardOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

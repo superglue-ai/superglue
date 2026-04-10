@@ -11,6 +11,8 @@ interface UseAgentStreamingOptions {
   updateToolCompletion: (toolCallId: string, data: any) => void;
 }
 
+export type StreamState = "idle" | "streaming" | "paused";
+
 export function useAgentStreaming({
   config,
   setMessages,
@@ -20,6 +22,7 @@ export function useAgentStreaming({
   const streamDripBufferRef = useRef("");
   const streamDripTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentStreamControllerRef = useRef<AbortController | null>(null);
+  const streamStateRef = useRef<StreamState>("idle");
 
   const startDrip = useCallback(
     (assistantMessageId: string) => {
@@ -91,6 +94,18 @@ export function useAgentStreaming({
       streamDripBufferRef.current = "";
       stopDrip();
 
+      if (currentAssistantMessage?.parts?.length) {
+        const last = currentAssistantMessage.parts[currentAssistantMessage.parts.length - 1];
+        if (last.type === "content" && last.content?.trim()) {
+          const id = currentAssistantMessage.id;
+          const partId = `content-${currentAssistantMessage.parts.length}`;
+          const emptyPart = { type: "content" as const, content: "", id: partId };
+          setMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, parts: [...(m.parts || []), emptyPart] } : m)),
+          );
+        }
+      }
+
       let assistantMessage = currentAssistantMessage;
 
       const ensureMessage = (): Message => {
@@ -114,21 +129,31 @@ export function useAgentStreaming({
               const rawData = lineBuffer.slice(6);
               try {
                 const data = JSON.parse(rawData);
-                const msg = ensureMessage();
-                if (data.type === "tool_call_complete") {
-                  updateToolCompletion(data.toolCall.id, data);
+                if (data.type === "system_message") {
+                  const sysMsg: Message = {
+                    id: data.systemMessage.id,
+                    role: "system",
+                    content: data.systemMessage.content,
+                    timestamp: new Date(),
+                  };
+                  setMessages((prev) => [sysMsg, ...prev]);
+                } else {
+                  const msg = ensureMessage();
+                  if (data.type === "tool_call_complete") {
+                    updateToolCompletion(data.toolCall.id, data);
 
-                  let parsedOutput: any = null;
-                  try {
-                    parsedOutput =
-                      typeof data.toolCall.output === "string"
-                        ? JSON.parse(data.toolCall.output)
-                        : data.toolCall.output;
-                  } catch {}
+                    let parsedOutput: any = null;
+                    try {
+                      parsedOutput =
+                        typeof data.toolCall.output === "string"
+                          ? JSON.parse(data.toolCall.output)
+                          : data.toolCall.output;
+                    } catch {}
 
-                  config.onToolComplete?.(data.toolCall.name, data.toolCall.id, parsedOutput);
-                } else if (data.type !== "content") {
-                  setMessages((prev) => prev.map((m) => updateMessageWithData(m, data, msg)));
+                    config.onToolComplete?.(data.toolCall.name, data.toolCall.id, parsedOutput);
+                  } else if (data.type !== "content") {
+                    setMessages((prev) => prev.map((m) => updateMessageWithData(m, data, msg)));
+                  }
                 }
               } catch (parseError) {
                 console.error(
@@ -219,6 +244,7 @@ export function useAgentStreaming({
 
                   config.onToolComplete?.(data.toolCall.name, data.toolCall.id, parsedOutput);
                 } else if (data.type === "paused") {
+                  streamStateRef.current = "paused";
                   setMessages((prev) =>
                     prev.map((m) => (m.id === msg.id ? { ...m, isStreaming: false } : m)),
                   );
@@ -288,6 +314,7 @@ export function useAgentStreaming({
   return {
     processStreamData,
     currentStreamControllerRef,
+    streamStateRef,
     abortStream,
     startDrip,
     stopDrip,

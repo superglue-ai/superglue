@@ -8,7 +8,7 @@
 import { ServiceMetadata } from "@superglue/shared";
 import { server_defaults } from "../default.js";
 import { LanguageModel } from "../llm/llm-base-model.js";
-import { sanitizeUnpairedSurrogates } from "../utils/helpers.js";
+import { sanitizeUnpairedSurrogates } from "../utils/string.js";
 import { logMessage } from "../utils/logs.js";
 
 export class DocumentationSearch {

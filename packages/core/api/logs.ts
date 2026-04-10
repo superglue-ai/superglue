@@ -56,6 +56,11 @@ registerApiModule({
       method: "GET",
       path: "/logs/stream",
       handler: logsStreamHandler,
+      permissions: {
+        type: "read",
+        resource: "run",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
   ],
 });

@@ -1,14 +1,7 @@
-import { useConfig } from "@/src/app/config-context";
-import { UserAction } from "@/src/lib/agent/agent-types";
 import { resolveFileReferences, validateFileReferences } from "@/src/lib/agent/agent-helpers";
-import {
-  abortExecution,
-  createSuperglueClient,
-  generateUUID,
-  shouldDebounceAbort,
-} from "@/src/lib/client-utils";
-import { tokenRegistry } from "@/src/lib/token-registry";
-import { SuperglueClient, Tool, ToolCall } from "@superglue/shared";
+import { abortExecution, generateUUID, shouldDebounceAbort } from "@/src/lib/client-utils";
+import { useSuperglueClient } from "@/src/queries/use-client";
+import { Tool, ToolCall } from "@superglue/shared";
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 
 export interface RunResult {
@@ -19,10 +12,7 @@ export interface RunResult {
 
 export interface ExecuteToolOptions {
   toolConfig: Tool;
-  appliedChangesCount?: number;
   overridePayload?: Record<string, any>;
-  toolNameForFeedback: string;
-  toolIdForFeedback?: string;
   onFailure?: (result: RunResult) => void;
   onSuccess?: (result: RunResult) => void;
 }
@@ -31,7 +21,6 @@ interface UseToolExecutionOptions {
   tool: ToolCall;
   editablePayload: string;
   filePayloads?: Record<string, any>;
-  bufferAction?: (action: UserAction) => void;
 }
 
 interface UseToolExecutionReturn {
@@ -47,9 +36,8 @@ export function useToolExecution({
   tool,
   editablePayload,
   filePayloads,
-  bufferAction,
 }: UseToolExecutionOptions): UseToolExecutionReturn {
-  const config = useConfig();
+  const createClient = useSuperglueClient();
 
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
@@ -75,7 +63,7 @@ export function useToolExecution({
     if (!currentRunIdRef.current) return;
 
     lastAbortTimeRef.current = Date.now();
-    const client = createSuperglueClient(config.apiEndpoint);
+    const client = createClient();
     const success = await abortExecution(client, currentRunIdRef.current);
 
     if (success) {
@@ -87,19 +75,11 @@ export function useToolExecution({
         logSubscriptionRef.current = null;
       }
     }
-  }, [config.apiEndpoint, config.apiEndpoint]);
+  }, [createClient]);
 
   const executeToolConfig = useCallback(
     async (options: ExecuteToolOptions) => {
-      const {
-        toolConfig,
-        appliedChangesCount = 0,
-        overridePayload,
-        toolNameForFeedback,
-        toolIdForFeedback,
-        onFailure,
-        onSuccess,
-      } = options;
+      const { toolConfig, overridePayload, onFailure, onSuccess } = options;
 
       const runId = generateUUID();
       currentRunIdRef.current = runId;
@@ -107,11 +87,7 @@ export function useToolExecution({
       setRunResult(null);
       setManualRunLogs([]);
 
-      const client = new SuperglueClient({
-        endpoint: config.apiEndpoint,
-        apiKey: tokenRegistry.getToken(),
-        apiEndpoint: config.apiEndpoint,
-      });
+      const client = createClient();
 
       try {
         const subscription = await client.subscribeToLogsSSE({
@@ -142,18 +118,6 @@ export function useToolExecution({
         const failResult: RunResult = { success: false, error: errorMsg };
         if (onFailure) {
           onFailure(failResult);
-        } else if (bufferAction) {
-          bufferAction({
-            type: "tool_event",
-            toolCallId: tool.id,
-            toolName: tool.name,
-            event: "manual_run_failure",
-            payload: {
-              toolId: toolIdForFeedback,
-              error: errorMsg,
-              appliedChanges: appliedChangesCount,
-            },
-          });
         }
       };
 
@@ -207,20 +171,6 @@ export function useToolExecution({
         if (result.success) {
           if (onSuccess) {
             onSuccess(runResultValue);
-          } else if (bufferAction) {
-            const truncatedResult =
-              result.data !== undefined ? JSON.stringify(result.data).substring(0, 500) : undefined;
-            bufferAction({
-              type: "tool_event",
-              toolCallId: tool.id,
-              toolName: tool.name,
-              event: "manual_run_success",
-              payload: {
-                toolId: toolIdForFeedback,
-                result: truncatedResult,
-                appliedChanges: appliedChangesCount,
-              },
-            });
           }
         } else {
           const truncatedError =
@@ -249,16 +199,7 @@ export function useToolExecution({
         }
       }
     },
-    [
-      config.apiEndpoint,
-      config.apiEndpoint,
-      filePayloads,
-      tool.input?.payload,
-      tool.id,
-      tool.name,
-      editablePayload,
-      bufferAction,
-    ],
+    [createClient, filePayloads, tool.input?.payload, editablePayload],
   );
 
   return {

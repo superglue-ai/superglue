@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -11,6 +9,7 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.response_filter import ResponseFilter
     from ..models.tool_input_schema import ToolInputSchema
     from ..models.tool_output_schema import ToolOutputSchema
     from ..models.tool_step import ToolStep
@@ -25,31 +24,39 @@ class Tool:
 
     Attributes:
         id (str):  Example: 550e8400-e29b-41d4-a716-446655440000.
-        steps (list[ToolStep]): Ordered execution steps that make up this tool
-        name (str | Unset):  Example: Web Search.
-        version (str | Unset): Semantic version string (major.minor.patch) Example: 2.1.0.
-        instruction (str | Unset): Human-readable instruction describing what the tool does Example: Search the web for
-            the given query and return relevant results.
-        input_schema (ToolInputSchema | Unset): JSON Schema for tool inputs Example: {'type': 'object', 'properties':
-            {'query': {'type': 'string'}, 'maxResults': {'type': 'integer', 'default': 10}}, 'required': ['query']}.
-        output_schema (ToolOutputSchema | Unset): JSON Schema for tool outputs (after transformations applied)
-        output_transform (str | Unset): JavaScript function for final output transformation.
+        steps (list['ToolStep']): Ordered execution steps that make up this tool
+        name (Union[Unset, str]):  Example: Web Search.
+        version (Union[Unset, str]): Semantic version string (major.minor.patch) Example: 2.1.0.
+        instruction (Union[Unset, str]): Human-readable instruction describing what the tool does Example: Search the
+            web for the given query and return relevant results.
+        input_schema (Union[Unset, ToolInputSchema]): JSON Schema for tool inputs Example: {'type': 'object',
+            'properties': {'query': {'type': 'string'}, 'maxResults': {'type': 'integer', 'default': 10}}, 'required':
+            ['query']}.
+        output_schema (Union[Unset, ToolOutputSchema]): JSON Schema for tool outputs (after transformations applied)
+        output_transform (Union[Unset, str]): JavaScript function for final output transformation.
             Format: (sourceData) => expression
              Example: (sourceData) => sourceData.map(item => ({ id: item.id, title: item.name })).
-        created_at (datetime.datetime | Unset):
-        updated_at (datetime.datetime | Unset):
+        folder (Union[Unset, str]): Folder path for organizing tools Example: integrations/payments.
+        archived (Union[Unset, bool]): Whether this tool is archived (if so, it will not be listed in the UI and cannot
+            be run) Default: False.
+        response_filters (Union[Unset, list['ResponseFilter']]): Filters to apply to the response data
+        created_at (Union[Unset, datetime.datetime]):
+        updated_at (Union[Unset, datetime.datetime]):
     """
 
     id: str
-    steps: list[ToolStep]
-    name: str | Unset = UNSET
-    version: str | Unset = UNSET
-    instruction: str | Unset = UNSET
-    input_schema: ToolInputSchema | Unset = UNSET
-    output_schema: ToolOutputSchema | Unset = UNSET
-    output_transform: str | Unset = UNSET
-    created_at: datetime.datetime | Unset = UNSET
-    updated_at: datetime.datetime | Unset = UNSET
+    steps: list["ToolStep"]
+    name: Union[Unset, str] = UNSET
+    version: Union[Unset, str] = UNSET
+    instruction: Union[Unset, str] = UNSET
+    input_schema: Union[Unset, "ToolInputSchema"] = UNSET
+    output_schema: Union[Unset, "ToolOutputSchema"] = UNSET
+    output_transform: Union[Unset, str] = UNSET
+    folder: Union[Unset, str] = UNSET
+    archived: Union[Unset, bool] = False
+    response_filters: Union[Unset, list["ResponseFilter"]] = UNSET
+    created_at: Union[Unset, datetime.datetime] = UNSET
+    updated_at: Union[Unset, datetime.datetime] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,21 +73,32 @@ class Tool:
 
         instruction = self.instruction
 
-        input_schema: dict[str, Any] | Unset = UNSET
+        input_schema: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.input_schema, Unset):
             input_schema = self.input_schema.to_dict()
 
-        output_schema: dict[str, Any] | Unset = UNSET
+        output_schema: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.output_schema, Unset):
             output_schema = self.output_schema.to_dict()
 
         output_transform = self.output_transform
 
-        created_at: str | Unset = UNSET
+        folder = self.folder
+
+        archived = self.archived
+
+        response_filters: Union[Unset, list[dict[str, Any]]] = UNSET
+        if not isinstance(self.response_filters, Unset):
+            response_filters = []
+            for response_filters_item_data in self.response_filters:
+                response_filters_item = response_filters_item_data.to_dict()
+                response_filters.append(response_filters_item)
+
+        created_at: Union[Unset, str] = UNSET
         if not isinstance(self.created_at, Unset):
             created_at = self.created_at.isoformat()
 
-        updated_at: str | Unset = UNSET
+        updated_at: Union[Unset, str] = UNSET
         if not isinstance(self.updated_at, Unset):
             updated_at = self.updated_at.isoformat()
 
@@ -104,6 +122,12 @@ class Tool:
             field_dict["outputSchema"] = output_schema
         if output_transform is not UNSET:
             field_dict["outputTransform"] = output_transform
+        if folder is not UNSET:
+            field_dict["folder"] = folder
+        if archived is not UNSET:
+            field_dict["archived"] = archived
+        if response_filters is not UNSET:
+            field_dict["responseFilters"] = response_filters
         if created_at is not UNSET:
             field_dict["createdAt"] = created_at
         if updated_at is not UNSET:
@@ -113,6 +137,7 @@ class Tool:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.response_filter import ResponseFilter
         from ..models.tool_input_schema import ToolInputSchema
         from ..models.tool_output_schema import ToolOutputSchema
         from ..models.tool_step import ToolStep
@@ -134,14 +159,14 @@ class Tool:
         instruction = d.pop("instruction", UNSET)
 
         _input_schema = d.pop("inputSchema", UNSET)
-        input_schema: ToolInputSchema | Unset
+        input_schema: Union[Unset, ToolInputSchema]
         if isinstance(_input_schema, Unset):
             input_schema = UNSET
         else:
             input_schema = ToolInputSchema.from_dict(_input_schema)
 
         _output_schema = d.pop("outputSchema", UNSET)
-        output_schema: ToolOutputSchema | Unset
+        output_schema: Union[Unset, ToolOutputSchema]
         if isinstance(_output_schema, Unset):
             output_schema = UNSET
         else:
@@ -149,15 +174,26 @@ class Tool:
 
         output_transform = d.pop("outputTransform", UNSET)
 
+        folder = d.pop("folder", UNSET)
+
+        archived = d.pop("archived", UNSET)
+
+        response_filters = []
+        _response_filters = d.pop("responseFilters", UNSET)
+        for response_filters_item_data in _response_filters or []:
+            response_filters_item = ResponseFilter.from_dict(response_filters_item_data)
+
+            response_filters.append(response_filters_item)
+
         _created_at = d.pop("createdAt", UNSET)
-        created_at: datetime.datetime | Unset
+        created_at: Union[Unset, datetime.datetime]
         if isinstance(_created_at, Unset):
             created_at = UNSET
         else:
             created_at = isoparse(_created_at)
 
         _updated_at = d.pop("updatedAt", UNSET)
-        updated_at: datetime.datetime | Unset
+        updated_at: Union[Unset, datetime.datetime]
         if isinstance(_updated_at, Unset):
             updated_at = UNSET
         else:
@@ -172,6 +208,9 @@ class Tool:
             input_schema=input_schema,
             output_schema=output_schema,
             output_transform=output_transform,
+            folder=folder,
+            archived=archived,
+            response_filters=response_filters,
             created_at=created_at,
             updated_at=updated_at,
         )

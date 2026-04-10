@@ -20,38 +20,25 @@
       "persistent": true
     },
     "test": {
-      "dependsOn": [
-        "^build",
-        "build"
-      ],
+      "dependsOn": ["^build", "build"],
       "outputs": []
     },
     "test:coverage": {
-      "dependsOn": [
-        "^build",
-        "build"
-      ],
-      "outputs": [
-        "coverage/**"
-      ]
+      "dependsOn": ["^build", "build"],
+      "outputs": ["coverage/**"]
     },
     "type-check": {
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^build"],
       "outputs": []
     },
     "type-check-strict": {
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^build"],
       "outputs": []
     }
   },
   "globalEnv": [
     "SUPERGLUE_APP_URL",
     "WEB_PORT",
-    "DATASTORE_TYPE",
     "REDIS_HOST",
     "REDIS_PORT",
     "REDIS_USERNAME",
@@ -80,7 +67,6 @@
     "LLM_FALLBACK_PROVIDER",
     "AI_GATEWAY_MODEL",
     "AI_GATEWAY_API_KEY",
-    "FRONTEND_LLM_PROVIDER",
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "OPENAI_API_BASE_URL",

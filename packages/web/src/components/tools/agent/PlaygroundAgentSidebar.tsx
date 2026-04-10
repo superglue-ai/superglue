@@ -4,10 +4,6 @@ import { Button } from "@/src/components/ui/button";
 import { FileChip } from "@/src/components/ui/file-chip";
 import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
-import {
-  formatPlaygroundHiddenContext,
-  formatSystemHiddenContext,
-} from "@/src/lib/agent/agent-context";
 import { cn } from "@/src/lib/general-utils";
 import {
   Tool,
@@ -24,10 +20,16 @@ import { AgentContextProvider, useAgentContext } from "../../agent/AgentContextP
 import { AgentInputArea } from "../../agent/AgentInputArea";
 import { AgentCapabilities } from "../../agent/AgentCapabilities";
 import { ConversationHistory } from "../../agent/ConversationHistory";
+import {
+  buildSystemPlaygroundInitializationMessage,
+  buildToolPlaygroundInitializationMessage,
+  SYSTEM_PLAYGROUND_INIT_MARKER,
+  TOOL_PLAYGROUND_INIT_MARKER,
+} from "@/src/lib/agent/agent-context";
 import type { AgentConfig } from "../../agent/hooks/types";
-import { AgentType } from "@/src/lib/agent/registry/agents";
+import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import { DraftLookup, PlaygroundToolContext } from "@/src/lib/agent/agent-types";
-import { useSystems } from "@/src/app/systems-context";
+import { useInvalidateSystems } from "@/src/queries/systems";
 import {
   ScrollToBottomButton,
   ScrollToBottomContainer,
@@ -36,14 +38,17 @@ import {
 } from "../../agent/hooks/use-scroll-to-bottom";
 import { ToolCallComponent } from "../../agent/ToolCallComponent";
 import { BackgroundToolGroup, groupMessageParts } from "../../agent/tool-components";
+import { STREAMDOWN_COMPONENTS } from "../../ui/streamdown-components";
 import { useToolConfig } from "../context/tool-config-context";
 import { useExecution } from "../context/tool-execution-context";
 import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 import type { SystemContextForAgent } from "../../systems/context/types";
+import { AccessRulesContext } from "@/src/lib/agent/agent-types";
+import { useSuperglueClient } from "@/src/queries/use-client";
 
 const MAX_MESSAGE_LENGTH = 50000;
 
-export type PlaygroundMode = "tool" | "system";
+export type PlaygroundMode = "tool" | "system" | "access";
 
 export type SystemConfigForAgent = SystemContextForAgent;
 
@@ -53,6 +58,34 @@ interface PlaygroundAgentSidebarProps {
   initialError?: string;
   mode?: PlaygroundMode;
   systemConfig?: SystemContextForAgent;
+}
+
+function buildToolExecutionResultsSnapshot(
+  execution: ReturnType<typeof useExecution>,
+  steps: ToolStep[],
+) {
+  const executionResults: Record<string, { status: string; result?: string; error?: string }> = {};
+
+  for (const step of steps) {
+    const stepStatus = execution.getStepStatus(step.id);
+    const stepResult = execution.getStepResult(step.id);
+    const stepError = execution.getStepError(step.id);
+
+    if (stepStatus !== "pending") {
+      const entry: { status: string; result?: string; error?: string } = { status: stepStatus };
+      if (stepResult !== null) {
+        const resultStr =
+          typeof stepResult === "string" ? stepResult : safeStringify(stepResult, 2);
+        entry.result = resultStr.length > 5000 ? resultStr.substring(0, 5000) + "..." : resultStr;
+      }
+      if (stepError) {
+        entry.error = stepError.length > 500 ? stepError.substring(0, 500) + "..." : stepError;
+      }
+      executionResults[step.id] = entry;
+    }
+  }
+
+  return Object.keys(executionResults).length > 0 ? executionResults : undefined;
 }
 
 function buildToolPlaygroundContext(
@@ -89,23 +122,29 @@ function buildToolPlaygroundContext(
   };
 }
 
-interface PlaygroundAgentContentProps {
+export interface PlaygroundAgentContentProps {
   hideHeader?: boolean;
   mode: PlaygroundMode;
   agentType: AgentType;
   cacheKeyPrefix: string;
+  initializationMessage?: string;
+  initializationMarker?: string;
   onApplyChanges?: (newConfig: Tool, diffs?: ToolDiff[]) => void;
   onApplyPayload?: (newPayload: string) => void;
+  onApplyRoleConfig?: (newConfig: any) => void;
   currentPlaygroundState?: Partial<PlaygroundToolContext>;
 }
 
-function PlaygroundAgentContent({
+export function PlaygroundAgentContent({
   hideHeader = false,
   mode,
   agentType,
   cacheKeyPrefix,
+  initializationMessage,
+  initializationMarker,
   onApplyChanges,
   onApplyPayload,
+  onApplyRoleConfig,
   currentPlaygroundState,
 }: PlaygroundAgentContentProps) {
   const initialError = currentPlaygroundState?.initialError;
@@ -114,12 +153,11 @@ function PlaygroundAgentContent({
   const {
     messages,
     isLoading,
-    handleSendMessage,
     stopStreaming,
     handleToolInputChange,
     handleToolUpdate,
+    handleToolMutation,
     sendAgentRequest,
-    bufferAction,
     filePayloads,
     currentConversationId,
     setCurrentConversationId,
@@ -140,6 +178,40 @@ function PlaygroundAgentContent({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoFixedRef = useRef(false);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
+  const hasVisibleMessages = messages.some((m) => m.role !== "system" && !(m as any).isHidden);
+  const hasInitializationMessage =
+    !!initializationMarker &&
+    messages.some(
+      (m) =>
+        !!(m as any).isHidden &&
+        typeof m.content === "string" &&
+        m.content.startsWith(initializationMarker),
+    );
+
+  const sendPlaygroundRequest = useCallback(
+    async (
+      userMessage?: string,
+      options?: {
+        hiddenStarterMessage?: string;
+        hideUserMessage?: boolean;
+        resumeToolCallId?: string;
+      },
+    ) => {
+      let hiddenStarterMessage = options?.hiddenStarterMessage;
+
+      if (initializationMessage && !hasInitializationMessage) {
+        hiddenStarterMessage = hiddenStarterMessage
+          ? `${initializationMessage}\n\n---\n\n${hiddenStarterMessage}`
+          : initializationMessage;
+      }
+
+      return sendAgentRequest(userMessage, {
+        ...options,
+        hiddenStarterMessage,
+      });
+    },
+    [sendAgentRequest, initializationMessage, hasInitializationMessage],
+  );
 
   // Register the setInput function to paste message into input field and select it
   useEffect(() => {
@@ -162,7 +234,7 @@ function PlaygroundAgentContent({
   }, [registerResetAgentChat, startNewConversation]);
 
   useEffect(() => {
-    if (initialError && !hasAutoFixedRef.current && !isLoading && messages.length === 0) {
+    if (initialError && !hasAutoFixedRef.current && !isLoading && !hasVisibleMessages) {
       hasAutoFixedRef.current = true;
       const truncatedError =
         initialError.length > 500 ? `${initialError.slice(0, 500)}...` : initialError;
@@ -170,33 +242,37 @@ function PlaygroundAgentContent({
         mode === "tool"
           ? `The tool execution failed with the following error:\n\n${truncatedError}\n\nPlease analyze this error and fix the tool configuration.`
           : `The system test failed with the following error:\n\n${truncatedError}\n\nPlease analyze this error and help fix the configuration.`;
-      handleSendMessage(errorMessage);
+      sendPlaygroundRequest(errorMessage);
     }
-  }, [initialError, isLoading, messages.length, handleSendMessage, mode]);
+  }, [initialError, isLoading, hasVisibleMessages, sendPlaygroundRequest, mode]);
 
   const handleSend = useCallback(() => {
     if (!inputValue.trim() || isLoading) return;
     scrollTriggerRef.current?.scrollToBottom();
-    handleSendMessage(inputValue.trim());
+    sendPlaygroundRequest(inputValue.trim());
     setInputValue("");
     setIsHighlighted(false);
-  }, [inputValue, isLoading, handleSendMessage]);
+  }, [inputValue, isLoading, sendPlaygroundRequest]);
 
   const formatTimestamp = (date: Date) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const hasMessages = messages.some((m) => m.role !== "system" && !(m as any).isHidden);
   const emptyStateText =
     mode === "tool"
       ? {
           title: "Ask superglue to edit your tool",
           hint: 'e.g. "Add a filter to step getUsers to retrieve only active users"',
         }
-      : {
-          title: "Ask superglue to help with your system",
-          hint: 'e.g. "Test my API credentials" or "Help me debug authentication"',
-        };
+      : mode === "access"
+        ? {
+            title: "Ask superglue to configure access rules",
+            hint: 'e.g. "Make this role read-only for Stripe" or "Block all POST requests to the admin API"',
+          }
+        : {
+            title: "Ask superglue to help with your system",
+            hint: 'e.g. "Test my API credentials" or "Help me debug authentication"',
+          };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -222,7 +298,7 @@ function PlaygroundAgentContent({
             onCurrentConversationIdChange={setCurrentConversationId}
             cacheKeyPrefix={cacheKeyPrefix}
           />
-          {(messages.length > 1 || (messages.length === 1 && messages[0].content)) && (
+          {(hasVisibleMessages || hideHeader) && (
             <Button variant="glass" size="sm" onClick={startNewConversation} className="h-8 px-2">
               <Plus className="w-3 h-3 mr-1" />
               New
@@ -238,7 +314,7 @@ function PlaygroundAgentContent({
         debounce={50}
       >
         <div className="p-4 space-y-4">
-          {!hasMessages && (
+          {!hasVisibleMessages && (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
               <div className="h-10 w-10 rounded-full bg-white dark:bg-black flex items-center justify-center mb-3">
                 <img
@@ -363,7 +439,9 @@ function PlaygroundAgentContent({
                                   message.isStreaming && "streaming-message",
                                 )}
                               >
-                                <Streamdown>{grouped.part.content || ""}</Streamdown>
+                                <Streamdown components={STREAMDOWN_COMPONENTS}>
+                                  {grouped.part.content || ""}
+                                </Streamdown>
                               </div>
                             );
                           } else if (grouped.type === "background_tools") {
@@ -375,11 +453,12 @@ function PlaygroundAgentContent({
                                 tool={grouped.part.tool}
                                 onInputChange={handleToolInputChange}
                                 onToolUpdate={handleToolUpdate}
-                                sendAgentRequest={sendAgentRequest}
-                                bufferAction={bufferAction}
+                                onToolMutation={handleToolMutation}
+                                sendAgentRequest={sendPlaygroundRequest}
                                 onAbortStream={stopStreaming}
                                 onApplyChanges={onApplyChanges}
                                 onApplyPayload={onApplyPayload}
+                                onApplyRoleConfig={onApplyRoleConfig}
                                 currentPayload={currentPayload}
                                 isPlayground={mode === "tool"}
                                 filePayloads={filePayloads}
@@ -390,7 +469,9 @@ function PlaygroundAgentContent({
                         })
                       ) : (
                         <div className="prose prose-sm max-w-none dark:prose-invert text-sm">
-                          <Streamdown>{message.content}</Streamdown>
+                          <Streamdown components={STREAMDOWN_COMPONENTS}>
+                            {message.content}
+                          </Streamdown>
                         </div>
                       )}
                     </div>
@@ -421,9 +502,9 @@ function PlaygroundAgentContent({
           maxLength={MAX_MESSAGE_LENGTH}
           compact
           inputRef={inputRef}
-          inputClassName={cn(
+          containerClassName={cn(
             isHighlighted &&
-              "!ring-1 ring-amber-500 border-amber-500 shadow-lg shadow-amber-500/30",
+              "!ring-1 ring-amber-500 border-amber-500 hover:border-amber-500 focus-within:border-amber-500 shadow-lg shadow-amber-500/30",
           )}
           scrollToBottom={() => scrollTriggerRef.current?.scrollToBottom()}
         />
@@ -439,6 +520,8 @@ function ToolPlaygroundAgentSidebar({
 }: Omit<PlaygroundAgentSidebarProps, "mode" | "systemConfig">) {
   const toolConfig = useToolConfig();
   const execution = useExecution();
+  const createClient = useSuperglueClient();
+  const { setSavedTool } = useRightSidebar();
   const toolId = toolConfig.tool.id;
 
   const handleApplyChanges = useCallback(
@@ -530,125 +613,93 @@ function ToolPlaygroundAgentSidebar({
     [toolConfig],
   );
 
+  const executionResults = useMemo(
+    () => buildToolExecutionResultsSnapshot(execution, toolConfig.steps),
+    [execution, toolConfig.steps],
+  );
+
+  const initializationMessage = useMemo(
+    () =>
+      buildToolPlaygroundInitializationMessage({
+        config: {
+          ...toolConfig.tool,
+          steps: toolConfig.steps.map((step) => ({ ...step })),
+        } as Tool,
+        manualPayload: toolConfig.payload.manualPayloadText || "{}",
+        mergedPayload: toolConfig.payload.computedPayload || {},
+      }),
+    [
+      toolConfig.tool,
+      toolConfig.steps,
+      toolConfig.payload.manualPayloadText,
+      toolConfig.payload.computedPayload,
+      toolConfig.payload.uploadedFiles,
+    ],
+  );
+
   // Build current draft config that updates whenever toolConfig changes
   const currentPlaygroundState = useMemo<PlaygroundToolContext>(
     () => buildToolPlaygroundContext(toolConfig, "", initialError),
     [toolConfig, initialError],
   );
 
-  const hiddenContextBuilderRef = useRef<() => string>(() => "");
-  const prevStateHashRef = useRef<string | null>(null);
-  hiddenContextBuilderRef.current = () => {
-    const { payload } = toolConfig;
-    const uploadedFiles = payload.uploadedFiles.map((f) => ({
-      name: f.name,
-      key: f.key,
-      status: f.status,
-    }));
-    const mergedPayload =
-      uploadedFiles.length > 0 ? safeStringify(payload.computedPayload, 2) : undefined;
-
-    const stepMeta = toolConfig.steps.map((step: ToolStep) => {
-      const reqConfig =
-        step.config && isRequestConfig(step.config)
-          ? (step.config as RequestStepConfig)
-          : undefined;
-      return {
-        id: step.id,
-        systemId: reqConfig?.systemId,
-        method: reqConfig?.method,
-        status: execution.getStepStatus(step.id),
-      };
-    });
-
-    let inputSchemaFields: string[] = [];
-    try {
-      const parsed =
-        typeof toolConfig.inputSchema === "string"
-          ? JSON.parse(toolConfig.inputSchema)
-          : toolConfig.inputSchema;
-      if (parsed?.properties?.payload?.properties) {
-        inputSchemaFields = Object.keys(parsed.properties.payload.properties);
-      } else if (parsed?.properties) {
-        inputSchemaFields = Object.keys(parsed.properties);
+  const syncSavedPlaygroundState = useCallback(
+    async (savedToolId: string) => {
+      try {
+        const client = createClient();
+        const savedTool = await client.getWorkflow(savedToolId);
+        if (savedTool) {
+          if (savedTool.id !== toolConfig.tool.id) {
+            toolConfig.setToolId(savedTool.id);
+          }
+          toolConfig.setSteps(
+            (savedTool.steps || []).map((step) => ({
+              ...step,
+            })),
+          );
+          toolConfig.setInstruction(savedTool.instruction || "");
+          toolConfig.setOutputTransform(
+            savedTool.outputTransform || "(sourceData) => { return {} }",
+          );
+          toolConfig.setInputSchema(
+            savedTool.inputSchema ? JSON.stringify(savedTool.inputSchema, null, 2) : null,
+          );
+          toolConfig.setOutputSchema(
+            savedTool.outputSchema ? JSON.stringify(savedTool.outputSchema, null, 2) : "",
+          );
+          toolConfig.setFolder(savedTool.folder);
+          toolConfig.setIsArchived(savedTool.archived || false);
+          toolConfig.setResponseFilters(savedTool.responseFilters || []);
+          setSavedTool(savedTool);
+        }
+      } catch (error) {
+        console.warn("Failed to refresh playground state after save_tool:", error);
+      } finally {
+        setTimeout(toolConfig.markCurrentStateAsBaseline, 0);
       }
-    } catch {}
+    },
+    [createClient, setSavedTool, toolConfig],
+  );
 
-    let outputSchemaFieldCount = 0;
-    try {
-      const parsed =
-        typeof toolConfig.outputSchema === "string"
-          ? JSON.parse(toolConfig.outputSchema)
-          : toolConfig.outputSchema;
-      if (parsed?.properties) {
-        outputSchemaFieldCount = Object.keys(parsed.properties).length;
+  const onToolComplete = useCallback(
+    (toolName: string, _toolCallId: string, output: any) => {
+      if (
+        toolName === "save_tool" &&
+        output?.success === true &&
+        output?.persistence === "saved" &&
+        typeof output.toolId === "string"
+      ) {
+        void syncSavedPlaygroundState(output.toolId);
       }
-    } catch {}
-
-    const hashInput = safeStringify({
-      steps: stepMeta,
-      outputTransform: toolConfig.outputTransform,
-      inputSchema: toolConfig.inputSchema,
-      outputSchema: toolConfig.outputSchema,
-      instruction: toolConfig.tool.instruction,
-      responseFilters: toolConfig.responseFilters,
-      transformStatus: execution.transformStatus,
-      payload: toolConfig.payload.manualPayloadText,
-      uploadedFiles,
-      mergedPayload,
-    });
-
-    let hash = 0;
-    for (let i = 0; i < hashInput.length; i++) {
-      hash = ((hash << 5) - hash + hashInput.charCodeAt(i)) | 0;
-    }
-    const hashStr = String(hash);
-
-    if (prevStateHashRef.current !== null && prevStateHashRef.current === hashStr) {
-      return "";
-    }
-    prevStateHashRef.current = hashStr;
-
-    return formatPlaygroundHiddenContext({
-      toolId: toolConfig.tool.id,
-      instruction: toolConfig.tool.instruction,
-      steps: stepMeta,
-      hasOutputTransform: !!toolConfig.outputTransform,
-      hasResponseFilters: (toolConfig.responseFilters?.length ?? 0) > 0,
-      inputSchemaFields,
-      outputSchemaFieldCount,
-      transformStatus: execution.transformStatus,
-      currentPayload: safeStringify(payload.computedPayload || {}, 2),
-      uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
-      mergedPayload,
-    });
-  };
+    },
+    [syncSavedPlaygroundState],
+  );
 
   const playgroundDraftBuilderRef = useRef<() => DraftLookup | null>(() => null);
   playgroundDraftBuilderRef.current = () => {
     const ctx = buildToolPlaygroundContext(toolConfig, "", initialError);
     if (!ctx.toolId || !ctx.steps || ctx.steps.length === 0) {
       return null;
-    }
-
-    const executionResults: Record<string, { status: string; result?: string; error?: string }> =
-      {};
-    for (const step of ctx.steps) {
-      const stepStatus = execution.getStepStatus(step.id);
-      const stepResult = execution.getStepResult(step.id);
-      const stepError = execution.getStepError(step.id);
-      if (stepStatus !== "pending") {
-        const entry: { status: string; result?: string; error?: string } = { status: stepStatus };
-        if (stepResult !== null) {
-          const resultStr =
-            typeof stepResult === "string" ? stepResult : safeStringify(stepResult, 2);
-          entry.result = resultStr.length > 5000 ? resultStr.substring(0, 5000) + "..." : resultStr;
-        }
-        if (stepError) {
-          entry.error = stepError.length > 500 ? stepError.substring(0, 500) + "..." : stepError;
-        }
-        executionResults[step.id] = entry;
-      }
     }
 
     return {
@@ -659,20 +710,24 @@ function ToolPlaygroundAgentSidebar({
         outputTransform: ctx.outputTransform,
         inputSchema: ctx.inputSchema ?? undefined,
         outputSchema: ctx.outputSchema ?? undefined,
+        folder: toolConfig.tool.folder,
+        archived: toolConfig.tool.isArchived,
+        responseFilters:
+          toolConfig.tool.responseFilters.length > 0 ? toolConfig.tool.responseFilters : undefined,
       },
       systemIds: ctx.systemIds || [],
       instruction: ctx.instruction || "",
-      executionResults: Object.keys(executionResults).length > 0 ? executionResults : undefined,
+      executionResults,
     };
   };
 
   const agentConfig = useMemo<AgentConfig>(() => {
     return {
       agentId: AgentType.PLAYGROUND,
-      hiddenContextBuilder: () => hiddenContextBuilderRef.current(),
       playgroundDraftBuilder: () => playgroundDraftBuilderRef.current?.() ?? null,
+      onToolComplete,
     };
-  }, []);
+  }, [onToolComplete]);
 
   return (
     <div className={cn("h-full", className)}>
@@ -682,6 +737,8 @@ function ToolPlaygroundAgentSidebar({
           mode="tool"
           agentType={AgentType.PLAYGROUND}
           cacheKeyPrefix={`superglue-playground-${toolId}`}
+          initializationMessage={initializationMessage}
+          initializationMarker={TOOL_PLAYGROUND_INIT_MARKER}
           onApplyChanges={handleApplyChanges}
           onApplyPayload={handleApplyPayload}
           currentPlaygroundState={currentPlaygroundState}
@@ -697,31 +754,29 @@ function SystemPlaygroundAgentSidebar({
   initialError,
   systemConfig,
 }: Omit<PlaygroundAgentSidebarProps, "mode"> & { systemConfig: SystemContextForAgent }) {
-  const { refreshSystems } = useSystems();
-
-  const hiddenContextBuilderRef = useRef<() => string>(() => "");
-  hiddenContextBuilderRef.current = () => {
-    return JSON.stringify({
-      display: formatSystemHiddenContext(systemConfig),
-    });
-  };
+  const invalidateSystems = useInvalidateSystems();
 
   const onToolComplete = useCallback(
     (toolName: string, _toolId: string, output: any) => {
       if ((toolName === "edit_system" || toolName === "create_system") && output?.success) {
-        refreshSystems();
+        invalidateSystems();
       }
     },
-    [refreshSystems],
+    [invalidateSystems],
   );
 
   const agentConfig = useMemo<AgentConfig>(() => {
     return {
       agentId: AgentType.SYSTEM_PLAYGROUND,
-      hiddenContextBuilder: () => hiddenContextBuilderRef.current(),
+      systemPlaygroundContextBuilder: () => systemConfig,
       onToolComplete,
     };
-  }, [onToolComplete]);
+  }, [onToolComplete, systemConfig]);
+
+  const initializationMessage = useMemo(
+    () => buildSystemPlaygroundInitializationMessage(systemConfig),
+    [systemConfig],
+  );
 
   return (
     <div className={cn("h-full", className)}>
@@ -731,7 +786,51 @@ function SystemPlaygroundAgentSidebar({
           mode="system"
           agentType={AgentType.SYSTEM_PLAYGROUND}
           cacheKeyPrefix={`superglue-system-${systemConfig.systemId || "new"}`}
+          initializationMessage={initializationMessage}
+          initializationMarker={SYSTEM_PLAYGROUND_INIT_MARKER}
           currentPlaygroundState={initialError ? { initialError } : undefined}
+        />
+      </AgentContextProvider>
+    </div>
+  );
+}
+
+function AccessPlaygroundAgentSidebar({
+  className,
+  hideHeader,
+}: Omit<PlaygroundAgentSidebarProps, "mode" | "systemConfig">) {
+  const { accessRulesContext, onRoleDraftUpdate } = useRightSidebar();
+
+  const onToolComplete = useCallback(
+    (toolName: string, _toolId: string, output: any) => {
+      if (toolName === "edit_role" && output?.success && output?.newConfig && onRoleDraftUpdate) {
+        onRoleDraftUpdate({ ...output.newConfig, roleId: output.roleId });
+      }
+    },
+    [onRoleDraftUpdate],
+  );
+
+  const contextRef = useRef<AccessRulesContext | undefined>(accessRulesContext);
+  contextRef.current = accessRulesContext;
+
+  const agentConfig = useMemo<AgentConfig>(
+    () => ({
+      agentId: AgentType.ACCESS_RULES,
+      accessRulesContextBuilder: () => contextRef.current || null,
+      onToolComplete,
+    }),
+    [onToolComplete],
+  );
+
+  return (
+    <div className={cn("h-full", className)}>
+      <AgentContextProvider config={agentConfig}>
+        <PlaygroundAgentContent
+          hideHeader={hideHeader}
+          mode="access"
+          agentType={AgentType.ACCESS_RULES}
+          cacheKeyPrefix="superglue-access"
+          onApplyRoleConfig={onRoleDraftUpdate}
         />
       </AgentContextProvider>
     </div>
@@ -745,6 +844,10 @@ export function PlaygroundAgentSidebar({
   mode = "tool",
   systemConfig,
 }: PlaygroundAgentSidebarProps) {
+  if (mode === "access") {
+    return <AccessPlaygroundAgentSidebar className={className} hideHeader={hideHeader} />;
+  }
+
   if (mode === "system" && systemConfig) {
     return (
       <SystemPlaygroundAgentSidebar

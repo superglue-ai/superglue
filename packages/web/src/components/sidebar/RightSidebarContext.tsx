@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
   useEffect,
+  useMemo,
   ReactNode,
   ComponentType,
 } from "react";
@@ -17,6 +18,7 @@ import {
 } from "../tools/agent/PlaygroundAgentSidebar";
 import { Tool } from "@superglue/shared";
 import { type ToolDraft } from "@/src/lib/storage";
+import { AccessRulesContext } from "@/src/lib/agent/agent-types";
 
 type SetInputFn = (message: string) => void;
 type ResetChatFn = () => void;
@@ -37,10 +39,15 @@ interface RightSidebarContextType {
   sendMessageToAgent: (message: string) => void;
   registerSetSidebarExpanded: (fn: (expanded: boolean) => void) => void;
   registerResetAgentChat: (fn: ResetChatFn) => void;
+  resetAgentChat: () => void;
   agentMode: PlaygroundMode;
   setAgentMode: (mode: PlaygroundMode) => void;
   systemConfig: SystemConfigForAgent | undefined;
   setSystemConfig: (config: SystemConfigForAgent | undefined) => void;
+  accessRulesContext: AccessRulesContext | undefined;
+  setAccessRulesContext: (ctx: AccessRulesContext | undefined) => void;
+  onRoleDraftUpdate: ((newConfig: any) => void) | undefined;
+  setOnRoleDraftUpdate: (fn: ((newConfig: any) => void) | undefined) => void;
   savedTool: Tool | null;
   setSavedTool: (tool: Tool | null) => void;
   playgroundTool: Tool | null;
@@ -59,10 +66,15 @@ const RightSidebarContext = createContext<RightSidebarContextType>({
   sendMessageToAgent: () => {},
   registerSetSidebarExpanded: () => {},
   registerResetAgentChat: () => {},
+  resetAgentChat: () => {},
   agentMode: "tool",
   setAgentMode: () => {},
   systemConfig: undefined,
   setSystemConfig: () => {},
+  accessRulesContext: undefined,
+  setAccessRulesContext: () => {},
+  onRoleDraftUpdate: undefined,
+  setOnRoleDraftUpdate: () => {},
   savedTool: null,
   setSavedTool: () => {},
   playgroundTool: null,
@@ -77,9 +89,13 @@ export function RightSidebarProvider({ children }: { children: ReactNode }) {
   const [sidebarExpanded, setSidebarExpandedState] = useState(false);
   const [agentMode, setAgentMode] = useState<PlaygroundMode>("tool");
   const [systemConfig, setSystemConfig] = useState<SystemConfigForAgent | undefined>(undefined);
+  const [accessRulesContext, setAccessRulesContext] = useState<AccessRulesContext | undefined>(
+    undefined,
+  );
   const [savedTool, setSavedTool] = useState<Tool | null>(null);
   const [playgroundTool, setPlaygroundTool] = useState<Tool | null>(null);
   const onRestoreDraftRef = useRef<((draft: ToolDraft) => void) | null>(null);
+  const onRoleDraftUpdateRef = useRef<((newConfig: any) => void) | null>(null);
   const setAgentInputRef = useRef<SetInputFn | null>(null);
   const setSidebarExpandedRef = useRef<((expanded: boolean) => void) | null>(null);
   const resetAgentChatRef = useRef<ResetChatFn | null>(null);
@@ -111,6 +127,10 @@ export function RightSidebarProvider({ children }: { children: ReactNode }) {
     resetAgentChatRef.current = fn;
   }, []);
 
+  const resetAgentChat = useCallback(() => {
+    resetAgentChatRef.current?.();
+  }, []);
+
   const sendMessageToAgent = useCallback((message: string) => {
     setSidebarExpandedRef.current?.(true);
     setAgentInputRef.current?.(message);
@@ -124,33 +144,62 @@ export function RightSidebarProvider({ children }: { children: ReactNode }) {
     onRestoreDraftRef.current?.(draft);
   }, []);
 
-  return (
-    <RightSidebarContext.Provider
-      value={{
-        showAgent,
-        setShowAgent,
-        agentPortalRef,
-        setAgentPortalRef,
-        AgentSidebarComponent: PlaygroundAgentSidebar,
-        registerSetAgentInput,
-        sendMessageToAgent,
-        registerSetSidebarExpanded,
-        registerResetAgentChat,
-        agentMode,
-        setAgentMode,
-        systemConfig,
-        setSystemConfig,
-        savedTool,
-        setSavedTool,
-        playgroundTool,
-        setPlaygroundTool,
-        onRestoreDraft,
-        setOnRestoreDraft,
-      }}
-    >
-      {children}
-    </RightSidebarContext.Provider>
+  const setOnRoleDraftUpdate = useCallback((fn: ((newConfig: any) => void) | undefined) => {
+    onRoleDraftUpdateRef.current = fn || null;
+  }, []);
+
+  const onRoleDraftUpdate = useCallback((newConfig: any) => {
+    onRoleDraftUpdateRef.current?.(newConfig);
+  }, []);
+
+  const value = useMemo<RightSidebarContextType>(
+    () => ({
+      showAgent,
+      setShowAgent,
+      agentPortalRef,
+      setAgentPortalRef,
+      AgentSidebarComponent: PlaygroundAgentSidebar,
+      registerSetAgentInput,
+      sendMessageToAgent,
+      registerSetSidebarExpanded,
+      registerResetAgentChat,
+      resetAgentChat,
+      agentMode,
+      setAgentMode,
+      systemConfig,
+      setSystemConfig,
+      accessRulesContext,
+      setAccessRulesContext,
+      onRoleDraftUpdate,
+      setOnRoleDraftUpdate,
+      savedTool,
+      setSavedTool,
+      playgroundTool,
+      setPlaygroundTool,
+      onRestoreDraft,
+      setOnRestoreDraft,
+    }),
+    [
+      showAgent,
+      agentPortalRef,
+      registerSetAgentInput,
+      sendMessageToAgent,
+      registerSetSidebarExpanded,
+      registerResetAgentChat,
+      resetAgentChat,
+      agentMode,
+      systemConfig,
+      accessRulesContext,
+      onRoleDraftUpdate,
+      setOnRoleDraftUpdate,
+      savedTool,
+      playgroundTool,
+      onRestoreDraft,
+      setOnRestoreDraft,
+    ],
   );
+
+  return <RightSidebarContext.Provider value={value}>{children}</RightSidebarContext.Provider>;
 }
 
 export const useRightSidebar = () => useContext(RightSidebarContext);

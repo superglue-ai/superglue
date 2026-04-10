@@ -1,6 +1,8 @@
 // This file contains the internal configuration for the server
 
 export const server_defaults = {
+  VERSION: "1.4.0",
+  MIN_CLI_VERSION: "1.0.0",
   posthog: {
     // this is the public key for the posthog project. This can be public, this is not a secret.
     apiKey: "phc_89mcVkZ9osPaFQwTp3oFA2595ne95OSNk47qnhqCCbE",
@@ -9,11 +11,13 @@ export const server_defaults = {
   MAX_CALL_RETRIES: 3,
   DEFAULT_LOOP_MAX_ITERS: 10_000,
   MAX_PAGINATION_REQUESTS: 1_000,
-  WORKER_POOLS: {
-    EXECUTE_TOOL_WORKER_POOL: {
-      SIZE: 12,
-      MEMORY_MB: 4096,
-    },
+  DENO: {
+    POOL_SIZE: 12,
+    MEMORY_MB: 8192,
+    TRANSFORM_TIMEOUT_MS: 600_000, // 10 minutes per transform
+    STEP_TIMEOUT_MS: 3_600_000, // 1 hour per step
+    WORKFLOW_TIMEOUT_MS: 21_600_000, // 6 hours per workflow
+    RECYCLE_AFTER_EXECUTIONS: 100, // Recycle worker after N executions
   },
   CONTEXT: {
     JSON_PREVIEW_DEPTH_LIMIT: 5,
@@ -66,6 +70,21 @@ export const server_defaults = {
     DEFAULT_RETRY_DELAY: 1000, // 1 second
     OAUTH_SECRET_TTL_MS: 5 * 60 * 1000, // 5 minutes
   },
+  MSSQL: {
+    POOL_IDLE_TIMEOUT: 10 * 60 * 1000, // 10 minutes
+    POOL_CLEANUP_INTERVAL: 60 * 1000, // 1 minute
+    DEFAULT_TIMEOUT: 600000, // 10 minutes
+    DEFAULT_RETRIES: 0,
+    DEFAULT_RETRY_DELAY: 1000, // 1 second
+    CONNECTION_TIMEOUT: 30000, // 30 seconds (increased for Azure SQL latency)
+    POOL_MAX: 10,
+    POOL_MIN: 0,
+  },
+  REDIS: {
+    DEFAULT_TIMEOUT: 30000, // 30 seconds
+    DEFAULT_RETRIES: 0,
+    DEFAULT_RETRY_DELAY: 1000, // 1 second
+  },
   FTP: {
     DEFAULT_TIMEOUT: 600000, // 10 minutes
     DEFAULT_RETRIES: 0,
@@ -81,7 +100,7 @@ export const server_defaults = {
     MAX_QUICK_RETRIES: 1,
     QUICK_RETRY_THRESHOLD_MS: 10000,
     DEFAULT_RETRY_DELAY_MS: 1000,
-    MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000 * 24, // 24 hours is the max wait time for rate limit retries, hardcoded
+    MAX_RATE_LIMIT_WAIT_MS: 60 * 60 * 1000, // 1 hour is the max wait time for rate limit retries
     REJECT_UNAUTHORIZED: false,
     KEEP_ALIVE: false,
     MAX_SOCKETS: 10,

@@ -41,7 +41,115 @@ export interface EnrichedDiff {
   contextNew?: string;
 }
 
+// ============================================================================
+// Normalization utilities for consistent diff comparison
+// ============================================================================
+
+// Try to parse stringified JSON, return original if not valid JSON
+function tryParseJson(val: any): any {
+  if (typeof val !== "string") return val;
+  const trimmed = val.trim();
+  if (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  ) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return val;
+    }
+  }
+  return val;
+}
+
+// Normalize a function/arrow function string by removing formatting differences
+function normalizeFunction(str: string): string {
+  if (typeof str !== "string") return str;
+  // Check if it looks like a function
+  if (!str.includes("=>") && !str.startsWith("function")) return str;
+  // Remove all whitespace and normalize
+  return str
+    .replace(/\s+/g, " ") // collapse whitespace
+    .replace(/\s*([{}(),:;=>\[\]])\s*/g, "$1") // remove space around punctuation
+    .replace(/,}/g, "}") // remove trailing commas
+    .trim();
+}
+
+// Check if a value is empty (null, undefined, empty array, empty object)
+function isEmptyValue(v: any): boolean {
+  if (v === null || v === undefined) return true;
+  if (Array.isArray(v) && v.length === 0) return true;
+  if (typeof v === "object" && Object.keys(v).length === 0) return true;
+  return false;
+}
+
+// Recursively normalize an object: parse stringified JSON, normalize functions, sort keys
+function deepNormalize(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+
+  // Try to parse if it's a stringified JSON
+  const parsed = tryParseJson(obj);
+
+  if (Array.isArray(parsed)) {
+    return parsed.map(deepNormalize);
+  }
+
+  if (typeof parsed === "object") {
+    const result: any = {};
+    for (const key of Object.keys(parsed).sort()) {
+      result[key] = deepNormalize(parsed[key]);
+    }
+    return result;
+  }
+
+  // Normalize function strings
+  if (typeof parsed === "string") {
+    return normalizeFunction(parsed);
+  }
+
+  return parsed;
+}
+
+const isEmptySchema = (v: any) => !v || (typeof v === "object" && Object.keys(v).length === 0);
+
+/**
+ * Normalize a tool for comparison by:
+ * 1. Stripping metadata fields (createdAt, updatedAt, etc.)
+ * 2. Removing empty schemas and empty arrays (like responseFilters: [])
+ * 3. Parsing stringified JSON fields (like body)
+ * 4. Normalizing function strings to ignore formatting differences
+ * 5. Sorting object keys for consistent comparison
+ */
+export function normalizeToolForComparison(tool: Tool | any): any {
+  const { createdAt, updatedAt, name, id, folder, archived, systemIds, ...rest } = tool;
+  if (isEmptySchema(rest.outputSchema)) delete rest.outputSchema;
+  if (isEmptySchema(rest.inputSchema)) delete rest.inputSchema;
+  // Treat empty responseFilters as non-existent
+  if (isEmptyValue(rest.responseFilters)) delete rest.responseFilters;
+  return deepNormalize(rest);
+}
+
+/**
+ * Compute enriched diffs between two tool configurations.
+ * This is the main entry point for diff calculation - use this instead of
+ * calling jsonpatch.compare and enrichDiffsWithTargets separately.
+ *
+ * @param baseTool - The original/saved tool configuration
+ * @param currentTool - The current/modified tool configuration
+ * @returns Array of enriched diffs ready for display
+ */
+export function computeToolDiffs(baseTool: Tool, currentTool: Tool): EnrichedDiff[] {
+  const baseNorm = normalizeToolForComparison(normalizeToolSchemas(baseTool));
+  const currentNorm = normalizeToolForComparison(normalizeToolSchemas(currentTool));
+  const diffs = jsonpatch.compare(baseNorm, currentNorm) as ToolDiff[];
+  // Pass normalized base tool so enrichDiffsWithTargets can traverse into parsed JSON fields
+  const enriched = enrichDiffsWithTargets(diffs, baseNorm as Tool);
+  return enriched.filter((d) => d.lines.length > 0);
+}
+
+// ============================================================================
 // Internal helpers
+// ============================================================================
 const stringify = (v: any): string =>
   v === undefined
     ? ""
@@ -275,24 +383,36 @@ export function enrichDiffsWithTargets(diffs: ToolDiff[], originalConfig?: Tool)
         contextNewObj = diff.op === "remove" ? undefined : diff.value;
       } else {
         let current = result;
+        let traversalFailed = false;
         for (let i = 0; i < parts.length - 1; i++) {
           if (current[parts[i]] === undefined || current[parts[i]] === null) {
             current[parts[i]] = {};
           }
-          current = current[parts[i]];
-        }
-        const lastKey = parts[parts.length - 1];
-        if (diff.op === "remove") {
-          // Use splice for array indices to properly shift elements (JSON Patch remove semantics)
-          if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
-            current.splice(parseInt(lastKey, 10), 1);
-          } else {
-            delete current[lastKey];
+          const next = current[parts[i]];
+          // Guard against traversing into a string or primitive
+          if (typeof next !== "object" || next === null) {
+            traversalFailed = true;
+            break;
           }
-        } else {
-          current[lastKey] = diff.value;
+          current = next;
         }
-        contextNewObj = result;
+        if (!traversalFailed) {
+          const lastKey = parts[parts.length - 1];
+          if (diff.op === "remove") {
+            // Use splice for array indices to properly shift elements (JSON Patch remove semantics)
+            if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
+              current.splice(parseInt(lastKey, 10), 1);
+            } else {
+              delete current[lastKey];
+            }
+          } else {
+            current[lastKey] = diff.value;
+          }
+          contextNewObj = result;
+        } else {
+          // Fallback: just use the diff value directly
+          contextNewObj = diff.value;
+        }
       }
     } else if (diff.value !== undefined) {
       contextNewObj = diff.value;

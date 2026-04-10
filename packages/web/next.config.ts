@@ -4,6 +4,15 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: "50mb",
   },
+  async redirects() {
+    return [
+      {
+        source: "/login",
+        destination: "/api-keys",
+        permanent: false,
+      },
+    ];
+  },
   env: {
     NEXT_PUBLIC_POSTHOG_KEY: "phc_89mcVkZ9osPaFQwTp3oFA2595ne95OSNk47qnhqCCbE",
     NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",

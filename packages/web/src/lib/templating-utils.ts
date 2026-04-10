@@ -1,4 +1,5 @@
 import { executeWithVMHelpers, isArrowFunction } from "@superglue/shared";
+import { truncateValue } from "./general-utils";
 
 export const DEFAULT_CODE_TEMPLATE = "(sourceData) => { return {} }";
 const CREDENTIAL_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*_[a-zA-Z0-9_$]+$/;
@@ -172,7 +173,9 @@ export function formatValueForDisplay(value: any): string {
   if (typeof value === "number" || typeof value === "boolean") return String(value);
 
   try {
-    return JSON.stringify(value, null, 2);
+    // Sample large objects/arrays before stringifying to avoid performance issues
+    const sampled = truncateValue(value, 0);
+    return JSON.stringify(sampled, null, 2);
   } catch {
     return "[Object]";
   }
@@ -180,9 +183,18 @@ export function formatValueForDisplay(value: any): string {
 
 export function extractCredentials(data: Record<string, unknown>): Record<string, string> {
   if (!data || typeof data !== "object") return {};
+  // Keys that should never be treated as credentials (context variables, etc.)
+  const nonCredentialKeys = new Set(["sg_auth_email"]);
   return Object.entries(data).reduce(
     (acc, [key, value]) => {
-      if (CREDENTIAL_PATTERN.test(key) && typeof value === "string" && value.length > 0) {
+      // Match credential-like keys (systemId_credentialKey) but exclude system URLs and context variables
+      if (
+        CREDENTIAL_PATTERN.test(key) &&
+        !key.endsWith("_url") &&
+        !nonCredentialKeys.has(key) &&
+        typeof value === "string" &&
+        value.length > 0
+      ) {
         acc[key] = value;
       }
       return acc;

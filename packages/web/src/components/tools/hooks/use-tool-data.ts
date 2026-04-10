@@ -1,10 +1,9 @@
-import { useConfig } from "@/src/app/config-context";
-import { useTools } from "@/src/app/tools-context";
+import { useUpsertTool } from "@/src/queries/tools";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import { useToast } from "@/src/hooks/use-toast";
-import { createSuperglueClient } from "@/src/lib/client-utils";
 import { deleteAllDrafts } from "@/src/lib/storage";
 import { Tool } from "@superglue/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useExecution, useToolConfig } from "../context";
 
 interface UseToolDataOptions {
@@ -18,8 +17,8 @@ interface UseToolDataOptions {
 export function useToolData(options: UseToolDataOptions) {
   const { id, initialTool, initialInstruction, embedded, onSave } = options;
 
-  const config = useConfig();
-  const { refreshTools } = useTools();
+  const upsertTool = useUpsertTool();
+  const createClient = useSuperglueClient();
   const { toast } = useToast();
   const {
     tool,
@@ -36,6 +35,7 @@ export function useToolData(options: UseToolDataOptions) {
     setFolder,
     setIsArchived,
     setResponseFilters,
+    markCurrentStateAsBaseline,
   } = useToolConfig();
 
   const { clearAllExecutions } = useExecution();
@@ -54,12 +54,24 @@ export function useToolData(options: UseToolDataOptions) {
   const [notFound, setNotFound] = useState(false);
   const [lastToolId, setLastToolId] = useState<string | undefined>(initialTool?.id);
 
+  // Track when we need to mark baseline after save completes
+  const pendingBaselineMarkRef = useRef(false);
+
+  // When justSaved becomes true, mark the current state as baseline
+  // This runs AFTER React has committed the state updates from save
+  useEffect(() => {
+    if (justSaved && pendingBaselineMarkRef.current) {
+      pendingBaselineMarkRef.current = false;
+      markCurrentStateAsBaseline();
+    }
+  }, [justSaved, markCurrentStateAsBaseline]);
+
   const loadTool = async (idToLoad: string) => {
     try {
       if (!idToLoad) return;
       setLoading(true);
       setNotFound(false);
-      const client = createSuperglueClient(config.apiEndpoint);
+      const client = createClient();
       const loadedTool = await client.getWorkflow(idToLoad);
       if (!loadedTool) {
         setNotFound(true);
@@ -213,8 +225,10 @@ export function useToolData(options: UseToolDataOptions) {
       if (embedded && onSave) {
         await onSave(toolToSave, computedPayload);
       } else {
-        const client = createSuperglueClient(config.apiEndpoint);
-        const savedTool = await client.upsertWorkflow(effectiveToolId, toolToSave as any);
+        const savedTool = await upsertTool.mutateAsync({
+          id: effectiveToolId,
+          input: toolToSave,
+        });
 
         if (!savedTool) {
           throw new Error("Failed to save tool");
@@ -223,16 +237,13 @@ export function useToolData(options: UseToolDataOptions) {
         setOutputTransform(savedTool.outputTransform);
         setSteps(savedTool.steps);
 
-        // Clear all drafts after successful save
         await deleteAllDrafts(savedTool.id).catch((err) => {
           console.warn("Failed to delete drafts after save:", err);
         });
-
-        // Refresh tools context so sidebar updates
-        await refreshTools().catch((err) => {
-          console.warn("Failed to refresh tools after save:", err);
-        });
       }
+
+      // Signal that we need to mark baseline after React commits the state updates
+      pendingBaselineMarkRef.current = true;
 
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);

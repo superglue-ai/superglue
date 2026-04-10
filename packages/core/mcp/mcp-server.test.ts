@@ -6,7 +6,6 @@ import { truncateToolExecutionResult } from "./mcp-server-utils.js";
 vi.mock("../auth/auth.js", () => ({
   validateToken: vi.fn().mockResolvedValue({
     orgId: "test-org",
-    isRestricted: false,
   }),
 }));
 
@@ -30,7 +29,6 @@ describe("MCP Server", () => {
 
   describe("createMcpServer", () => {
     it("creates server and registers tools from API", async () => {
-      // Mock listTools response
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -60,12 +58,6 @@ describe("MCP Server", () => {
                 archived: false,
                 steps: [],
               },
-              {
-                id: "archived-tool",
-                instruction: "This is archived",
-                archived: true,
-                steps: [],
-              },
             ],
           }),
       });
@@ -87,21 +79,17 @@ describe("MCP Server", () => {
       );
     });
 
-    it("filters out archived tools", async () => {
+    it("registers only tools returned by the API (archived excluded server-side)", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
           Promise.resolve({
-            data: [
-              { id: "active-tool", instruction: "Active", archived: false, steps: [] },
-              { id: "archived-tool", instruction: "Archived", archived: true, steps: [] },
-            ],
+            data: [{ id: "active-tool", instruction: "Active", archived: false, steps: [] }],
           }),
       });
 
       const server = await createMcpServer("test-api-key");
       expect(server).toBeDefined();
-      // The archived tool should not be registered (only active-tool + authenticate)
     });
 
     it("handles empty tool list", async () => {
@@ -282,8 +270,7 @@ describe("truncateToolExecutionResult", () => {
     const output = truncateToolExecutionResult(result, 10);
 
     // Should hit the hard truncate
-    expect(output).toContain("[TRUNCATED: exceeded");
-    expect(output).toContain("char limit]");
+    expect(output).toContain("... [truncated]");
     expect(output.length).toBeLessThanOrEqual(20100); // limit + truncation message
   });
 });

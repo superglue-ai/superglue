@@ -1,54 +1,33 @@
-import { UserInfo } from "@superglue/shared";
-import { logMessage } from "./logs.js";
+import { getDataStore } from "../datastore/datastore.js";
+import { isEEDataStore } from "../datastore/ee/types.js";
 
 /**
- * Fetches user email from Supabase by user ID using the Admin API.
- * Returns null if user not found or on error.
+ * Check if a tool config references sg_auth_email and resolve the user's email if so.
+ * Returns the existing email if already known, skips the DB lookup if not needed.
  */
-export async function getUserEmailById(userId: string): Promise<string | null> {
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.PRIV_SUPABASE_SERVICE_ROLE_KEY;
+export async function resolveUserEmailIfNeeded({
+  toolConfig,
+  userId,
+  existingEmail,
+}: {
+  toolConfig: unknown;
+  userId?: string;
+  existingEmail?: string;
+}): Promise<string | undefined> {
+  if (existingEmail) return existingEmail;
+  if (!userId) return undefined;
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    logMessage("error", "Missing Supabase configuration for user lookup");
-    return null;
-  }
-
+  // Only hit the DB if the tool config actually references sg_auth_email
   try {
-    const url = `${SUPABASE_URL}/auth/v1/admin/users/${userId}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        logMessage("debug", `User not found: ${userId}`);
-        return null;
-      }
-      logMessage("error", `Failed to fetch user: ${response.statusText}`);
-      return null;
-    }
-
-    const user = await response.json();
-    return user.email ?? null;
-  } catch (error) {
-    logMessage("error", `Error fetching user email: ${error}`);
-    return null;
+    const serialized = JSON.stringify(toolConfig);
+    if (!serialized.includes("sg_auth_email")) return undefined;
+  } catch {
+    return undefined;
   }
-}
 
-/**
- * Fetches user info (id and email) from Supabase by user ID.
- * Returns null if user not found or on error.
- */
-export async function getUserInfoById(userId: string): Promise<UserInfo | null> {
-  const email = await getUserEmailById(userId);
-  if (email === null) {
-    return null;
-  }
-  return { id: userId, email };
+  const dataStore = getDataStore();
+  if (!isEEDataStore(dataStore)) return undefined;
+
+  const user = await dataStore.getAuthUser({ userId });
+  return user?.email ?? undefined;
 }

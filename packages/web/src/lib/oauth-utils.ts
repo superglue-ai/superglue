@@ -436,7 +436,7 @@ export const triggerOAuthFlow = (
 
   if (!usingTemplate && oauthFields.client_secret && oauthFields.client_id && apiKey && endpoint) {
     clientCredentialsUid = crypto.randomUUID();
-    const client = new SuperglueClient({ endpoint, apiKey, apiEndpoint });
+    const client = new SuperglueClient({ apiKey, apiEndpoint: apiEndpoint || endpoint });
     cachePromise = client.cacheOauthClientCredentials({
       clientCredentialsUid,
       clientId: oauthFields.client_id,

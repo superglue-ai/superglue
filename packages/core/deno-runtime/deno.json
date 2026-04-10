@@ -1,0 +1,28 @@
+{
+  "name": "@superglue/deno-runtime",
+  "version": "1.0.0",
+  "exports": "./workflow-executor.ts",
+  "tasks": {
+    "check": "deno check workflow-executor.ts",
+    "run": "deno run --allow-net --allow-env --allow-sys=hostname --deny-read --deny-write --deny-run workflow-executor.ts"
+  },
+  "imports": {
+    "@msgpack/msgpack": "npm:@msgpack/msgpack@^3.0.0",
+    "pg": "npm:pg@8.11.3",
+    "mssql": "npm:mssql@^12.2.1",
+    "ioredis": "npm:ioredis@5.3.2",
+    "ssh2-sftp-client": "npm:ssh2-sftp-client@9.1.0",
+    "basic-ftp": "npm:basic-ftp@5.0.4",
+    "@awo00/smb2": "npm:@awo00/smb2@1.0.5",
+    "xlsx": "npm:xlsx@0.18.5",
+    "js-yaml": "npm:js-yaml@4.1.0",
+    "jszip": "npm:jszip@3.10.1",
+    "papaparse": "npm:papaparse@5.4.1",
+    "sax": "npm:sax@1.4.1",
+    "htmlparser2": "npm:htmlparser2@9.1.0"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true
+  }
+}

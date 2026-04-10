@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,21 +13,21 @@ T = TypeVar("T", bound="RunRequestOptions")
 class RunRequestOptions:
     """
     Attributes:
-        async_ (bool | Unset): If true, return immediately (202) and execute asynchronously. If false, wait for
+        async_ (Union[Unset, bool]): If true, return immediately (202) and execute asynchronously. If false, wait for
             completion (200). Default: False.
-        timeout (int | Unset): Request timeout in seconds (only for synchronous execution)
-        webhook_url (str | Unset): URL to receive completion webhook when run finishes (for both sync and async
+        timeout (Union[Unset, int]): Request timeout in milliseconds Default: 60000.
+        webhook_url (Union[Unset, str]): URL to receive completion webhook when run finishes (for both sync and async
             executions).
             Webhook receives POST request with Run object (same schema as getRun response) in body.
             Alternatively, a tool to run after - run via tool:toolId
              Example: https://your-app.com/webhooks/superglue.
-        trace_id (str | Unset): Custom trace ID for log tracking Example: a1b2c3d4-e5f6-7890-abcd-ef1234567890.
+        trace_id (Union[Unset, str]): Custom trace ID for log tracking Example: a1b2c3d4-e5f6-7890-abcd-ef1234567890.
     """
 
-    async_: bool | Unset = False
-    timeout: int | Unset = UNSET
-    webhook_url: str | Unset = UNSET
-    trace_id: str | Unset = UNSET
+    async_: Union[Unset, bool] = False
+    timeout: Union[Unset, int] = 60000
+    webhook_url: Union[Unset, str] = UNSET
+    trace_id: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

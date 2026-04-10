@@ -7,7 +7,7 @@ interface ToolExample {
   title: string;
   icon: string;
   userPrompt: string;
-  systemPrompt: string;
+  hiddenStarterMessage: string;
 }
 
 const TOOL_EXAMPLES: ToolExample[] = [
@@ -16,7 +16,7 @@ const TOOL_EXAMPLES: ToolExample[] = [
     icon: "github",
     userPrompt:
       "Create a tool that fetches all public repositories for the GitHub user '<user_name>' using the GitHub REST API.",
-    systemPrompt: `
+    hiddenStarterMessage: `
   The GitHub API is needs a personal access token from https://github.com/settings/tokens (no scopes required for public repos).
   
   Ask the user for his access token and for his GitHub username - you need this to create the tool!
@@ -34,7 +34,7 @@ const TOOL_EXAMPLES: ToolExample[] = [
     icon: "hubspot",
     userPrompt:
       "Create a tool that adds a new contact to a HubSpot account using the HubSpot CRM API.",
-    systemPrompt: `
+    hiddenStarterMessage: `
   HubSpot requires an personal access key.
   To generate a new Key, go to your HubSpot account, navigate to Development.
   In the left sidebar menu, click Keys, then click Personal access key and create a new key.
@@ -53,7 +53,7 @@ const TOOL_EXAMPLES: ToolExample[] = [
     icon: "shopify",
     userPrompt:
       "Create a tool that retrieves all products from timbuk2.com/products.json and supports pagination.",
-    systemPrompt: `
+    hiddenStarterMessage: `
   The Timbuk2 store exposes a public Shopify endpoint: https://www.timbuk2.com/products.json  
   Pagination is handled via the \`page\` and \`limit\` query parameters.
   
@@ -70,7 +70,7 @@ const TOOL_EXAMPLES: ToolExample[] = [
     title: "Create a Page in Notion",
     icon: "notion",
     userPrompt: "Create a tool that adds a new page to a Notion database using the Notion API.",
-    systemPrompt: `
+    hiddenStarterMessage: `
   The Notion API requires an integration token.  
   Create one here: https://www.notion.so/my-integrations  
   Then share the target database with that system.
@@ -90,13 +90,13 @@ const TOOL_EXAMPLES: ToolExample[] = [
 ];
 
 interface AgentWelcomeExamplesProps {
-  onStartPrompt: (userPrompt: string, systemPrompt?: string) => void;
+  onStartPrompt: (userPrompt: string, hiddenStarterMessage?: string) => void;
   onDismiss: () => void;
 }
 
 export function AgentWelcomeExamples({ onStartPrompt, onDismiss }: AgentWelcomeExamplesProps) {
   const handleSuggestionClick = (suggestion: ToolExample) => {
-    onStartPrompt(suggestion.userPrompt, suggestion.systemPrompt);
+    onStartPrompt(suggestion.userPrompt, suggestion.hiddenStarterMessage);
   };
 
   return (

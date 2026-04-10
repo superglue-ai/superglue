@@ -21,17 +21,20 @@ import { createOpenAI } from "@ai-sdk/openai";
  * @param options - Configuration options
  * @param options.providerEnvVar - Environment variable name for the provider (default: 'LLM_PROVIDER')
  * @param options.defaultModel - Default model if not specified in env (default: 'gpt-4.1')
+ * @param options.modelOverride - If set, use this model instead of env var (useful for dedicated endpoints)
  * @returns AI model instance that can be used with Vercel AI SDK functions
  */
 export function initializeAIModel(options?: {
   providerEnvVar?: string;
   defaultModel?: string;
+  modelOverride?: string;
 }): any {
   const providerEnvVar = options?.providerEnvVar || "LLM_PROVIDER";
   const defaultModel = options?.defaultModel || "gpt-4.1";
+  const modelOverride = options?.modelOverride;
 
   if (process.env.AI_GATEWAY_API_KEY && process.env.AI_GATEWAY_MODEL) {
-    return process.env.AI_GATEWAY_MODEL;
+    return modelOverride || process.env.AI_GATEWAY_MODEL;
   }
 
   let provider: any;
@@ -48,7 +51,7 @@ export function initializeAIModel(options?: {
         anthropicOptions.baseURL = process.env.ANTHROPIC_BASE_URL;
       }
       provider = createAnthropic(anthropicOptions);
-      modelId = process.env.ANTHROPIC_MODEL || defaultModel;
+      modelId = modelOverride || process.env.ANTHROPIC_MODEL || defaultModel;
       break;
     }
     case "openai": {
@@ -57,7 +60,7 @@ export function initializeAIModel(options?: {
         openaiOptions.baseURL = process.env.OPENAI_BASE_URL;
       }
       provider = createOpenAI(openaiOptions);
-      modelId = process.env.OPENAI_MODEL || defaultModel;
+      modelId = modelOverride || process.env.OPENAI_MODEL || defaultModel;
       break;
     }
     case "gemini": {
@@ -66,7 +69,7 @@ export function initializeAIModel(options?: {
         geminiOptions.baseURL = process.env.GEMINI_BASE_URL;
       }
       provider = createGoogleGenerativeAI(geminiOptions);
-      modelId = process.env.GEMINI_MODEL || defaultModel;
+      modelId = modelOverride || process.env.GEMINI_MODEL || defaultModel;
       break;
     }
     case "azure": {
@@ -83,11 +86,12 @@ export function initializeAIModel(options?: {
       if (process.env.AZURE_API_VERSION) {
         azureOptions.apiVersion = process.env.AZURE_API_VERSION;
       }
-      if (process.env.AZURE_USE_DEPLOYMENT_BASED_URLS) {
-        azureOptions.useDeploymentBasedUrls = process.env.AZURE_USE_DEPLOYMENT_BASED_URLS;
+      if (process.env.AZURE_USE_DEPLOYMENT_BASED_URLS !== undefined) {
+        azureOptions.useDeploymentBasedUrls =
+          process.env.AZURE_USE_DEPLOYMENT_BASED_URLS === "true";
       }
       provider = createAzure(azureOptions);
-      modelId = process.env.AZURE_MODEL || defaultModel;
+      modelId = modelOverride || process.env.AZURE_MODEL || defaultModel;
       break;
     }
     case "bedrock": {
@@ -103,11 +107,11 @@ export function initializeAIModel(options?: {
         bedrockOptions.baseURL = process.env.AWS_BASE_URL;
       }
       provider = createAmazonBedrock(bedrockOptions);
-      modelId = process.env.BEDROCK_MODEL || defaultModel;
+      modelId = modelOverride || process.env.BEDROCK_MODEL || defaultModel;
       break;
     }
     case "vertex": {
-      modelId = process.env.VERTEX_MODEL || defaultModel;
+      modelId = modelOverride || process.env.VERTEX_MODEL || defaultModel;
       const isAnthropicModel = modelId.startsWith("claude");
       if (isAnthropicModel) {
         const anthropicVertexOptions: any = {};

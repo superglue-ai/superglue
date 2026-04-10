@@ -2,16 +2,30 @@
 import { createContext, useContext, ReactNode, useEffect, useRef } from "react";
 import { tokenRegistry } from "../lib/token-registry";
 
-interface Config {
-  superglueApiKey: string | null;
+export interface ServerSession {
+  userId: string;
+  email: string;
+  orgId: string;
+  orgName: string;
+  orgStatus: string;
+}
+
+export interface Config {
+  superglueApiKey: string;
   apiEndpoint: string;
   postHogKey: string;
   postHogHost: string;
+  serverSession: ServerSession | null;
 }
 
-interface ConfigWithoutApiKey extends Omit<Config, "superglueApiKey"> {}
+interface ConfigContextValue {
+  apiEndpoint: string;
+  postHogKey: string;
+  postHogHost: string;
+  serverSession: ServerSession | null;
+}
 
-const ConfigContext = createContext<ConfigWithoutApiKey | null>(null);
+const ConfigContext = createContext<ConfigContextValue | null>(null);
 
 export function ConfigProvider({ children, config }: { children: ReactNode; config: Config }) {
   const isInitialTokenSetRef = useRef<boolean>(false);

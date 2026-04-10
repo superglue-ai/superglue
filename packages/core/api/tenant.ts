@@ -67,11 +67,21 @@ registerApiModule({
       method: "GET",
       path: "/tenant-info",
       handler: getTenantInfoHandler,
+      permissions: {
+        type: "read",
+        resource: "tenant",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "PUT",
       path: "/tenant-info",
       handler: setTenantInfoHandler,
+      permissions: {
+        type: "write",
+        resource: "tenant",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
   ],
 });

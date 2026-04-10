@@ -4,33 +4,26 @@ import { Button } from "@/src/components/ui/button";
 import { ScrollArea } from "@/src/components/ui/scroll-area";
 import { Switch } from "@/src/components/ui/switch";
 import { cn } from "@/src/lib/general-utils";
-import { Log, SuperglueClient } from "@superglue/shared";
-import { ChevronRight, MessagesSquare, ScrollText } from "lucide-react";
+import { Log } from "@superglue/shared";
+import { ChevronRight, History, MessagesSquare, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useConfig } from "@/src/app/config-context";
-import { tokenRegistry } from "@/src/lib/token-registry";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import { useRightSidebar } from "./RightSidebarContext";
+import { EnterpriseFeatureCard } from "@/src/components/ui/enterprise-feature-card";
 
 const SIDEBAR_MIN_WIDTH = 300;
 const SIDEBAR_MAX_WIDTH = 700;
 const SIDEBAR_DEFAULT_WIDTH = 350;
 const SIDEBAR_COLLAPSED_WIDTH = 45;
 
-type ActivePanel = "logs" | "agent";
+type ActivePanel = "logs" | "agent" | "history";
 
 interface RightSidebarProps {
   className?: string;
 }
 
 export function RightSidebar({ className }: RightSidebarProps) {
-  const {
-    showAgent,
-    setAgentPortalRef,
-    registerSetSidebarExpanded,
-    savedTool,
-    playgroundTool,
-    onRestoreDraft,
-  } = useRightSidebar();
+  const { showAgent, setAgentPortalRef, registerSetSidebarExpanded, savedTool } = useRightSidebar();
   const agentContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       setAgentPortalRef(node);
@@ -38,7 +31,9 @@ export function RightSidebar({ className }: RightSidebarProps) {
     [setAgentPortalRef],
   );
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activePanel, setActivePanel] = useState<ActivePanel>(showAgent ? "agent" : "logs");
+  const [activePanel, setActivePanel] = useState<ActivePanel>(
+    savedTool ? "history" : showAgent ? "agent" : "logs",
+  );
   const [isHydrated, setIsHydrated] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
@@ -51,7 +46,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
   const [hasNewLogs, setHasNewLogs] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
-  const config = useConfig();
+  const createClient = useSuperglueClient();
 
   const isExpandedRef = useRef(isExpanded);
   const activePanelRef = useRef(activePanel);
@@ -59,30 +54,39 @@ export function RightSidebar({ className }: RightSidebarProps) {
   activePanelRef.current = activePanel;
 
   useEffect(() => {
-    const storageKey = showAgent ? "playground-sidebar" : "global-sidebar";
+    const storageKey = showAgent || savedTool ? "playground-sidebar" : "global-sidebar";
     const savedExpanded = localStorage.getItem(`${storageKey}-expanded`) === "true";
     const savedPanel = localStorage.getItem(`${storageKey}-panel`) as ActivePanel;
-    setIsExpanded(showAgent ? true : savedExpanded);
-    if (showAgent) {
-      const validPanels: ActivePanel[] = ["logs", "agent"];
-      setActivePanel(savedPanel && validPanels.includes(savedPanel) ? savedPanel : "agent");
+    // When agent mode or tool is active, always expand the sidebar
+    setIsExpanded(showAgent || savedTool ? true : savedExpanded);
+    if (showAgent || savedTool) {
+      const validPanels: ActivePanel[] = showAgent
+        ? ["logs", "agent", "history"]
+        : ["logs", "history"];
+      setActivePanel(
+        savedPanel && validPanels.includes(savedPanel)
+          ? savedPanel
+          : savedTool
+            ? "history"
+            : "agent",
+      );
     }
     setIsHydrated(true);
     requestAnimationFrame(() => setTransitionDuration(0.3));
-  }, [showAgent]);
+  }, [showAgent, savedTool]);
 
   useEffect(() => {
     if (isHydrated) {
-      const storageKey = showAgent ? "playground-sidebar" : "global-sidebar";
+      const storageKey = showAgent || savedTool ? "playground-sidebar" : "global-sidebar";
       localStorage.setItem(`${storageKey}-expanded`, String(isExpanded));
     }
-  }, [isExpanded, isHydrated, showAgent]);
+  }, [isExpanded, isHydrated, showAgent, savedTool]);
 
   useEffect(() => {
-    if (isHydrated && showAgent) {
+    if (isHydrated && (showAgent || savedTool)) {
       localStorage.setItem("playground-sidebar-panel", activePanel);
     }
-  }, [activePanel, isHydrated, showAgent]);
+  }, [activePanel, isHydrated, showAgent, savedTool]);
 
   useEffect(() => {
     registerSetSidebarExpanded((expanded: boolean) => {
@@ -93,13 +97,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
     });
   }, [registerSetSidebarExpanded]);
 
-  const client = useMemo(() => {
-    return new SuperglueClient({
-      endpoint: config.apiEndpoint,
-      apiKey: tokenRegistry.getToken(),
-      apiEndpoint: config.apiEndpoint,
-    });
-  }, [config.apiEndpoint]);
+  const client = useMemo(() => createClient(), [createClient]);
 
   const filteredLogs = useMemo(
     () => (showDebug ? logs : logs.filter((log) => log.level !== "DEBUG")),
@@ -114,9 +112,7 @@ export function RightSidebar({ className }: RightSidebarProps) {
           setHasNewLogs(true);
         }
       },
-      onError: (error) => {
-        console.warn("Log subscription error:", error);
-      },
+      onError: () => {},
       includeDebug: true,
     });
 
@@ -210,6 +206,20 @@ export function RightSidebar({ className }: RightSidebarProps) {
             <MessagesSquare className="h-5 w-5" />
           </Button>
         )}
+        {savedTool && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handlePanelSelect("history")}
+            className={cn(
+              "h-10 w-10 relative",
+              activePanel === "history" && "bg-primary/10 text-primary",
+            )}
+            title="Version History"
+          >
+            <History className="h-5 w-5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -240,6 +250,20 @@ export function RightSidebar({ className }: RightSidebarProps) {
               >
                 <MessagesSquare className="h-3.5 w-3.5" />
                 Agent
+              </button>
+            )}
+            {savedTool && (
+              <button
+                onClick={() => setActivePanel("history")}
+                className={cn(
+                  "h-7 px-2 gap-1.5 text-xs rounded-md inline-flex items-center font-medium transition-colors",
+                  activePanel === "history"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                )}
+              >
+                <History className="h-3.5 w-3.5" />
+                History
               </button>
             )}
             <button
@@ -274,6 +298,16 @@ export function RightSidebar({ className }: RightSidebarProps) {
               ref={agentContainerRef}
               className={cn("h-full", activePanel !== "agent" && "hidden")}
             />
+          )}
+          {savedTool && (
+            <div className={cn("h-full", activePanel !== "history" && "hidden")}>
+              <div className="p-4">
+                <EnterpriseFeatureCard
+                  title="Version History"
+                  description="Tool version history and restore flows are available in the Enterprise edition."
+                />
+              </div>
+            </div>
           )}
           <div className={cn("h-full", activePanel !== "logs" && "hidden")}>
             <LogsPanel

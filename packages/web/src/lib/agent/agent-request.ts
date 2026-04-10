@@ -1,41 +1,30 @@
 import { Message } from "@superglue/shared";
 import { jsonSchema } from "ai";
 import { tavilySearch } from "@tavily/ai-sdk";
-import { AgentType, getAgent } from "./registry/agents";
-import { TOOL_EVENTS, resolveEventMessage } from "./registry/tool-events";
-import { TOOL_REGISTRY } from "./registry/tool-definitions";
+import { AgentType, getAgent } from "./registries/agent-registry";
+import { TOOL_REGISTRY, SKILL_GATED_TOOLS } from "./registries/tool-registry";
 import { truncateToolResult } from "../general-utils";
 import {
+  recordConfirmationObservation,
+  updateActiveToolObservation,
+} from "./observability/langfuse";
+import {
+  PrepareMessagesResult,
   ToolExecutionContext,
   ToolRegistryEntry,
   ValidatedAgentRequest,
-  UserAction,
-  ToolEventAction,
 } from "./agent-types";
-import { getEffectiveMode } from "./registry/tool-policies";
+import { getEffectiveMode } from "./agent-tools/tool-policies";
 import { needsSystemMessage } from "./agent-helpers";
+import { type SkillName } from "./skills/index";
 
 export interface ConfirmationResult {
   toolId: string;
   toolName: string;
   output: string;
   status: "completed" | "declined";
-}
-
-function validateUserActions(actions: UserAction[]): void {
-  for (const action of actions) {
-    if (action.type === "tool_event") {
-      if (!action.toolCallId || !action.toolName || !action.event) {
-        throw new Error("ToolEventAction requires toolCallId, toolName, and event");
-      }
-      const eventDef = TOOL_EVENTS[action.toolName]?.[action.event];
-      if (!eventDef) {
-        throw new Error(`Unknown event "${action.event}" for tool "${action.toolName}"`);
-      }
-    } else {
-      throw new Error(`Unknown UserAction type: ${(action as any).type}`);
-    }
-  }
+  confirmationState?: string | null;
+  confirmationData?: unknown;
 }
 
 export function validateAgentRequest(body: any): ValidatedAgentRequest {
@@ -47,16 +36,8 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     throw new Error("messages is required and must be an array");
   }
 
-  if (body.userActions) {
-    validateUserActions(body.userActions);
-  }
-
-  if (
-    !body.userMessage &&
-    (!body.userActions || body.userActions.length === 0) &&
-    !body.hiddenContext
-  ) {
-    throw new Error("Request must have userMessage, userActions, or hiddenContext");
+  if (!body.userMessage && !body.resumeToolCallId) {
+    throw new Error("Request must have userMessage or resumeToolCallId");
   }
 
   const agent = getAgent(body.agentId);
@@ -69,148 +50,16 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     agentId: body.agentId,
     messages: body.messages,
     userMessage: body.userMessage,
-    userActions: body.userActions,
+    visibleUserMessageId: body.visibleUserMessageId,
+    resumeToolCallId: body.resumeToolCallId,
     filePayloads: body.filePayloads,
-    hiddenContext: body.hiddenContext,
     toolExecutionPolicies: body.toolExecutionPolicies,
+    loadedSkills: body.loadedSkills,
     playgroundDraft: body.playgroundDraft,
+    systemPlaygroundContext: body.systemPlaygroundContext,
+    accessRulesContext: body.accessRulesContext,
     agent,
   };
-}
-
-type ToolStatus =
-  | "pending"
-  | "declined"
-  | "completed"
-  | "awaiting_confirmation"
-  | "running"
-  | "stopped"
-  | "failed"
-  | "error";
-
-function updateToolInMessages(
-  messages: Message[],
-  toolCallId: string,
-  updates: { status?: ToolStatus; confirmationData?: any; confirmationState?: string },
-): Message[] {
-  return messages.map((msg) => {
-    if (msg.role !== "assistant" || !msg.parts) return msg;
-
-    const updatedParts = msg.parts.map((part) => {
-      if (part.type === "tool" && part.tool?.id === toolCallId) {
-        let updatedOutput = part.tool.output;
-        if (updates.confirmationState || updates.confirmationData) {
-          if (updatedOutput) {
-            try {
-              const parsed =
-                typeof updatedOutput === "string" ? JSON.parse(updatedOutput) : updatedOutput;
-              if (updates.confirmationState) {
-                parsed.confirmationState = updates.confirmationState;
-              }
-              if (updates.confirmationData) {
-                parsed.confirmationData = updates.confirmationData;
-              }
-              updatedOutput = JSON.stringify(parsed);
-            } catch {
-              updatedOutput = JSON.stringify({
-                confirmationState: updates.confirmationState,
-                confirmationData: updates.confirmationData,
-              });
-            }
-          } else {
-            updatedOutput = JSON.stringify({
-              confirmationState: updates.confirmationState,
-              confirmationData: updates.confirmationData,
-            });
-          }
-        }
-        return {
-          ...part,
-          tool: {
-            ...part.tool,
-            ...(updates.status && { status: updates.status }),
-            ...(updatedOutput && { output: updatedOutput }),
-          },
-        };
-      }
-      return part;
-    });
-
-    return { ...msg, parts: updatedParts };
-  }) as Message[];
-}
-
-function processToolEvent(
-  action: ToolEventAction,
-  messages: Message[],
-): { messages: Message[]; continuation: string } {
-  const eventDef = TOOL_EVENTS[action.toolName]?.[action.event];
-  if (!eventDef) {
-    throw new Error(`Unknown event "${action.event}" for tool "${action.toolName}"`);
-  }
-
-  const continuation = resolveEventMessage(eventDef.message, action.payload);
-
-  const updatedMessages = eventDef.statusUpdate
-    ? updateToolInMessages(messages, action.toolCallId, {
-        status: eventDef.statusUpdate,
-        confirmationState: action.event,
-        ...(action.payload && { confirmationData: action.payload }),
-      })
-    : messages;
-
-  return { messages: updatedMessages, continuation };
-}
-
-function processUserActions(
-  actions: UserAction[],
-  messages: Message[],
-): { messages: Message[]; continuations: string[] } {
-  const continuations: string[] = [];
-  let updatedMessages = [...messages];
-
-  for (const action of actions) {
-    if (action.type === "tool_event") {
-      const result = processToolEvent(action, updatedMessages);
-      updatedMessages = result.messages;
-      continuations.push(result.continuation);
-    }
-  }
-
-  return { messages: updatedMessages, continuations };
-}
-
-function buildUserTurn(
-  hiddenContext: string | null,
-  continuations: string[],
-  userMessage?: string,
-): Message | null {
-  const parts: string[] = [];
-
-  if (hiddenContext) {
-    try {
-      const parsed = JSON.parse(hiddenContext);
-      parts.push(parsed.display || hiddenContext);
-    } catch {
-      parts.push(hiddenContext);
-    }
-  }
-  if (continuations.length > 0) parts.push(continuations.join("\n\n"));
-  if (userMessage) parts.push(userMessage);
-
-  if (parts.length === 0) return null;
-
-  return {
-    id: `user-${Date.now()}`,
-    role: "user",
-    content: parts.join("\n\n"),
-    timestamp: new Date(),
-  };
-}
-
-export interface PrepareMessagesResult {
-  messages: Message[];
-  systemMessage?: { id: string; content: string };
 }
 
 export async function prepareMessages(
@@ -234,25 +83,21 @@ export async function prepareMessages(
     systemMessage = { id: systemMessageObj.id, content: result.content };
   }
 
-  let continuations: string[] = [];
-  if (request.userActions && request.userActions.length > 0) {
-    const result = processUserActions(request.userActions, messages);
-    messages = result.messages;
-    continuations = result.continuations;
-  }
+  const userMessageAlreadyInHistory = request.visibleUserMessageId
+    ? messages.some((m) => m.id === request.visibleUserMessageId && m.role === "user")
+    : messages[messages.length - 1]?.role === "user" &&
+      messages[messages.length - 1]?.content === request.userMessage;
 
-  const lastMessage = messages[messages.length - 1];
-  const userMessageAlreadyInHistory =
-    lastMessage?.role === "user" && lastMessage?.content === request.userMessage;
-
-  const userTurn = buildUserTurn(
-    request.hiddenContext || null,
-    continuations,
-    userMessageAlreadyInHistory ? undefined : request.userMessage,
-  );
-
-  if (userTurn) {
-    messages = [...messages, userTurn];
+  if (!userMessageAlreadyInHistory && request.userMessage) {
+    messages = [
+      ...messages,
+      {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: request.userMessage,
+        timestamp: new Date(),
+      },
+    ];
   }
 
   return { messages, systemMessage };
@@ -265,32 +110,66 @@ export async function prepareMessages(
  *
  * Each tool declares its own processable states via validActions:
  * - create_system, edit_system, call_system: confirmed, declined
- * - edit_tool, edit_payload: confirmed, declined, partial
+ * - edit_tool: confirmed, declined, partial
  * - authenticate_oauth: oauth_success, oauth_failure, declined
  */
 function extractPendingConfirmation(part: any): {
   tool: any;
   toolEntry: ToolRegistryEntry;
+  normalizedOutput: any;
 } | null {
   if (part.type !== "tool" || !part.tool) return null;
 
   const toolEntry = TOOL_REGISTRY[part.tool.name];
-  if (!toolEntry?.confirmation || !part.tool.output) return null;
+  if (!toolEntry?.confirmation) return null;
 
-  let parsedOutput: any;
-  try {
-    parsedOutput =
-      typeof part.tool.output === "string" ? JSON.parse(part.tool.output) : part.tool.output;
-  } catch {
-    return null;
+  let parsedOutput: Record<string, unknown> = {};
+  if (part.tool.output !== undefined && part.tool.output !== null) {
+    try {
+      if (typeof part.tool.output === "string") {
+        try {
+          const parsed = JSON.parse(part.tool.output);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            parsedOutput = parsed;
+          } else {
+            parsedOutput = { result: parsed };
+          }
+        } catch {
+          parsedOutput = { result: part.tool.output };
+        }
+      } else if (typeof part.tool.output === "object" && !Array.isArray(part.tool.output)) {
+        parsedOutput = part.tool.output;
+      } else {
+        parsedOutput = { result: part.tool.output };
+      }
+    } catch {
+      return null;
+    }
   }
 
-  if (!parsedOutput.confirmationState) return null;
+  const confirmationState =
+    part.tool.confirmationState !== undefined
+      ? part.tool.confirmationState
+      : parsedOutput.confirmationState;
+  const confirmationData =
+    part.tool.confirmationData !== undefined
+      ? part.tool.confirmationData
+      : parsedOutput.confirmationData;
+
+  if (!confirmationState) return null;
 
   const processableStates = new Set<string>(toolEntry.confirmation.validActions);
-  if (!processableStates.has(parsedOutput.confirmationState)) return null;
+  if (!processableStates.has(confirmationState)) return null;
 
-  return { tool: part.tool, toolEntry };
+  return {
+    tool: part.tool,
+    toolEntry,
+    normalizedOutput: {
+      ...parsedOutput,
+      confirmationState,
+      ...(confirmationData !== undefined ? { confirmationData } : {}),
+    },
+  };
 }
 
 export async function processConfirmations(
@@ -306,21 +185,45 @@ export async function processConfirmations(
       const pending = extractPendingConfirmation(part);
       if (!pending) continue;
 
-      const { tool, toolEntry } = pending;
+      const { tool, toolEntry, normalizedOutput } = pending;
       const result = await toolEntry.confirmation!.processConfirmation(
         tool.input,
-        tool.output,
+        normalizedOutput,
         ctx,
       );
 
       if (result) {
+        try {
+          await recordConfirmationObservation({
+            toolName: tool.name,
+            toolCallId: tool.id,
+            action: normalizedOutput.confirmationState as string,
+            status: result.status,
+            input: tool.input,
+            normalizedOutput,
+          });
+        } catch (error) {
+          console.error("Failed to record confirmation observation:", error);
+        }
+
         tool.output = result.output;
         tool.status = result.status;
+        delete tool.confirmationState;
+        delete tool.confirmationData;
+        const siblingTool = message.tools?.find((candidate) => candidate.id === tool.id);
+        if (siblingTool && siblingTool !== tool) {
+          siblingTool.output = result.output;
+          siblingTool.status = result.status;
+          delete siblingTool.confirmationState;
+          delete siblingTool.confirmationData;
+        }
         results.push({
           toolId: tool.id,
           toolName: tool.name,
           output: result.output,
           status: result.status,
+          confirmationState: null,
+          confirmationData: null,
         });
       }
     }
@@ -347,6 +250,9 @@ async function* executeToolWithLogs(
   const toolCallId = crypto.randomUUID();
   let logUpdates: any[] = [];
   let filterTraceId: string | undefined;
+  const executionMode = getEffectiveMode(entry.name, context.toolExecutionPolicies, input);
+  const awaitingConfirmation =
+    executionMode === "confirm_after_execution" || executionMode === "confirm_before_execution";
 
   const logCallback = (message: string) => {
     // Handle TRACE_ID messages from run_tool, build_tool, and edit_tool
@@ -425,7 +331,20 @@ async function* executeToolWithLogs(
       };
     }
 
-    const toolResultAsString = truncateToolResult(result, 50000);
+    const toolResultAsString = truncateToolResult(result, 80_000);
+
+    try {
+      updateActiveToolObservation({
+        toolName: entry.name,
+        toolCallId,
+        executionMode,
+        awaitingConfirmation,
+        input,
+        result,
+      });
+    } catch (metadataError) {
+      console.error("Failed to enrich tool observation:", metadataError);
+    }
 
     context.messages.push({
       id: crypto.randomUUID(),
@@ -452,6 +371,20 @@ async function* executeToolWithLogs(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorResult = { success: false, error: errorMessage };
     const errorResultAsString = truncateToolResult(errorResult, 50000);
+
+    try {
+      updateActiveToolObservation({
+        toolName: entry.name,
+        toolCallId,
+        executionMode,
+        awaitingConfirmation,
+        input,
+        result: errorResult,
+        error: errorMessage,
+      });
+    } catch (metadataError) {
+      console.error("Failed to enrich tool observation:", metadataError);
+    }
 
     context.messages.push({
       id: crypto.randomUUID(),
@@ -539,4 +472,60 @@ export function buildToolsForAISDK(
   }
 
   return tools;
+}
+
+export function registerSkillGatedTools(
+  tools: Record<string, any>,
+  baseToolSet: string[],
+  loadedSkills: Set<SkillName>,
+  registry: Record<string, ToolRegistryEntry>,
+  context: ToolExecutionContext,
+): string[] {
+  const gatedToolNames = new Set<string>();
+  for (const skill of loadedSkills) {
+    const gated = SKILL_GATED_TOOLS[skill];
+    if (gated) gated.forEach((t) => gatedToolNames.add(t));
+  }
+
+  const newlyAdded: string[] = [];
+  for (const toolName of gatedToolNames) {
+    if (tools[toolName] || baseToolSet.includes(toolName)) continue;
+    const entry = registry[toolName];
+    if (!entry) continue;
+
+    const definition = entry.definition();
+    let schema = definition.inputSchema;
+    if (!schema || !schema.type || schema.type !== "object") {
+      schema = {
+        type: "object",
+        properties: schema?.properties || {},
+        required: schema?.required || [],
+        additionalProperties: false,
+      };
+    }
+
+    const toolDef: any = {
+      description: definition.description || "",
+      inputSchema: jsonSchema(schema),
+    };
+
+    const effectiveMode = getEffectiveMode(toolName, context.toolExecutionPolicies);
+    const shouldAttachExecute =
+      entry.execute && (effectiveMode === "auto" || effectiveMode === "confirm_after_execution");
+
+    if (shouldAttachExecute) {
+      toolDef.execute = async function* (input: any) {
+        const actualMode = getEffectiveMode(toolName, context.toolExecutionPolicies, input);
+        if (actualMode === "confirm_before_execution") {
+          return;
+        }
+        yield* executeToolWithLogs(entry, input, context);
+      };
+    }
+
+    tools[definition.name] = toolDef;
+    newlyAdded.push(definition.name);
+  }
+
+  return newlyAdded;
 }

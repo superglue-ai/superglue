@@ -8,6 +8,7 @@ interface ConfirmButtonProps {
   onConfirm: () => void;
   disabled?: boolean;
   isLoading?: boolean;
+  loadingText?: string;
   children: React.ReactNode;
   confirmText?: string;
   variant?: "ghost" | "default" | "destructive" | "outline" | "secondary" | "link";
@@ -20,6 +21,7 @@ export function ConfirmButton({
   onConfirm,
   disabled,
   isLoading,
+  loadingText,
   children,
   confirmText = "Confirm",
   variant = "ghost",
@@ -40,6 +42,7 @@ export function ConfirmButton({
   if (isLoading) {
     return (
       <Button variant={variant} size={size} disabled className={className}>
+        {loadingText && loadingText}
         <Loader2 className="h-3 w-3 animate-spin" />
       </Button>
     );

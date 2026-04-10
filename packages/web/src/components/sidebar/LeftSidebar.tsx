@@ -1,23 +1,19 @@
 "use client";
 
-import { useConfig, useSupabaseClient } from "@/src/app/config-context";
 import { cn } from "@/src/lib/general-utils";
 import {
   Blocks,
   Book,
   ExternalLink,
   Hammer,
-  Home,
-  Key,
-  LogOut,
   Menu,
   MessagesSquare,
   Moon,
+  Settings2,
   Sun,
-  User,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "../../hooks/use-theme";
 import { Button } from "../ui/button";
@@ -31,6 +27,7 @@ const baseNavItems: {
   { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
+  { icon: Settings2, label: "Setup", href: "/setup" },
 ];
 
 const docsNavItem = {
@@ -42,20 +39,11 @@ const docsNavItem = {
 
 export function LeftSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = useSupabaseClient();
   const [isOpen, setIsOpen] = useState(false);
   const [theme, setTheme, resolvedTheme] = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
-
-  const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-      window.location.href = "/login";
-    }
-  };
 
   return (
     <>
@@ -76,7 +64,7 @@ export function LeftSidebar() {
       <div
         className={`
         fixed lg:static inset-y-0 left-0 z-40
-        w-48 flex-shrink-0 bg-background border-r border-border 
+        w-48 flex-shrink-0 bg-background border-r border-border
         flex flex-col transform transition-transform duration-200 ease-in-out
         lg:transform-none ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}
@@ -92,7 +80,7 @@ export function LeftSidebar() {
             </Link>
           </div>
         </div>
-        <nav className="flex-1 px-2 pt-2">
+        <nav className="flex-1 px-2 pt-2 overflow-y-auto min-h-0">
           {baseNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -126,17 +114,6 @@ export function LeftSidebar() {
             <ExternalLink className="h-3 w-3 ml-1.5 opacity-70" />
           </Link>
         </nav>
-        <div className="py-3 px-2 border-t border-border space-y-0.5">
-          {supabase && (
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center px-3 py-2.5 text-sm text-muted-foreground hover:bg-gradient-to-br hover:from-muted/40 hover:to-muted/20 dark:hover:from-muted/40 dark:hover:to-muted/20 hover:text-foreground rounded-xl transition-all duration-200"
-            >
-              <LogOut className="h-4 w-4 mr-3" />
-              Sign Out
-            </button>
-          )}
-        </div>
         <div className="pt-0 px-6 pb-6 mt-auto flex flex-col items-center w-full">
           {mounted && (
             <div className="flex gap-2">

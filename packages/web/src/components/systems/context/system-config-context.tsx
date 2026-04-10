@@ -1,9 +1,10 @@
 "use client";
 
-import { useConfig } from "@/src/app/config-context";
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems, useCreateSystem, useUpdateSystem } from "@/src/queries/systems";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import { useToast } from "@/src/hooks/use-toast";
-import { createSuperglueClient } from "@/src/lib/client-utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/src/queries/query-keys";
 import type { System } from "@superglue/shared";
 import {
   systems as systemTemplates,
@@ -52,23 +53,15 @@ const DEFAULT_OAUTH_FIELDS: OAuthFields = {
 function detectAuthType(credentials: any): "oauth" | "apikey" | "none" {
   if (!credentials || Object.keys(credentials).length === 0) return "none";
 
-  const oauthSpecificFields = [
-    "client_id",
-    "client_secret",
-    "auth_url",
-    "token_url",
-    "access_token",
-    "refresh_token",
-    "scopes",
-    "expires_at",
-    "token_type",
-  ];
-
   const allKeys = Object.keys(credentials);
-  const hasOAuthFields = allKeys.some((key) => oauthSpecificFields.includes(key));
 
-  if (hasOAuthFields) return "oauth";
-  return "apikey";
+  // OAuth requires client_id AND at least one OAuth URL (token_url or auth_url)
+  // This distinguishes from APIs that just happen to use client_id/client_secret naming
+  const hasClientId = allKeys.includes("client_id");
+  const hasOAuthUrl = allKeys.includes("token_url") || allKeys.includes("auth_url");
+
+  if (hasClientId && hasOAuthUrl) return "oauth";
+  return allKeys.length > 0 ? "apikey" : "none";
 }
 
 function extractOAuthFields(credentials: Record<string, any>): OAuthFields {
@@ -116,13 +109,6 @@ function extractNonOAuthCredentials(credentials: Record<string, any>): string {
   return Object.keys(nonOAuthCreds).length > 0 ? JSON.stringify(nonOAuthCreds, null, 2) : "{}";
 }
 
-function isSystemUsingTemplateOAuth(system: System | undefined): boolean {
-  if (!system?.credentials?.client_id) return false;
-  const match = findTemplateForSystem(system);
-  const templateClientId = match?.template?.oauth?.client_id;
-  return Boolean(templateClientId && system.credentials.client_id === templateClientId);
-}
-
 interface SystemConfigProviderProps {
   initialSystem?: System;
   isNew?: boolean;
@@ -146,9 +132,10 @@ export function SystemConfigProvider({
   isOnboarding = false,
   children,
 }: SystemConfigProviderProps) {
-  const config = useConfig();
   const { toast } = useToast();
-  const { systems, refreshSystems } = useSystems();
+  const { systems } = useSystems();
+  const createSystemMutation = useCreateSystem();
+  const updateSystemMutation = useUpdateSystem();
 
   const initialRef = useRef(initialSystem);
 
@@ -157,6 +144,9 @@ export function SystemConfigProvider({
   const [url, setUrl] = useState(initialSystem?.url || "");
   const [templateName, setTemplateName] = useState(initialSystem?.templateName || "");
   const [icon, setIcon] = useState(initialSystem?.icon || "");
+  const [environment, setEnvironment] = useState<"dev" | "prod" | undefined>(
+    initialSystem?.environment,
+  );
 
   const initialAuthType = initialSystem
     ? detectAuthType(initialSystem.credentials || {})
@@ -177,10 +167,7 @@ export function SystemConfigProvider({
         : JSON.stringify(initialSystem.credentials, null, 2)
       : "{}",
   );
-  // Detect if system was created with superglue OAuth by comparing stored client_id with template's
-  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(() =>
-    isSystemUsingTemplateOAuth(initialSystem),
-  );
+  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(false);
   const [multiTenancyMode, setMultiTenancyMode] = useState<"disabled" | "enabled">(
     (initialSystem?.multiTenancyMode as "disabled" | "enabled") || "disabled",
   );
@@ -188,7 +175,6 @@ export function SystemConfigProvider({
   const [specificInstructions, setSpecificInstructions] = useState(
     initialSystem?.specificInstructions || "",
   );
-  const [docFileCount, setDocFileCount] = useState(0);
   const [activeSection, setActiveSection] = useState<SystemSection>("configuration");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -196,21 +182,33 @@ export function SystemConfigProvider({
 
   const [isOnboardingActive, setIsOnboardingActive] = useState(isOnboarding);
 
-  useEffect(() => {
-    if (!initialSystem?.id) return;
-    const client = createSuperglueClient(config.apiEndpoint);
-    client
-      .listSystemFileReferences(initialSystem.id)
-      .then((result) => {
-        setDocFileCount(result.files.length);
-      })
-      .catch(() => {});
-  }, [initialSystem?.id, config.apiEndpoint, config.apiEndpoint]);
+  const createClient = useSuperglueClient();
+  const queryClient = useQueryClient();
+  const docFileQueryKey = useMemo(
+    () => ["system-doc-file-count", initialSystem?.id],
+    [initialSystem?.id],
+  );
+  const docFileQuery = useQuery({
+    queryKey: docFileQueryKey,
+    queryFn: async () => {
+      const client = createClient();
+      const result = await client.listSystemFileReferences(initialSystem!.id);
+      return result.files.length;
+    },
+    enabled: !!initialSystem?.id,
+  });
+  const docFileCount = docFileQuery.data ?? 0;
+  const setDocFileCount = useCallback(
+    (count: number) => queryClient.setQueryData(docFileQueryKey, count),
+    [queryClient, docFileQueryKey],
+  );
 
   useEffect(() => {
     if (!systemId || isNew) return;
 
-    const updatedSystem = systems.find((s) => s.id === systemId);
+    // Find the system with matching ID AND environment
+    // Use current environment state, not initialRef which can be stale after env-based navigation
+    const updatedSystem = systems.find((s) => s.id === systemId && s.environment === environment);
     if (!updatedSystem) return;
 
     const currentUpdatedAt = updatedSystem.updatedAt
@@ -238,12 +236,12 @@ export function SystemConfigProvider({
           : JSON.stringify(updatedSystem.credentials || {}, null, 2),
       );
 
-      setUseSuperglueOAuth(isSystemUsingTemplateOAuth(updatedSystem));
+      setUseSuperglueOAuth(false);
 
       initialRef.current = updatedSystem;
       setHasUnsavedChanges(false);
     }
-  }, [systems, systemId, isNew]);
+  }, [systems, systemId, isNew, environment]);
 
   useEffect(() => {
     if (!initialSystem) return;
@@ -298,8 +296,10 @@ export function SystemConfigProvider({
       icon: icon || undefined,
       createdAt: initialSystem?.createdAt,
       updatedAt: initialSystem?.updatedAt,
+      tunnel: initialSystem?.tunnel,
+      environment,
     }),
-    [systemId, systemName, url, templateName, icon, initialSystem],
+    [systemId, systemName, url, templateName, icon, initialSystem, environment],
   );
 
   const auth = useMemo<AuthState>(
@@ -421,6 +421,7 @@ export function SystemConfigProvider({
       authType,
       credentialKeys,
       specificInstructions,
+      isNewSystem: isNew,
       sectionStatuses: {
         configuration: getSectionStatus("configuration"),
         authentication: getSectionStatus("authentication"),
@@ -436,6 +437,7 @@ export function SystemConfigProvider({
     apiKeyCredentials,
     specificInstructions,
     getSectionStatus,
+    isNew,
   ]);
 
   const saveSystem = useCallback(
@@ -513,14 +515,27 @@ export function SystemConfigProvider({
           multiTenancyMode: multiTenancyMode,
         };
 
-        const existingSystem = systems.find((s) => s.id === systemId);
+        const existingSystem = systems.find(
+          (s) => s.id === systemId && s.environment === environment,
+        );
 
-        const client = createSuperglueClient(config.apiEndpoint);
-        const savedSystem = existingSystem
-          ? await client.updateSystem(systemId, systemData)
-          : await client.createSystem({ ...systemData, name: systemData.name || systemId });
+        let savedSystem: System;
 
-        await refreshSystems();
+        if (existingSystem) {
+          savedSystem = await updateSystemMutation.mutateAsync({
+            id: systemId,
+            input: systemData,
+            options: { environment: existingSystem.environment },
+          });
+        } else {
+          savedSystem = await createSystemMutation.mutateAsync({
+            ...systemData,
+            id: systemId,
+            name: systemData.name || systemId,
+            environment: environment,
+          });
+        }
+
         setHasUnsavedChanges(false);
         initialRef.current = savedSystem;
         return true;
@@ -547,10 +562,10 @@ export function SystemConfigProvider({
       apiKeyCredentials,
       templateName,
       multiTenancyMode,
+      environment,
       systems,
-      config.apiEndpoint,
-      config.apiEndpoint,
-      refreshSystems,
+      createSystemMutation,
+      updateSystemMutation,
       toast,
     ],
   );
@@ -563,6 +578,7 @@ export function SystemConfigProvider({
       setUrl(initial.url || "");
       setTemplateName(initial.templateName || "");
       setIcon(initial.icon || "");
+      setEnvironment(initial.environment);
       setAuthType(detectAuthType(initial.credentials || {}));
       setCredentials(initial.credentials || {});
       setOauthFieldsState(extractOAuthFields(initial.credentials || {}));
@@ -579,6 +595,7 @@ export function SystemConfigProvider({
       setUrl("");
       setTemplateName("");
       setIcon("");
+      setEnvironment(undefined);
       setAuthType("apikey");
       setCredentials({});
       setOauthFieldsState(DEFAULT_OAUTH_FIELDS);

@@ -2,9 +2,9 @@
 
 ## Build Recipe
 
-MANDATORY before producing a tool config:
+Before producing a tool config:
 
-1. Load relevant skills: superglue-concepts, variables-and-data-flow, transforms-and-output, plus protocol skill(s) for the involved systems
+1. Load relevant skills: data-handling and protocol skill(s) for the involved systems
 2. Use find_system for every involved system — note credentialPlaceholders and URL
 3. Use search_documentation for each system — look up endpoints, auth patterns, pagination, response structure
 4. Use web_search for the specific API to find information not present in the docs
@@ -13,33 +13,33 @@ MANDATORY before producing a tool config:
 
 ## Planning Steps
 
-- Plan ALL data retrieval steps FIRST — understand what data you need and in what order
-- Fetch prerequisites: available projects, entity types, categories, etc. Don't assume you know the data — always fetch first.
+- Fetch prerequisites: available projects, entity types, categories, etc.
 - Each step = one API call, one DB query, one file operation or a transform step (no compound ops)
-- Use transform steps for intermediate reshaping between request steps
-- Prioritize transform steps over complex transformations in request bodies
-- Do not add a transform step before the output transform
 - Final aggregation/filtering/sorting should happen in the outputTransform, not in a step
-- Step IDs: camelCase, descriptive (e.g., fetchCustomerDetails, listInvoices)
+
+### Choosing Between Transform Points
+
+| Need                                              | Use                                        |
+| ------------------------------------------------- | ------------------------------------------ |
+| Control step input or trigger loop mode           | `dataSelector`                             |
+| Intermediate data needed by a later request step  | Transform step                             |
+| Aggregating/combining results from multiple steps | Transform step                             |
+| Complex body construction for a request           | Transform step + simple `<<>>` ref in body |
+| Final output shaping                              | `outputTransform`                          |
+| Simple filtering within one step                  | `dataSelector` returning a filtered array  |
+
+**Do NOT** add a transform step right before the outputTransform — merge it into the outputTransform instead. Rule of thumb: if your `<<>>` expression is longer than ~80 characters or contains multiple statements, use a transform step.
+
 - Step instructions: 2-3 sentences describing the goal and expected data
 - instruction: Write a 1-2 sentence summary of the tool's purpose — what it does and what it returns. Never leave empty.
 
 ## Step Result Envelopes
 
-Every step result is wrapped — you MUST account for this in dataSelectors and outputTransform.
+Every step result is wrapped — you MUST account for this in dataSelectors and outputTransform. See data-handling skill for the full envelope reference.
 
-- **Object selector (or none)** → `sourceData.stepId = { currentItem, data, success }` → access via `.data`
-- **Array selector** → `sourceData.stepId = [{ currentItem, data, success }, ...]` → access via `.map(i => i.data)`
-
-```javascript
-// Object-selector step
-dataSelector: "(sourceData) => sourceData.getUsers.data.users";
-outputTransform: "(sourceData) => sourceData.getUsers.data.results";
-
-// Array-selector step
-dataSelector: "(sourceData) => sourceData.fetchDetails.flatMap(item => item.data.contacts)";
-outputTransform: "(sourceData) => sourceData.fetchDetails.map(item => item.data)";
-```
+- **Object selector (or none)** → access via `sourceData.stepId.data`
+- **Array selector** → access via `sourceData.stepId.map(i => i.data)`
+- **Paginated step** → access via `sourceData.stepId.data` (pages are merged server-side into a single envelope — do NOT `.map()` over it)
 
 NEVER access step results without `.data` — `sourceData.stepId.results` will fail because you're hitting the envelope, not the API response.
 
@@ -64,8 +64,7 @@ build_tool expects the full tool config as input:
   }],
   outputTransform: string,       // JS: (sourceData) => finalOutput
   outputSchema?: JSONSchema,     // only if user explicitly requests output shape
-  payload?: object,              // sample payload for inputSchema generation
-  systemIds?: string[]           // system IDs used (for validation)
+  payload?: object               // sample payload for inputSchema generation
 }
 ```
 
@@ -74,8 +73,8 @@ Request step config:
 ```typescript
 {
   type: "request",
-  systemId: string,
-  url: string,
+  systemId?: string,             // links system credentials → <<systemId_credKey>> variables. Omit for public APIs.
+  url: string,                   // PREFER <<systemId_url>>/endpoint over hardcoded URLs when systemId is set
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
   headers?: Record<string, string>,
   queryParams?: Record<string, string>,
@@ -104,9 +103,29 @@ If build_tool tool validation fails, you get an error — fix and call build_too
 
 - Tool must have a valid `id` string
 - Tool must have a `steps` array
-- Every request step must have a `systemId` matching one of the provided systemIds
+- `systemId` is optional on request steps. Setting it makes that system's credentials available as `<<systemId_credKey>>` template variables in headers/URL/body, and enables `<<systemId_url>>` for the base URL. Omit it for public APIs that need no credentials.
 - Every request step must have a non-empty `url`
 - Transform steps must have `transformCode`
+
+## Build Result Persistence
+
+Do not assume a built tool is draft-only or saved. Always inspect these fields on the `build_tool` result:
+
+- `persistence`: `"saved"` or `"draft_only"`
+- `toolId`: the tool's canonical ID
+- `draftId`: present only when a draft exists
+
+Main agent behavior:
+
+- Successful builds auto-save by default
+- If the requested tool ID already exists, `build_tool` fails with a descriptive error
+- If auto-save fails for another reason, the result falls back to `persistence: "draft_only"` and includes `saveError` plus a `draftId`
+- For follow-up runs or edits, use `toolId` when `persistence` is `"saved"` and `draftId` when it is `"draft_only"`
+
+Tool playground behavior:
+
+- Builds may remain draft-only until explicitly saved
+- Use `save_tool` only when the result says `persistence: "draft_only"`
 
 ## System-Specific Instructions
 
@@ -114,8 +133,8 @@ Systems may include specificInstructions from the user (visible in find_system o
 
 ## Key Pitfalls
 
-- NEVER access step results without `.data` — `sourceData.stepId.results` is WRONG, use `sourceData.stepId.data.results` (object selector) or `sourceData.stepId.map(i => i.data.results)` (array selector)
 - NEVER guess API endpoints — always verify with documentation or call_system first
+- NEVER put `systemId` on the step object — it belongs inside `step.config.systemId`. That's what triggers credential and URL variable resolution.
 - NEVER use <<(sourceData) => sourceData.payload.X>> — payload fields are at root level of sourceData
 - NEVER use <<currentItem.id>> - use arrow function syntax for nested properties, e.g. <<(sourceData) => sourceData.currentItem.id>>
 - NEVER hardcode pagination params — use <<page>>, <<offset>>, <<cursor>>, <<limit>>
@@ -123,10 +142,12 @@ Systems may include specificInstructions from the user (visible in find_system o
 - NEVER use build_tool to modify an existing tool — use edit_tool with JSON Patch operations instead
 - NEVER leave instructions empty — always summarize what the tool does
 - ALWAYS include explicit auth headers — credentials are NEVER auto-injected into requests. Every request step must include the appropriate auth header using `<<systemId_credentialKey>>` syntax (e.g., `"Authorization": "Bearer <<gmail_access_token>>"`). OAuth systems also require an explicit header — only the token refresh is automatic.
+- PREFER system URL variables (`<<systemId_url>>`) over hardcoded base URLs — this enables the same tool to work across dev/prod environments without modification. Only hardcode URLs when they differ significantly from the system's base URL.
 - Check find_system output for `credentialPlaceholders` to know the exact variable names available
 - If there are payload input credentials, ALWAYS prioritize them over system-stored credentials
 - Always check documentation for the correct authentication pattern before building
 - outputTransform must be a single-line JS string (DO NOT ADD literal newlines or tabs in the code string)
+- NEVER use regex literals with `/` or complex escapes in transforms — they corrupt during serialization. Use `new URL()`, `.split()`, or `new RegExp()` instead. See data-handling skill "Serialization Safety".
 - For complex request bodies, always use a preceding transform step — don't put multi-statement logic inside <<>> expressions
 
 ## Complex Body Construction
@@ -148,5 +169,3 @@ transformCode: "(sourceData) => { var items = sourceData.step1.data.results; ret
 // Step: submitData (request)
 body: "<<(sourceData) => JSON.stringify(sourceData.prepareBody.data)>>";
 ```
-
-Rule of thumb: if your `<<>>` expression is longer than ~80 characters or contains multiple statements, use a transform step.

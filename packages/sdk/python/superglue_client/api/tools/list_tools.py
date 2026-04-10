@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -11,8 +11,8 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
-    page: int | Unset = 1,
-    limit: int | Unset = 50,
+    page: Union[Unset, int] = 1,
+    limit: Union[Unset, int] = 50,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -31,7 +31,9 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> ListToolsResponse200 | None:
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[ListToolsResponse200]:
     if response.status_code == 200:
         response_200 = ListToolsResponse200.from_dict(response.json())
 
@@ -44,7 +46,7 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[ListToolsResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -56,15 +58,15 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    page: int | Unset = 1,
-    limit: int | Unset = 50,
+    client: Union[AuthenticatedClient, Client],
+    page: Union[Unset, int] = 1,
+    limit: Union[Unset, int] = 50,
 ) -> Response[ListToolsResponse200]:
     """List tools
 
     Args:
-        page (int | Unset):  Default: 1.
-        limit (int | Unset):  Default: 50.
+        page (Union[Unset, int]):  Default: 1.
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -88,15 +90,15 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    page: int | Unset = 1,
-    limit: int | Unset = 50,
-) -> ListToolsResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+    page: Union[Unset, int] = 1,
+    limit: Union[Unset, int] = 50,
+) -> Optional[ListToolsResponse200]:
     """List tools
 
     Args:
-        page (int | Unset):  Default: 1.
-        limit (int | Unset):  Default: 50.
+        page (Union[Unset, int]):  Default: 1.
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -115,15 +117,15 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    page: int | Unset = 1,
-    limit: int | Unset = 50,
+    client: Union[AuthenticatedClient, Client],
+    page: Union[Unset, int] = 1,
+    limit: Union[Unset, int] = 50,
 ) -> Response[ListToolsResponse200]:
     """List tools
 
     Args:
-        page (int | Unset):  Default: 1.
-        limit (int | Unset):  Default: 50.
+        page (Union[Unset, int]):  Default: 1.
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -145,15 +147,15 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    page: int | Unset = 1,
-    limit: int | Unset = 50,
-) -> ListToolsResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+    page: Union[Unset, int] = 1,
+    limit: Union[Unset, int] = 50,
+) -> Optional[ListToolsResponse200]:
     """List tools
 
     Args:
-        page (int | Unset):  Default: 1.
-        limit (int | Unset):  Default: 50.
+        page (Union[Unset, int]):  Default: 1.
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

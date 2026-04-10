@@ -1,6 +1,6 @@
 "use client";
 
-import { useTools } from "@/src/app/tools-context";
+import { useTools } from "@/src/queries/tools";
 import { Button } from "@/src/components/ui/button";
 import {
   Command,

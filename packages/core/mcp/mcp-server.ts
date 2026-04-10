@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { RequestSource, SuperglueClient, Tool } from "@superglue/shared";
 import { randomUUID } from "crypto";
+import { Request, Response } from "express";
 import type { IncomingMessage, ServerResponse } from "http";
 import { z } from "zod";
 import { validateToken } from "../auth/auth.js";
@@ -21,7 +22,6 @@ export const AuthenticateInputSchema = z.object({
 
 interface McpAuthContext {
   orgId: string;
-  isRestricted?: boolean;
 }
 
 /**
@@ -153,7 +153,6 @@ export const createMcpServer = async (apiKey: string) => {
     const authResult = await validateToken(apiKey);
     return {
       orgId: authResult.orgId,
-      isRestricted: authResult.isRestricted,
     };
   };
 
@@ -168,12 +167,9 @@ export const createMcpServer = async (apiKey: string) => {
     logMessage("error", `MCP: Failed to fetch tools: ${error.message}`, {
       orgId: authContext.orgId,
     });
-    // Continue with empty tools list - authenticate tool will still be available
   }
 
-  const activeTools = allTools.filter((t) => !t.archived);
-
-  logMessage("info", `MCP: Registering ${activeTools.length} tools for org`, {
+  logMessage("info", `MCP: Registering ${allTools.length} tools for org`, {
     orgId: authContext.orgId,
   });
 
@@ -181,7 +177,7 @@ export const createMcpServer = async (apiKey: string) => {
   const registeredNames = new Set<string>(["authenticate"]);
 
   // Register each superglue tool as a native MCP tool
-  for (const tool of activeTools) {
+  for (const tool of allTools) {
     const toolName = sanitizeToolName(tool.id, registeredNames);
     const description = tool.instruction || `Execute the ${tool.id} tool`;
 
@@ -202,7 +198,7 @@ export const createMcpServer = async (apiKey: string) => {
       toolName,
       {
         description,
-        inputSchema: inputZodSchema,
+        inputSchema: inputZodSchema as any,
       },
       async (args, extra) => {
         try {
@@ -280,7 +276,7 @@ export const createMcpServer = async (apiKey: string) => {
       description: `Generates an authentication portal link for an end user to connect their accounts.
 Use this when a tool execution fails because the end user hasn't authenticated with required systems.
 The portal allows users to authenticate with all available systems that require credentials.`,
-      inputSchema: AuthenticateInputSchema,
+      inputSchema: AuthenticateInputSchema as any,
     },
     async (args, extra) => {
       const currentAuthContext = await getAuthContext();
@@ -350,7 +346,7 @@ The portal allows users to authenticate with all available systems that require 
     },
   );
 
-  logMessage("info", `MCP: Server ready with ${activeTools.length} tools + authenticate`, {
+  logMessage("info", `MCP: Server ready with ${allTools.length} tools + authenticate`, {
     orgId: authContext.orgId,
   });
 

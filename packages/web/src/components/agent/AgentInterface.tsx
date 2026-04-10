@@ -5,16 +5,16 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
-import { UserAction } from "@/src/lib/agent/agent-types";
 import { Message, ToolCall } from "@superglue/shared";
 import { AlertTriangle, ChevronDown, ChevronUp, Pencil, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentCapabilities } from "./AgentCapabilities";
-import { AgentType } from "@/src/lib/agent/registry/agents";
+import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
 import { AgentInputArea } from "./AgentInputArea";
 import { ConversationHistory } from "./ConversationHistory";
+import { ToolMutation } from "@/src/lib/agent/agent-tools/tool-call-state";
 import {
   ScrollToBottomButton,
   ScrollToBottomContainer,
@@ -24,6 +24,7 @@ import {
 import { ToolCallComponent } from "./ToolCallComponent";
 import { BackgroundToolGroup, groupMessageParts } from "./tool-components";
 import { AgentWelcome } from "./welcome/AgentWelcome";
+import { STREAMDOWN_COMPONENTS } from "../ui/streamdown-components";
 
 const MAX_MESSAGE_LENGTH = 50000;
 
@@ -67,8 +68,8 @@ const MemoMessage = React.memo(
     message,
     onInputChange,
     onToolUpdate,
+    onToolMutation,
     sendAgentRequest,
-    bufferAction,
     onAbortStream,
     editingMessageId,
     editingContent,
@@ -83,11 +84,15 @@ const MemoMessage = React.memo(
     message: Message;
     onInputChange: (newInput: any) => void;
     onToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
+    onToolMutation: (toolCallId: string, mutation: ToolMutation) => void;
     sendAgentRequest?: (
       userMessage?: string,
-      options?: { userActions?: UserAction[] },
+      options?: {
+        hiddenStarterMessage?: string;
+        hideUserMessage?: boolean;
+        resumeToolCallId?: string;
+      },
     ) => Promise<void>;
-    bufferAction?: (action: UserAction) => void;
     onAbortStream?: () => void;
     editingMessageId: string | null;
     editingContent: string;
@@ -210,7 +215,9 @@ const MemoMessage = React.memo(
                           message.isStreaming && "streaming-message streaming-active",
                         )}
                       >
-                        <Streamdown>{grouped.part.content || ""}</Streamdown>
+                        <Streamdown components={STREAMDOWN_COMPONENTS}>
+                          {grouped.part.content || ""}
+                        </Streamdown>
                       </div>
                     );
                   } else if (grouped.type === "error") {
@@ -230,8 +237,8 @@ const MemoMessage = React.memo(
                         tool={grouped.part.tool}
                         onInputChange={onInputChange}
                         onToolUpdate={onToolUpdate}
+                        onToolMutation={onToolMutation}
                         sendAgentRequest={sendAgentRequest}
-                        bufferAction={bufferAction}
                         onAbortStream={onAbortStream}
                         filePayloads={filePayloads}
                       />
@@ -247,7 +254,7 @@ const MemoMessage = React.memo(
                       message.isStreaming && "streaming-message streaming-active",
                     )}
                   >
-                    <Streamdown>{message.content}</Streamdown>
+                    <Streamdown components={STREAMDOWN_COMPONENTS}>{message.content}</Streamdown>
                   </div>
                   {message.tools && message.tools.length > 0 && (
                     <div className="space-y-3">
@@ -257,8 +264,8 @@ const MemoMessage = React.memo(
                           tool={tool}
                           onInputChange={onInputChange}
                           onToolUpdate={onToolUpdate}
+                          onToolMutation={onToolMutation}
                           sendAgentRequest={sendAgentRequest}
-                          bufferAction={bufferAction}
                           onAbortStream={onAbortStream}
                           filePayloads={filePayloads}
                         />
@@ -273,12 +280,34 @@ const MemoMessage = React.memo(
       </div>
     );
   },
+  (prevProps, nextProps) => {
+    // Custom comparison to avoid re-renders when filePayloads content hasn't changed
+    if (prevProps.message !== nextProps.message) return false;
+    if (prevProps.editingMessageId !== nextProps.editingMessageId) return false;
+    if (prevProps.editingContent !== nextProps.editingContent) return false;
+    if (prevProps.isLoading !== nextProps.isLoading) return false;
+
+    // For filePayloads, only compare keys (not the actual content)
+    const prevKeys = Object.keys(prevProps.filePayloads || {})
+      .sort()
+      .join(",");
+    const nextKeys = Object.keys(nextProps.filePayloads || {})
+      .sort()
+      .join(",");
+    if (prevKeys !== nextKeys) return false;
+
+    // Functions are stable due to useCallback, so we can skip comparing them
+    return true;
+  },
 );
+
+MemoMessage.displayName = "MemoMessage";
 
 interface AgentInterfaceProps {
   initialPrompts?: {
     userPrompt: string;
-    systemPrompt: string;
+    hiddenStarterMessage: string;
+    hideUserMessage?: boolean;
     chatTitle?: string;
     chatIcon?: string;
   } | null;
@@ -314,8 +343,8 @@ function AgentInterfaceContent({
     stopStreaming,
     handleToolInputChange,
     handleToolUpdate,
+    handleToolMutation,
     sendAgentRequest,
-    bufferAction,
     abortStream,
     filePayloads,
     currentConversationId,
@@ -343,7 +372,7 @@ function AgentInterfaceContent({
   const handleStartPrompt = useCallback(
     (
       userPrompt: string,
-      hiddenContext?: string,
+      hiddenStarterMessage?: string,
       options?: { hideUserMessage?: boolean; chatTitle?: string; chatIcon?: string },
     ) => {
       if (options?.chatTitle) {
@@ -352,7 +381,7 @@ function AgentInterfaceContent({
       if (options?.chatIcon) {
         setChatIcon(options.chatIcon);
       }
-      startTemplatePrompt(userPrompt, hiddenContext, options);
+      startTemplatePrompt(userPrompt, hiddenStarterMessage, options);
     },
     [startTemplatePrompt],
   );
@@ -525,8 +554,8 @@ function AgentInterfaceContent({
                     message={m}
                     onInputChange={handleToolInputChange}
                     onToolUpdate={handleToolUpdate}
+                    onToolMutation={handleToolMutation}
                     sendAgentRequest={sendAgentRequest}
-                    bufferAction={bufferAction}
                     onAbortStream={abortStream}
                     editingMessageId={editingMessageId}
                     editingContent={editingContent}

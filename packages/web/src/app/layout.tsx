@@ -5,7 +5,6 @@ import { jetbrainsMono, jetbrainsSans } from "./fonts";
 import { getThemeScript } from "@/src/lib/general-utils";
 import "./globals.css";
 
-// we need to force dynamic to get the env vars at runtime
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -44,16 +43,25 @@ export default function RootLayout({
 }>) {
   const apiEndpoint =
     process.env.API_ENDPOINT || "http://localhost:" + (process.env.API_PORT || 3002);
+  const apiKey = process.env.AUTH_TOKEN || process.env.NEXT_PUBLIC_SUPERGLUE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("AUTH_TOKEN is not set and no other authentication provider is configured.");
+  }
 
   const config = {
-    // Never expose any env-based API keys to the browser
-    // Users must authenticate via the popup
-    superglueApiKey: null,
+    superglueApiKey: apiKey,
     apiEndpoint,
     postHogKey: nextConfig.env?.NEXT_PUBLIC_POSTHOG_KEY,
     postHogHost: nextConfig.env?.NEXT_PUBLIC_POSTHOG_HOST,
+    serverSession: {
+      userId: "oss-admin",
+      email: "",
+      orgId: "",
+      orgName: "Personal",
+      orgStatus: "free",
+    },
   };
-  // Users will authenticate via popup modal (cookie-based auth)
 
   return (
     <html

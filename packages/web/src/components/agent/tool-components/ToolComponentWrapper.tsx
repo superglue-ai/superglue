@@ -190,7 +190,6 @@ export function ToolCallWrapper({
                 {(() => {
                   const displayNames: Record<string, string> = {
                     edit_tool: "Edit Tool",
-                    edit_payload: "Edit Tool Input",
                   };
                   return (
                     displayNames[tool.name] ||

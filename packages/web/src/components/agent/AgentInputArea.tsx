@@ -23,6 +23,7 @@ export interface AgentInputAreaProps {
   showCharCount?: boolean;
   inputContainerRef?: React.RefObject<HTMLDivElement | null>;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
+  containerClassName?: string;
   inputClassName?: string;
   scrollToBottom?: () => void;
 }
@@ -39,6 +40,7 @@ export function AgentInputArea({
   showCharCount = false,
   inputContainerRef,
   inputRef: inputRefProp,
+  containerClassName,
   inputClassName,
   scrollToBottom,
 }: AgentInputAreaProps) {
@@ -103,6 +105,7 @@ export function AgentInputArea({
               compact
                 ? "rounded-lg gap-1 shadow-sm"
                 : "rounded-2xl gap-2 shadow-sm hover:shadow-md focus-within:shadow-md",
+              containerClassName,
             )}
             onDrop={handleDrop}
             onDragOver={handleDragOver}

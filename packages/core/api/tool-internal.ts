@@ -1,13 +1,19 @@
-import { ToolStep, ResponseFilter, Tool, RequestSource, ServiceMetadata } from "@superglue/shared";
+import {
+  ToolStep,
+  ResponseFilter,
+  Tool,
+  RequestSource,
+  ServiceMetadata,
+  isTransformConfig,
+} from "@superglue/shared";
+import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
 import { executeTool, ToolExecutionContext } from "../tools/tool-execution-service.js";
+import { SystemManager } from "../systems/system-manager.js";
 import { logMessage } from "../utils/logs.js";
+import { resolveUserEmailIfNeeded } from "../utils/user-lookup.js";
 import { registerApiModule } from "./registry.js";
 import { addTraceHeader, sendError } from "./response-helpers.js";
 import type { AuthenticatedFastifyRequest, RouteHandler } from "./types.js";
-
-export function rewriteUrlForTunnel(url: string, _tunnelPortMappings?: any): string {
-  return url;
-}
 
 // Step execution types (internal only, not in OpenAPI spec)
 interface RunStepRequestOptions {
@@ -21,6 +27,8 @@ interface RunStepRequestBody {
   credentials?: Record<string, unknown>;
   options?: RunStepRequestOptions;
   runId?: string; // Client-provided runId for abort tracking
+  mode?: "dev" | "prod"; // Execution mode for system resolution
+  systemIds?: string[]; // System IDs to load credentials from (for transform steps)
 }
 
 interface RunStepResponse {
@@ -57,13 +65,27 @@ const runStep: RouteHandler = async (request, reply) => {
   const body = request.body as RunStepRequestBody;
 
   const traceId = authReq.traceId;
-  const metadata = { orgId: authReq.authInfo.orgId, traceId };
 
   if (!body.step) {
     return sendError(reply, 400, "Step configuration is required");
   }
 
   const step = body.step as unknown as ToolStep;
+
+  // Lazy resolve user email - only fetch if step config references sg_auth_email
+  const userEmail = await resolveUserEmailIfNeeded({
+    toolConfig: step,
+    userId: authReq.authInfo.userId,
+    existingEmail: authReq.authInfo.userEmail,
+  });
+
+  const metadata = {
+    orgId: authReq.authInfo.orgId,
+    traceId,
+    userEmail,
+    userId: authReq.authInfo.userId,
+    roleIds: authReq.authInfo.roles.map((r) => r.id),
+  };
 
   // For non-run executions, prefix runId with orgId for abort tracking uniqueness
   const clientRunId = body.runId || crypto.randomUUID();
@@ -78,6 +100,56 @@ const runStep: RouteHandler = async (request, reply) => {
     requestSource: RequestSource.FRONTEND,
   };
 
+  // Load system credentials if systemIds provided (needed for transform steps)
+  let systemCredentials: Record<string, string> = {};
+  if (body.systemIds && body.systemIds.length > 0 && isTransformConfig(step.config)) {
+    const mode = body.mode || "prod";
+    try {
+      // Use environment-aware system loading (same logic as forToolExecution)
+      const preferredEnv = mode === "dev" ? "dev" : "prod";
+      const fallbackEnv = mode === "dev" ? "prod" : "dev";
+
+      const preferredSystems = await authReq.datastore.getManySystems({
+        ids: body.systemIds,
+        environment: preferredEnv,
+        includeDocs: false,
+        orgId: authReq.authInfo.orgId,
+      });
+
+      const foundIds = new Set(preferredSystems.map((s) => s.id));
+      const missingIds = body.systemIds.filter((id) => !foundIds.has(id));
+
+      let fallbackSystems: typeof preferredSystems = [];
+      if (missingIds.length > 0) {
+        fallbackSystems = await authReq.datastore.getManySystems({
+          ids: missingIds,
+          environment: fallbackEnv,
+          includeDocs: false,
+          orgId: authReq.authInfo.orgId,
+        });
+      }
+
+      const systems = [...preferredSystems, ...fallbackSystems];
+      const systemManagers = SystemManager.fromSystems(systems, authReq.datastore, metadata);
+
+      // Enrich with template credentials and refresh tokens if needed
+      await Promise.all(
+        systemManagers.map(async (m) => {
+          await m.enrichWithTemplateCredentials();
+          await m.refreshTokenIfNeeded();
+        }),
+      );
+      const refreshedSystems = await Promise.all(systemManagers.map((m) => m.getSystem()));
+      const validSystems = refreshedSystems.filter((s) => s !== null);
+
+      if (validSystems.length > 0) {
+        systemCredentials = flattenAndNamespaceCredentials(validSystems);
+      }
+    } catch (error) {
+      logMessage("warn", `Failed to load system credentials: ${error}`, metadata);
+    }
+  }
+
   // Wrap step in a temporary tool and execute without creating a run record
   const tempTool: Tool = {
     id: `temp_step_${step.id}`,
@@ -91,14 +163,21 @@ const runStep: RouteHandler = async (request, reply) => {
     ...(body.previousResults || {}),
   };
 
+  // Merge provided credentials with loaded system credentials
+  const mergedCredentials = {
+    ...systemCredentials,
+    ...(body.credentials as Record<string, string> | undefined),
+  };
+
   try {
     const result = await executeTool(ctx, {
       tool: tempTool,
       payload: executionPayload,
-      credentials: body.credentials as Record<string, string> | undefined,
+      credentials: mergedCredentials,
       requestOptions: { timeout: body.options?.timeout },
       createRun: false,
       runId: internalRunId,
+      mode: body.mode || "prod",
     });
 
     const stepResult = result.stepResults?.[0];
@@ -131,11 +210,25 @@ const runTransform: RouteHandler = async (request, reply) => {
   const body = request.body as RunTransformRequestBody;
 
   const traceId = authReq.traceId;
-  const metadata: ServiceMetadata = { orgId: authReq.authInfo.orgId, traceId };
 
   if (!body.outputTransform && !body.responseFilters?.length) {
     return sendError(reply, 400, "Either outputTransform or responseFilters is required");
   }
+
+  // Lazy resolve user email - only fetch if transform config references sg_auth_email
+  const userEmail = await resolveUserEmailIfNeeded({
+    toolConfig: body,
+    userId: authReq.authInfo.userId,
+    existingEmail: authReq.authInfo.userEmail,
+  });
+
+  const metadata: ServiceMetadata = {
+    orgId: authReq.authInfo.orgId,
+    traceId,
+    userEmail,
+    userId: authReq.authInfo.userId,
+    roleIds: authReq.authInfo.roles.map((r) => r.id),
+  };
 
   // For non-run executions, prefix runId with orgId for abort tracking uniqueness
   const clientRunId = body.runId || crypto.randomUUID();
@@ -221,7 +314,7 @@ registerApiModule({
       permissions: {
         type: "execute",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
       },
     },
     {
@@ -231,7 +324,7 @@ registerApiModule({
       permissions: {
         type: "execute",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
       },
     },
     {
@@ -241,7 +334,7 @@ registerApiModule({
       permissions: {
         type: "execute",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
       },
     },
   ],

@@ -10,8 +10,9 @@ body {
   scrollbar-gutter: stable both-edges;
 }
 
-/* Allow scrolling for embedded pages */
-body:has([data-embedded-page]) {
+/* Allow scrolling for embedded and portal pages */
+body:has([data-embedded-page]),
+body:has([data-portal-page]) {
   overflow: auto;
 }
 
@@ -67,8 +68,8 @@ tt {
     /* #cfd2d6 */
     --accent-foreground: 0 0% 100%;
     /* #fff */
-    --destructive: 0 72% 51%;
-    /* #e5484d */
+    --destructive: 0 55% 45%;
+    /* softer red */
     --destructive-foreground: 0 0% 100%;
     /* #fff */
     --ring: 220 7% 20%;
@@ -101,7 +102,7 @@ tt {
   }
 
   .dark {
-    --background: 0 0% 0%;
+    --background: 0 0% 5%;
     /* #000 */
     --foreground: 0 0% 100%;
     /* #fff */
@@ -133,8 +134,8 @@ tt {
     /* lighter accent */
     --accent-foreground: 0 0% 100%;
     /* #fff */
-    --destructive: 0 72% 51%;
-    /* #e5484d */
+    --destructive: 0 55% 45%;
+    /* softer red */
     --destructive-foreground: 0 0% 0%;
     /* #000 */
     --border: 0 0% 25%;
@@ -207,7 +208,6 @@ tt {
     @apply bg-background text-foreground;
   }
 
-  button:hover,
   .nav-link:hover,
   .system-button:hover,
   .example-button:hover,
@@ -269,14 +269,16 @@ html.dark {
 
   .btn-ghost:hover:not(:disabled),
   .btn[variant="ghost"]:hover:not(:disabled) {
-    background-color: hsl(var(--ghost-hover)) !important;
+    background-color: transparent !important;
     color: hsl(var(--ghost-foreground)) !important;
+    outline: 1px solid hsl(var(--border) / 0.5);
   }
 
   .btn-ghost.text-destructive:hover,
   .btn[variant="ghost"].text-destructive:hover {
-    background-color: hsl(var(--destructive) / 0.5) !important;
+    background-color: transparent !important;
     color: hsl(var(--destructive)) !important;
+    outline: 1px solid hsl(var(--border) / 0.5);
   }
 
   .btn,

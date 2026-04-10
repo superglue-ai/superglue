@@ -12,11 +12,12 @@ import {
 } from "@/src/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { cn } from "@/src/lib/general-utils";
+import { useOrg } from "@/src/app/org-context";
 import { Tool } from "@superglue/shared";
 import { Archive, Check, ChevronRight, Filter, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 
-const FOLDER_STORAGE_KEY = "superglue-selected-folder";
+const FOLDER_STORAGE_KEY_BASE = "superglue-selected-folder";
 const UNCATEGORIZED = "";
 
 interface FolderNode {
@@ -203,9 +204,12 @@ export function FolderSelector({ tools, selectedFolder, onFolderChange }: Folder
 }
 
 export function useFolderFilter(tools: Tool[]) {
+  const { orgId } = useOrg();
+  const storageKey = orgId ? `${FOLDER_STORAGE_KEY_BASE}:${orgId}` : FOLDER_STORAGE_KEY_BASE;
+
   const [selectedFolder, setSelectedFolder] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem(FOLDER_STORAGE_KEY) || "all";
+      return localStorage.getItem(storageKey) || "all";
     }
     return "all";
   });
@@ -213,7 +217,7 @@ export function useFolderFilter(tools: Tool[]) {
   const handleFolderChange = (folder: string) => {
     setSelectedFolder(folder);
     if (typeof window !== "undefined") {
-      localStorage.setItem(FOLDER_STORAGE_KEY, folder);
+      localStorage.setItem(storageKey, folder);
     }
   };
 
@@ -247,4 +251,4 @@ export function useFolderFilter(tools: Tool[]) {
   };
 }
 
-export { FOLDER_STORAGE_KEY, UNCATEGORIZED };
+export { FOLDER_STORAGE_KEY_BASE, UNCATEGORIZED };

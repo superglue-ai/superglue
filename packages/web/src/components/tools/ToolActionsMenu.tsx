@@ -1,9 +1,7 @@
-import { useConfig } from "@/src/app/config-context";
-import { useTools } from "@/src/app/tools-context";
-import { createSuperglueClient } from "@/src/lib/client-utils";
+import { useArchiveTool } from "@/src/queries/tools";
 import { cn } from "@/src/lib/general-utils";
 import { Tool } from "@superglue/shared";
-import { Archive, ArchiveRestore, CopyPlus, Edit2, MoreVertical } from "lucide-react";
+import { Archive, ArchiveRestore, CopyPlus, Download, Edit2, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
 import {
@@ -15,6 +13,7 @@ import {
 import { ArchiveConfigDialog } from "./dialogs/ArchiveConfigDialog";
 import { DuplicateToolDialog } from "./dialogs/DuplicateToolDialog";
 import { RenameToolDialog } from "./dialogs/RenameToolDialog";
+import { ExportToolDialog } from "./ExportToolDialog";
 
 interface ToolActionsMenuProps {
   tool: Tool;
@@ -37,39 +36,29 @@ export function ToolActionsMenu({
   disabled = false,
   showLabel = false,
 }: ToolActionsMenuProps) {
-  const config = useConfig();
-  const { refreshTools } = useTools();
+  const archiveTool = useArchiveTool();
 
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleRenamed = (newId: string) => {
-    refreshTools();
     onRenamed?.(newId);
   };
 
   const handleDuplicated = (newId: string) => {
-    refreshTools();
     onDuplicated?.(newId);
   };
 
   const handleArchived = () => {
-    refreshTools();
-    if (onArchived) {
-      onArchived();
-    }
+    onArchived?.();
   };
 
   const handleUnarchive = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const client = createSuperglueClient(config.apiEndpoint);
-    await client.archiveWorkflow(tool.id, false);
-    refreshTools();
-    if (onUnarchived) {
-      onUnarchived();
-    }
+    archiveTool.mutate({ id: tool.id, archived: false }, { onSuccess: () => onUnarchived?.() });
   };
 
   return (
@@ -98,6 +87,10 @@ export function ToolActionsMenu({
           <DropdownMenuItem onClick={() => setShowDuplicateDialog(true)}>
             <CopyPlus className="h-4 w-4 mr-2" />
             Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
           </DropdownMenuItem>
           {tool.archived ? (
             <DropdownMenuItem onClick={handleUnarchive}>
@@ -132,6 +125,12 @@ export function ToolActionsMenu({
         isOpen={showArchiveDialog}
         onClose={() => setShowArchiveDialog(false)}
         onArchived={handleArchived}
+      />
+
+      <ExportToolDialog
+        tool={tool}
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
       />
     </>
   );

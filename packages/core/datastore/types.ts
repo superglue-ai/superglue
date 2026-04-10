@@ -9,6 +9,7 @@ import type {
   RunStatus,
   Tool,
   ToolSchedule,
+  DocumentationFiles,
 } from "@superglue/shared";
 
 export type PrometheusRunStatusLabel = "success" | "failed" | "aborted";
@@ -43,6 +44,11 @@ export interface DataStore {
     limit?: number;
     offset?: number;
     configId?: string;
+    allowedToolIds?: string[];
+    includeTotal?: boolean;
+    search?: string;
+    searchUserIds?: string[];
+    startedAfter?: Date;
     status?: RunStatus;
     requestSources?: RequestSource[];
     orgId?: string;
@@ -57,11 +63,16 @@ export interface DataStore {
   }): Promise<PrometheusRunMetrics>;
 
   // Workflow Methods
-  getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null>;
+  getWorkflow(params: {
+    id: string;
+    orgId?: string;
+    includeArchived?: boolean;
+  }): Promise<Tool | null>;
   listWorkflows(params?: {
     limit?: number;
     offset?: number;
     orgId?: string;
+    includeArchived?: boolean;
   }): Promise<{ items: Tool[]; total: number }>;
   upsertWorkflow(params: {
     id: string;
@@ -86,39 +97,69 @@ export interface DataStore {
   setTenantInfo(params?: { email?: string; emailEntrySkipped?: boolean }): Promise<void>;
 
   // System Methods
-  getSystem(params: { id: string; includeDocs?: boolean; orgId?: string }): Promise<System | null>;
+  getSystem(params: {
+    id: string;
+    includeDocs?: boolean;
+    orgId?: string;
+    environment?: "dev" | "prod";
+  }): Promise<System | null>;
   listSystems(params?: {
     limit?: number;
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
+    mode?: "dev" | "prod" | "all";
   }): Promise<{ items: System[]; total: number }>;
   createSystem(params: { system: System; orgId?: string }): Promise<System>;
   updateSystem(params: {
     id: string;
     system: Partial<System>;
     orgId?: string;
+    environment?: "dev" | "prod";
   }): Promise<System | null>;
-  upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System>;
-  deleteSystem(params: { id: string; orgId?: string }): Promise<boolean>;
+  upsertSystem(params: {
+    id: string;
+    system: System;
+    orgId?: string;
+    environment?: "dev" | "prod";
+  }): Promise<System>;
+  updateSystemDocumentationFiles(params: {
+    id: string;
+    documentationFiles: DocumentationFiles;
+    orgId?: string;
+  }): Promise<void>;
+  deleteSystem(params: {
+    id: string;
+    orgId?: string;
+    environment?: "dev" | "prod";
+  }): Promise<boolean>;
+  hasOtherSystemEnvironments(params: {
+    id: string;
+    excludeEnvironment: "dev" | "prod";
+    orgId?: string;
+  }): Promise<boolean>;
   getManySystems(params: {
     ids: string[];
     includeDocs?: boolean;
     orgId?: string;
+    environment?: "dev" | "prod";
   }): Promise<System[]>;
   getTemplateOAuthCredentials(params: {
     templateId: string;
   }): Promise<{ client_id: string; client_secret: string } | null>;
+  hasLinkedNonProdSystems(params: { orgId?: string }): Promise<boolean>;
 
   // OAuth cache methods
   cacheOAuthSecret(params: {
     uid: string;
+    orgId: string;
     clientId: string;
     clientSecret: string;
     ttlMs: number;
   }): Promise<void>;
   getOAuthSecret(params: {
     uid: string;
+    orgId: string;
   }): Promise<{ clientId: string; clientSecret: string } | null>;
   copyTemplateDocumentationToUserSystem(params: {
     templateId: string;
@@ -186,13 +227,7 @@ export interface DataStore {
   listApiKeys(params: { orgId: string }): Promise<ApiKeyRecord[]>;
   getApiKeyByKey(params: { key: string }): Promise<ApiKeyRecord | null>;
   createApiKey(params: CreateApiKeyParams): Promise<ApiKeyRecord>;
-  updateApiKey(params: {
-    id: string;
-    orgId: string;
-    isActive?: boolean;
-    isRestricted?: boolean;
-    userId?: string;
-  }): Promise<ApiKeyRecord | null>;
+  updateApiKey(params: UpdateApiKeyParams): Promise<ApiKeyRecord | null>;
   deleteApiKey(params: { id: string; orgId: string }): Promise<boolean>;
   deleteApiKeysByUserId(params: { userId: string; orgId: string }): Promise<void>;
 }
@@ -213,11 +248,9 @@ export interface ApiKeyRecord {
   id: string;
   orgId: string;
   key: string;
-  userId?: string; // For end-user keys
-  createdByUserId?: string; // Who created this key
-  mode: "frontend" | "backend";
+  userId: string;
+  createdByUserId: string;
   isActive: boolean;
-  isRestricted: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -225,8 +258,12 @@ export interface ApiKeyRecord {
 export interface CreateApiKeyParams {
   orgId: string;
   createdByUserId: string;
-  isRestricted: boolean;
-  key?: string; // Optional - will be generated if not provided
-  userId?: string;
-  mode?: "frontend" | "backend";
+  key?: string;
+  userId: string;
+}
+
+export interface UpdateApiKeyParams {
+  id: string;
+  orgId: string;
+  isActive?: boolean;
 }

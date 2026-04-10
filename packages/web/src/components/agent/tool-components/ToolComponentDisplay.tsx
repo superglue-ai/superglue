@@ -1,6 +1,6 @@
 "use client";
 
-import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
+import { JsonEditor } from "@/src/components/editors/JsonEditor";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card } from "@/src/components/ui/card";
@@ -24,7 +24,7 @@ import {
   Save,
 } from "lucide-react";
 import React, { useMemo } from "react";
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems } from "@/src/queries/systems";
 
 interface ToolCallToolDisplayProps {
   toolId?: string;
@@ -251,7 +251,7 @@ export function ToolCallToolDisplay({
             <FileJson className="w-4 h-4" />
             <span className="font-medium text-sm">Tool Input</span>
           </div>
-          <JsonCodeEditor
+          <JsonEditor
             value={payloadDisplayInfo.payloadJson}
             readOnly
             minHeight={payloadDisplayInfo.height}
@@ -274,7 +274,7 @@ export function ToolCallToolDisplay({
             )}
           </div>
           {displayOutput && !hasParseError ? (
-            <JsonCodeEditor
+            <JsonEditor
               value={JSON.stringify(displayOutput, null, 2)}
               readOnly
               maxHeight={resultDisplayHeight}

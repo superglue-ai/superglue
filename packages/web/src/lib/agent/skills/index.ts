@@ -1,28 +1,36 @@
 export const SKILL_NAMES = [
   "superglue-concepts",
-  "variables-and-data-flow",
+  "data-handling",
   "http-apis",
   "databases",
+  "redis",
   "file-servers",
-  "transforms-and-output",
   "tool-building",
-  "tool-fixing",
+  "tool-editing",
   "systems-handling",
+  "access-rules",
+  "demos",
 ] as const;
 
 export type SkillName = (typeof SKILL_NAMES)[number];
 
 export const SKILL_INDEX: Record<SkillName, string> = {
   "superglue-concepts": "Core mental model — tools, systems, steps, execution pipeline",
-  "variables-and-data-flow":
-    "<<>> syntax, data selectors, result envelope, credential injection — #1 source of errors",
+  "data-handling":
+    "<<>> syntax, data selectors, result envelopes, credential injection, sourceData structure, JS sandbox constraints",
   "http-apis": "HTTP step config — auth patterns, pagination, retries, error detection",
-  databases: "PostgreSQL step config — connection, queries, parameterization",
+  databases:
+    "PostgreSQL and MSSQL/Azure SQL step config — connections, queries, parameterization, protocol differences",
+  redis: "Redis step config — connection, commands, key-value/hash/list/set operations",
   "file-servers": "FTP/SFTP/SMB steps — identical operation interface, batch ops",
-  "transforms-and-output": "dataSelectors, transform steps, outputTransform, response filters",
   "tool-building":
-    "Build recipe, tool config schema, step planning rules, validation, common pitfalls",
-  "tool-fixing": "JSON Patch format, tool structure, patch operations, validation, common fixes",
+    "Build recipe, tool config schema, step planning rules, validation, common pitfalls. Includes: build_tool, save_tool",
+  "tool-editing":
+    "JSON Patch format, tool structure, patch operations, validation, partial approval, debugging with step results. Includes: edit_tool, save_tool",
   "systems-handling":
-    "Creating/editing systems, credentials, OAuth setup, templates, documentation",
+    "Creating/editing systems, credentials, OAuth setup, templates, documentation. Includes: create_system, edit_system, authenticate_oauth",
+  "access-rules":
+    "Enterprise-only RBAC reference — data model, tool/system permissions, custom rules, enforcement layers, multi-role semantics",
+  demos:
+    "Guided onboarding demo flow using httpbin: create system, build tool, run tool, and narrate mapping to real systems",
 };

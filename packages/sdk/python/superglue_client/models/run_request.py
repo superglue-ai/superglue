@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,36 +19,36 @@ T = TypeVar("T", bound="RunRequest")
 class RunRequest:
     """
     Attributes:
-        run_id (str | Unset): Optional pre-generated run ID. If not provided, server generates one.
+        run_id (Union[Unset, str]): Optional pre-generated run ID. If not provided, server generates one.
             Useful for idempotency and tracking runs before they start.
              Example: 7f3e9c1a-2b4d-4e8f-9a3b-1c5d7e9f2a4b.
-        inputs (RunRequestInputs | Unset): Tool-specific input parameters Example: {'query': 'latest AI news',
+        inputs (Union[Unset, RunRequestInputs]): Tool-specific input parameters Example: {'query': 'latest AI news',
             'maxResults': 5}.
-        credentials (RunRequestCredentials | Unset): Runtime credentials for systems (overrides stored system
+        credentials (Union[Unset, RunRequestCredentials]): Runtime credentials for systems (overrides stored system
             credentials if provided).
             WARNING: These credentials are not persisted. Use systems for stored credentials.
              Example: {'apiKey': 'sk_live_abc123def456', 'apiSecret': 'secret_xyz789'}.
-        options (RunRequestOptions | Unset):
+        options (Union[Unset, RunRequestOptions]):
     """
 
-    run_id: str | Unset = UNSET
-    inputs: RunRequestInputs | Unset = UNSET
-    credentials: RunRequestCredentials | Unset = UNSET
-    options: RunRequestOptions | Unset = UNSET
+    run_id: Union[Unset, str] = UNSET
+    inputs: Union[Unset, "RunRequestInputs"] = UNSET
+    credentials: Union[Unset, "RunRequestCredentials"] = UNSET
+    options: Union[Unset, "RunRequestOptions"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         run_id = self.run_id
 
-        inputs: dict[str, Any] | Unset = UNSET
+        inputs: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.inputs, Unset):
             inputs = self.inputs.to_dict()
 
-        credentials: dict[str, Any] | Unset = UNSET
+        credentials: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.credentials, Unset):
             credentials = self.credentials.to_dict()
 
-        options: dict[str, Any] | Unset = UNSET
+        options: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.options, Unset):
             options = self.options.to_dict()
 
@@ -78,21 +76,21 @@ class RunRequest:
         run_id = d.pop("runId", UNSET)
 
         _inputs = d.pop("inputs", UNSET)
-        inputs: RunRequestInputs | Unset
+        inputs: Union[Unset, RunRequestInputs]
         if isinstance(_inputs, Unset):
             inputs = UNSET
         else:
             inputs = RunRequestInputs.from_dict(_inputs)
 
         _credentials = d.pop("credentials", UNSET)
-        credentials: RunRequestCredentials | Unset
+        credentials: Union[Unset, RunRequestCredentials]
         if isinstance(_credentials, Unset):
             credentials = UNSET
         else:
             credentials = RunRequestCredentials.from_dict(_credentials)
 
         _options = d.pop("options", UNSET)
-        options: RunRequestOptions | Unset
+        options: Union[Unset, RunRequestOptions]
         if isinstance(_options, Unset):
             options = UNSET
         else:

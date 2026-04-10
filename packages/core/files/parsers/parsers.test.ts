@@ -1,5 +1,4 @@
 import { SupportedFileType } from "@superglue/shared";
-import axios from "axios";
 import { describe, expect, it } from "vitest";
 import { parseFile, FileStrategyRegistry } from "../index.js";
 import { parseZIP, ZIPStrategy } from "./zip.js";
@@ -322,13 +321,15 @@ describe("File Parsing - Comprehensive Tests", () => {
 
   describe("ZIP Parsing", () => {
     it("should extract all files from zip archive", async () => {
-      const file = await axios.get(
-        "https://sample-files.com/downloads/compressed/zip/basic-text.zip",
-        { responseType: "arraybuffer" },
-      );
+      const zip = new JSZip();
+      zip.file("hello.txt", "Hello World");
+      zip.file("data.json", JSON.stringify({ key: "value" }));
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
 
-      const result = await parseZIP(Buffer.from(file.data));
-      expect(Object.keys(result).length).toBeGreaterThan(0);
+      const result = await parseZIP(zipBuffer);
+      expect(Object.keys(result).length).toBe(2);
+      expect(result["hello.txt"]).toBe("Hello World");
+      expect(result["data.json"]).toEqual({ key: "value" });
     });
 
     it("should create and parse a ZIP file with multiple file types", async () => {

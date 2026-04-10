@@ -1,6 +1,5 @@
 from http import HTTPStatus
-from typing import Any
-from urllib.parse import quote
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -16,15 +15,15 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/tools/{tool_id}".format(
-            tool_id=quote(str(tool_id), safe=""),
-        ),
+        "url": f"/tools/{tool_id}",
     }
 
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Error | Tool | None:
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[Union[Error, Tool]]:
     if response.status_code == 200:
         response_200 = Tool.from_dict(response.json())
 
@@ -41,7 +40,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Error | Tool]:
+def _build_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[Union[Error, Tool]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -53,8 +54,8 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     tool_id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[Error | Tool]:
+    client: Union[AuthenticatedClient, Client],
+) -> Response[Union[Error, Tool]]:
     """Get tool details
 
     Args:
@@ -65,7 +66,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | Tool]
+        Response[Union[Error, Tool]]
     """
 
     kwargs = _get_kwargs(
@@ -82,8 +83,8 @@ def sync_detailed(
 def sync(
     tool_id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Error | Tool | None:
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[Union[Error, Tool]]:
     """Get tool details
 
     Args:
@@ -94,7 +95,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | Tool
+        Union[Error, Tool]
     """
 
     return sync_detailed(
@@ -106,8 +107,8 @@ def sync(
 async def asyncio_detailed(
     tool_id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[Error | Tool]:
+    client: Union[AuthenticatedClient, Client],
+) -> Response[Union[Error, Tool]]:
     """Get tool details
 
     Args:
@@ -118,7 +119,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | Tool]
+        Response[Union[Error, Tool]]
     """
 
     kwargs = _get_kwargs(
@@ -133,8 +134,8 @@ async def asyncio_detailed(
 async def asyncio(
     tool_id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Error | Tool | None:
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[Union[Error, Tool]]:
     """Get tool details
 
     Args:
@@ -145,7 +146,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | Tool
+        Union[Error, Tool]
     """
 
     return (

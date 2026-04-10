@@ -1,17 +1,14 @@
-import { truncateForDisplay, truncateLines } from "@/src/lib/general-utils";
-import { inferJsonSchema } from "@superglue/shared";
+import { truncateForDisplay } from "@/src/lib/general-utils";
 
-const MAX_DISPLAY_LINES = 3000;
+const MAX_DISPLAY_LINES = 10000;
 
 export enum TaskType {
   STRINGIFY = "STRINGIFY",
-  COMPUTE_SCHEMA = "COMPUTE_SCHEMA",
   COMPUTE_PREVIEW = "COMPUTE_PREVIEW",
 }
 
 export type ComputeTask =
   | { type: TaskType.STRINGIFY; data: any }
-  | { type: TaskType.COMPUTE_SCHEMA; data: any }
   | { type: TaskType.COMPUTE_PREVIEW; data: any };
 
 export interface ComputeRequest {
@@ -28,16 +25,6 @@ export interface ComputeResponse {
 const taskHandlers: Record<TaskType, (data: any) => any> = {
   STRINGIFY: (data: any) => {
     return JSON.stringify(data, null, 2);
-  },
-
-  COMPUTE_SCHEMA: (data: any) => {
-    const schemaObj = inferJsonSchema(data);
-    const schemaString = truncateLines(JSON.stringify(schemaObj, null, 2), MAX_DISPLAY_LINES);
-    return {
-      schema: schemaObj,
-      displayString: schemaString,
-      truncated: false,
-    };
   },
 
   COMPUTE_PREVIEW: (data: any) => {

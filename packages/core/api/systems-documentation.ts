@@ -1,10 +1,4 @@
-import {
-  DocumentationFiles,
-  FileReference,
-  FileStatus,
-  System,
-  uniqueKeywords,
-} from "@superglue/shared";
+import { DocumentationFiles, FileReference, FileStatus, uniqueKeywords } from "@superglue/shared";
 import axios from "axios";
 import * as yaml from "js-yaml";
 import { DocumentationFetcher } from "../documentation/documentation-fetching.js";
@@ -17,6 +11,7 @@ import { getFileService } from "../filestore/file-service.js";
 import {
   DirectOpenApiStrategy,
   SwaggerUIStrategy,
+  SwaggerHubStrategy,
   HtmlLinkExtractorStrategy,
   OpenApiLinkExtractorStrategy,
 } from "../documentation/strategies/index.js";
@@ -77,16 +72,13 @@ async function createOpenApiFileReference(
   const currentSystem = await datastore.getSystem({ id: systemId, includeDocs: false, orgId });
   if (currentSystem) {
     const currentDocFiles = currentSystem.documentationFiles || {};
-    await datastore.upsertSystem({
+    const updatedDocFiles = {
+      ...currentDocFiles,
+      openApiFileIds: [...(currentDocFiles.openApiFileIds || []), openApiFileId],
+    };
+    await datastore.updateSystemDocumentationFiles({
       id: systemId,
-      system: {
-        ...currentSystem,
-        documentationFiles: {
-          ...currentDocFiles,
-          openApiFileIds: [...(currentDocFiles.openApiFileIds || []), openApiFileId],
-        },
-        updatedAt: new Date(),
-      },
+      documentationFiles: updatedDocFiles,
       orgId,
     });
   }
@@ -164,18 +156,33 @@ async function runDocumentationScrape(
         let specString: string | null = null;
         let specSource: string = scrapeUrl;
 
-        const detectedUrl = extractOpenApiUrlFromHtml(rawHtml);
-        if (detectedUrl) {
-          const absoluteUrl = detectedUrl.startsWith("/")
-            ? new URL(detectedUrl, scrapeUrl).href
-            : detectedUrl;
+        // Try SwaggerHub strategy first (handles app.swaggerhub.com -> api.swaggerhub.com)
+        const swaggerHubStrategy = new SwaggerHubStrategy();
+        const swaggerHubResult = await swaggerHubStrategy.tryFetch(rawHtml, scrapeUrl, metadata);
+        if (swaggerHubResult) {
           logMessage(
             "info",
-            `Detected OpenAPI spec URL from scraped HTML: ${absoluteUrl}`,
+            `SwaggerHubStrategy detected OpenAPI spec from URL: ${scrapeUrl}`,
             metadata,
           );
-          specString = await fetchMultipleOpenApiSpecs([absoluteUrl], metadata);
-          specSource = absoluteUrl;
+          specString = swaggerHubResult;
+          specSource = scrapeUrl;
+        }
+
+        if (!specString) {
+          const detectedUrl = extractOpenApiUrlFromHtml(rawHtml);
+          if (detectedUrl) {
+            const absoluteUrl = detectedUrl.startsWith("/")
+              ? new URL(detectedUrl, scrapeUrl).href
+              : detectedUrl;
+            logMessage(
+              "info",
+              `Detected OpenAPI spec URL from scraped HTML: ${absoluteUrl}`,
+              metadata,
+            );
+            specString = await fetchMultipleOpenApiSpecs([absoluteUrl], metadata);
+            specSource = absoluteUrl;
+          }
         }
 
         if (!specString) {
@@ -338,18 +345,14 @@ const triggerScrape: RouteHandler = async (request, reply) => {
       orgId: authReq.authInfo.orgId,
     });
 
-    const updatedSystem: System = {
-      ...system,
-      documentationFiles: {
-        ...docFiles,
-        scrapeFileIds: [...(docFiles.scrapeFileIds || []), fileId],
-      },
-      updatedAt: new Date(),
+    const updatedDocFiles = {
+      ...docFiles,
+      scrapeFileIds: [...(docFiles.scrapeFileIds || []), fileId],
     };
 
-    await authReq.datastore.upsertSystem({
+    await authReq.datastore.updateSystemDocumentationFiles({
       id: params.systemId,
-      system: updatedSystem,
+      documentationFiles: updatedDocFiles,
       orgId: authReq.authInfo.orgId,
     });
 
@@ -550,16 +553,13 @@ const uploadDocumentation: RouteHandler = async (request, reply) => {
 
     const newUploadIds = results.map((r) => r.id);
     const docFiles: DocumentationFiles = system.documentationFiles || {};
-    await authReq.datastore.upsertSystem({
+    const updatedDocFiles = {
+      ...docFiles,
+      uploadFileIds: [...(docFiles.uploadFileIds || []), ...newUploadIds],
+    };
+    await authReq.datastore.updateSystemDocumentationFiles({
       id: params.systemId,
-      system: {
-        ...system,
-        documentationFiles: {
-          ...docFiles,
-          uploadFileIds: [...(docFiles.uploadFileIds || []), ...newUploadIds],
-        },
-        updatedAt: new Date(),
-      },
+      documentationFiles: updatedDocFiles,
       orgId: authReq.authInfo.orgId,
     });
 
@@ -625,13 +625,9 @@ const deleteDocumentationFile: RouteHandler = async (request, reply) => {
       openApiFileIds: (docFiles.openApiFileIds || []).filter((id) => id !== params.fileId),
     };
 
-    await authReq.datastore.upsertSystem({
+    await authReq.datastore.updateSystemDocumentationFiles({
       id: params.systemId,
-      system: {
-        ...system,
-        documentationFiles: updatedDocFiles,
-        updatedAt: new Date(),
-      },
+      documentationFiles: updatedDocFiles,
       orgId: authReq.authInfo.orgId,
     });
 
@@ -821,37 +817,61 @@ registerApiModule({
       method: "POST",
       path: "/systems/:systemId/documentation/search",
       handler: searchDocumentation,
-      permissions: { type: "read", resource: "system" },
+      permissions: {
+        type: "read",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "POST",
       path: "/systems/:systemId/documentation/openapi",
       handler: fetchOpenApiSpec,
-      permissions: { type: "write", resource: "system" },
+      permissions: {
+        type: "write",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
     {
       method: "POST",
       path: "/systems/:systemId/documentation/scrape",
       handler: triggerScrape,
-      permissions: { type: "write", resource: "system" },
+      permissions: {
+        type: "write",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
     {
       method: "POST",
       path: "/systems/:systemId/file-references",
       handler: uploadDocumentation,
-      permissions: { type: "write", resource: "system" },
+      permissions: {
+        type: "write",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
     {
       method: "GET",
       path: "/systems/:systemId/file-references",
       handler: listSystemFileReferences,
-      permissions: { type: "read", resource: "system" },
+      permissions: {
+        type: "read",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "DELETE",
       path: "/systems/:systemId/file-references/:fileId",
       handler: deleteDocumentationFile,
-      permissions: { type: "delete", resource: "system" },
+      permissions: {
+        type: "delete",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
   ],
 });

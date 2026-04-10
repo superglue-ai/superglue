@@ -1,59 +1,38 @@
 "use client";
 
-import { useConfig } from "@/src/app/config-context";
 import { SystemConfigProvider } from "@/src/components/systems/context";
 import { SystemPlayground } from "@/src/components/systems/SystemPlayground";
-import { createSuperglueClient } from "@/src/lib/client-utils";
-import type { System } from "@superglue/shared";
+import { useSystem } from "@/src/queries/systems";
 import { Loader2 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 export default function SystemPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const config = useConfig();
 
   const systemId = params.id as string;
   const isNew = systemId === "new";
+  const envParam = searchParams.get("env") as "dev" | "prod" | null;
 
-  const [system, setSystem] = useState<System | null>(null);
-  const [isLoading, setIsLoading] = useState(!isNew);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: system,
+    isLoading,
+    error,
+  } = useSystem(
+    isNew
+      ? ""
+      : (() => {
+          try {
+            return decodeURIComponent(systemId);
+          } catch {
+            return systemId;
+          }
+        })(),
+    envParam ? { environment: envParam } : undefined,
+  );
 
-  useEffect(() => {
-    if (isNew) {
-      setSystem(null);
-      setError(null);
-      setIsLoading(false);
-      return;
-    }
-
-    const loadSystem = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const client = createSuperglueClient(config.apiEndpoint);
-        const fetchedSystem = await client.getSystem(decodeURIComponent(systemId));
-
-        if (fetchedSystem) {
-          setSystem(fetchedSystem);
-        } else {
-          setError("System not found");
-        }
-      } catch (err) {
-        console.error("Error loading system:", err);
-        setError("Failed to load system");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadSystem();
-  }, [systemId, isNew, config.apiEndpoint, config.apiEndpoint]);
-
-  if (isLoading) {
+  if (!isNew && isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-foreground" />
@@ -61,10 +40,21 @@ export default function SystemPage() {
     );
   }
 
-  if (error) {
+  if (!isNew && error) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
-        <p className="text-lg text-muted-foreground">{error}</p>
+        <p className="text-lg text-muted-foreground">Failed to load system</p>
+        <button onClick={() => router.push("/systems")} className="text-primary hover:underline">
+          Back to Systems
+        </button>
+      </div>
+    );
+  }
+
+  if (!isNew && !system) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <p className="text-lg text-muted-foreground">System not found</p>
         <button onClick={() => router.push("/systems")} className="text-primary hover:underline">
           Back to Systems
         </button>

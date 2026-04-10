@@ -1,6 +1,7 @@
-import { Pagination, ServiceMetadata, Tool, ToolStep, UserRole } from "@superglue/shared";
+import { Pagination, ServiceMetadata, Tool, ToolStep } from "@superglue/shared";
+import type { Role } from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
-import type { DataStore } from "../datastore/types.js";
+import type { EEDataStore } from "../datastore/ee/types.js";
 import type { WorkerPools } from "../worker/types.js";
 import type {
   DocumentationFiles,
@@ -13,7 +14,7 @@ export type { PatchSystemBody };
 export interface AuthenticatedFastifyRequest extends FastifyRequest {
   traceId?: string;
   authInfo: AuthInfo;
-  datastore: DataStore;
+  datastore: EEDataStore;
   workerPools: WorkerPools;
 
   toMetadata: () => ServiceMetadata;
@@ -22,23 +23,24 @@ export interface AuthenticatedFastifyRequest extends FastifyRequest {
 export interface AuthInfo {
   orgId: string;
   userId?: string;
+  userEmail?: string;
   orgName?: string;
-  orgRole?: UserRole;
-  // EE: Effective permissions (intersection of API key + end user scopes)
-  isRestricted?: boolean;
-  allowedSystems?: string[] | null; // null or ['*'] means all systems allowed
+  roles: Role[];
 }
 
 export interface RouteHandler {
   (request: AuthenticatedFastifyRequest, reply: FastifyReply): Promise<any>;
 }
 
-// Route-level permission configuration
+export type BaseRoleId = "admin" | "member" | "enduser";
+
+export const ALL_BASE_ROLES: BaseRoleId[] = ["admin", "member", "enduser"];
+
 export interface RoutePermission {
   type: "read" | "write" | "execute" | "delete";
   resource: string;
-  allowRestricted?: boolean; // Can restricted API keys access this route? (default: false)
-  checkResourceId?: "toolId"; // Which param needs permission validation?
+  allowedBaseRoles: BaseRoleId[];
+  checkResourceId?: "toolId" | "systemId";
 }
 
 export interface RouteConfig {
@@ -46,7 +48,7 @@ export interface RouteConfig {
   path: string;
   handler: RouteHandler;
   schema?: any;
-  permissions?: RoutePermission;
+  permissions: RoutePermission;
 }
 
 export interface ApiModule {
@@ -73,7 +75,7 @@ export interface OpenAPIRunMetadata {
 export interface OpenAPIRun {
   runId: string;
   toolId: string;
-  tool?: Tool; // Full tool config
+  tool?: Tool;
   status: "running" | "success" | "failed" | "aborted";
   toolPayload?: Record<string, unknown>;
   data?: Record<string, unknown>;
@@ -82,19 +84,19 @@ export interface OpenAPIRun {
   options?: Record<string, unknown>;
   requestSource?: string;
   traceId?: string;
-  resultStorageUri?: string; // S3 URI where full results are stored (EE feature)
-  userId?: string; // User or end user who triggered this run
+  resultStorageUri?: string;
+  userId?: string;
+  executionMode?: "dev" | "prod";
   metadata: OpenAPIRunMetadata;
 }
 
-// Request body types
 export interface RunToolRequestOptions {
   async?: boolean;
   timeout?: number;
   webhookUrl?: string;
   traceId?: string;
-  // Optional source of the request; 'frontend' and 'mcp' are honored; Other sources are derived from the request context.
   requestSource?: string;
+  mode?: "dev" | "prod";
 }
 
 export interface RunToolRequestBody {
@@ -104,7 +106,6 @@ export interface RunToolRequestBody {
   options?: RunToolRequestOptions;
 }
 
-// For manual run creation (e.g., playground execution records)
 export interface CreateRunRequestBody {
   toolId: string;
   toolConfig: Tool;
@@ -118,7 +119,7 @@ export interface CreateRunRequestBody {
 }
 
 export interface CreateSystemBody {
-  id?: string;
+  id: string;
   name: string;
   url: string;
   credentials?: Record<string, any>;
@@ -129,6 +130,7 @@ export interface CreateSystemBody {
   icon?: string;
   metadata?: Record<string, any>;
   tunnel?: { tunnelId: string; targetName: string };
+  environment?: "dev" | "prod";
 }
 
 export interface UploadDocumentationBody {

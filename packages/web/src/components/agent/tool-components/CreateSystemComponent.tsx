@@ -1,6 +1,6 @@
 "use client";
 
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems, useInvalidateSystems } from "@/src/queries/systems";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { useToast } from "@/src/hooks/use-toast";
@@ -8,7 +8,10 @@ import { useSystemActions } from "@/src/hooks/use-system-actions";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import { System, SystemInput, ToolCall } from "@superglue/shared";
-import { UserAction } from "@/src/lib/agent/agent-types";
+import {
+  createToolInteractionEntry,
+  ToolMutation,
+} from "@/src/lib/agent/agent-tools/tool-call-state";
 import {
   AlertTriangle,
   CheckCircle,
@@ -29,9 +32,14 @@ interface CreateSystemComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
+  onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
   sendAgentRequest?: (
     userMessage?: string,
-    options?: { userActions?: UserAction[] },
+    options?: {
+      hiddenStarterMessage?: string;
+      hideUserMessage?: boolean;
+      resumeToolCallId?: string;
+    },
   ) => Promise<void>;
   onAbortStream?: () => void;
 }
@@ -50,6 +58,7 @@ function CreateSystemComponentImpl({
   tool,
   onInputChange,
   onToolUpdate,
+  onToolMutation,
   sendAgentRequest,
   onAbortStream,
 }: CreateSystemComponentProps) {
@@ -60,7 +69,8 @@ function CreateSystemComponentImpl({
   const [isExecuting, setIsExecuting] = useState(false);
   const { saveSystem, handleOAuth } = useSystemActions();
   const { toast } = useToast();
-  const { systems, refreshSystems, isRefreshing } = useSystems();
+  const { systems, isRefreshing } = useSystems();
+  const invalidateSystems = useInvalidateSystems();
 
   const getAuthBadge = useCallback((credentials: Record<string, any>) => {
     if (!credentials || Object.keys(credentials).length === 0) {
@@ -110,7 +120,11 @@ function CreateSystemComponentImpl({
     if (output?.requiredSensitiveFields && output.requiredSensitiveFields.length > 0) {
       return output.requiredSensitiveFields;
     }
-    if (input?.sensitiveCredentials) {
+    if (
+      input?.sensitiveCredentials &&
+      typeof input.sensitiveCredentials === "object" &&
+      !Array.isArray(input.sensitiveCredentials)
+    ) {
       return Object.keys(input.sensitiveCredentials);
     }
     return [];
@@ -121,7 +135,6 @@ function CreateSystemComponentImpl({
   const isConfirming = tool.status === "running" && hasSensitiveCredentials;
   const isCompleted = tool.status === "completed" && output?.success;
   const isToolInProgress = tool.status === "running" || tool.status === "pending";
-  const showPendingMessage = isToolInProgress && !isCompleted && !hasSensitiveCredentials;
 
   const systemConfig = output?.systemConfig || input;
 
@@ -152,9 +165,9 @@ function CreateSystemComponentImpl({
   useEffect(() => {
     if (isCompleted && systemId && !hasTriggeredRefreshRef.current) {
       hasTriggeredRefreshRef.current = true;
-      refreshSystems();
+      invalidateSystems();
     }
-  }, [isCompleted, systemId, refreshSystems]);
+  }, [isCompleted, systemId, invalidateSystems]);
 
   useEffect(() => {
     if (isCompleted || tool.status === "declined" || tool.status === "error") {
@@ -177,39 +190,40 @@ function CreateSystemComponentImpl({
 
     setIsExecuting(true);
     onToolUpdate?.(tool.id, { status: "running" });
+    onToolMutation?.(tool.id, {
+      interactionEntry: createToolInteractionEntry(
+        "user_submitted_credentials_and_confirmed_system_creation",
+        {
+          providedCredentialFields: Object.keys(credentialValues).filter((field) =>
+            credentialValues[field]?.trim(),
+          ),
+        },
+      ),
+      confirmationState: "confirmed",
+      confirmationData: {
+        systemConfig,
+        userProvidedCredentials: credentialValues,
+      },
+    });
 
     sendAgentRequest(undefined, {
-      userActions: [
-        {
-          type: "tool_event",
-          toolCallId: tool.id,
-          toolName: "create_system",
-          event: "confirmed",
-          payload: {
-            systemConfig,
-            userProvidedCredentials: credentialValues,
-          },
-        },
-      ],
+      resumeToolCallId: tool.id,
     });
-  }, [sendAgentRequest, onToolUpdate, tool.id, systemConfig, credentialValues]);
+  }, [credentialValues, onToolMutation, onToolUpdate, sendAgentRequest, systemConfig, tool.id]);
 
   const handleCancel = useCallback(() => {
     if (!sendAgentRequest) return;
 
     onToolUpdate?.(tool.id, { status: "declined" });
+    onToolMutation?.(tool.id, {
+      interactionEntry: createToolInteractionEntry("user_declined_system_creation"),
+      confirmationState: "declined",
+    });
 
     sendAgentRequest(undefined, {
-      userActions: [
-        {
-          type: "tool_event",
-          toolCallId: tool.id,
-          toolName: "create_system",
-          event: "declined",
-        },
-      ],
+      resumeToolCallId: tool.id,
     });
-  }, [sendAgentRequest, onToolUpdate, tool.id]);
+  }, [onToolMutation, onToolUpdate, sendAgentRequest, tool.id]);
 
   const allCredentialsProvided = useMemo(() => {
     return requiredSensitiveFields.every(
@@ -249,14 +263,21 @@ function CreateSystemComponentImpl({
     }
   }
 
-  const wrapperStatusOverride = isToolInProgress ? "running" : undefined;
+  if (isToolInProgress && !isAwaitingConfirmation) {
+    return (
+      <ToolCallWrapper tool={tool} openByDefault={true} statusOverride="running">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+            <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-pulse" />
+          </div>
+          <div className="text-sm text-muted-foreground">Creating system...</div>
+        </div>
+      </ToolCallWrapper>
+    );
+  }
 
   return (
-    <ToolCallWrapper
-      tool={tool}
-      openByDefault={!isCompleted}
-      statusOverride={wrapperStatusOverride}
-    >
+    <ToolCallWrapper tool={tool} openByDefault={!isCompleted}>
       <div className="space-y-4">
         {systemNotFound && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
@@ -272,18 +293,9 @@ function CreateSystemComponentImpl({
 
         <div
           className={`bg-background border rounded-lg p-4 ${
-            isAwaitingConfirmation
-              ? "border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10"
-              : showPendingMessage
-                ? "border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10"
-                : "border-border"
+            isAwaitingConfirmation ? "border-amber-200 dark:border-amber-800" : "border-border"
           }`}
         >
-          {showPendingMessage && (
-            <div className="mb-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded">
-              Showing input data - system will be created shortly
-            </div>
-          )}
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0">
               {displaySystem?.name || displaySystem?.id ? (
@@ -299,7 +311,7 @@ function CreateSystemComponentImpl({
                   System Endpoint
                 </div>
                 <div className="text-sm font-mono bg-muted/50 px-2 py-1 rounded">
-                  {displaySystem.url || "No API endpoint specified"}
+                  {displaySystem.url || "No endpoint specified"}
                 </div>
               </div>
 
@@ -404,7 +416,6 @@ function CreateSystemComponentImpl({
             <Button
               size="sm"
               variant="glass"
-              className="!bg-[#ffa500] hover:!bg-[#ffd700] dark:!bg-[#ffa500] dark:hover:!bg-[#ffd700] !text-black !border-amber-400/50 dark:!border-amber-500/50 font-semibold"
               onClick={handleConfirm}
               disabled={!allCredentialsProvided || isExecuting}
             >

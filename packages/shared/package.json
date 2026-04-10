@@ -26,24 +26,25 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^4.0.61",
-    "@ai-sdk/anthropic": "^3.0.45",
-    "@ai-sdk/azure": "^3.0.31",
-    "@ai-sdk/google": "^3.0.29",
-    "@ai-sdk/google-vertex": "^4.0.59",
-    "@ai-sdk/openai": "^3.0.30",
-    "@anthropic-ai/sdk": "^0.64.0",
-    "ai": "^6.0.91",
-    "cron-parser": "^5.3.1",
-    "cron-validate": "^1.5.2",
-    "js-tiktoken": "^1.0.14",
-    "json-schema": "^0.4.0",
-    "lodash.keys": "^4.2.0",
-    "lodash.merge": "^4.6.2",
-    "lodash.xor": "^4.5.0"
+    "@ai-sdk/amazon-bedrock": "4.0.83",
+    "@ai-sdk/anthropic": "3.0.64",
+    "@ai-sdk/azure": "3.0.49",
+    "@ai-sdk/google": "3.0.53",
+    "@ai-sdk/google-vertex": "4.0.95",
+    "@ai-sdk/openai": "3.0.48",
+    "@anthropic-ai/sdk": "0.80.0",
+    "ai": "6.0.137",
+    "cron-parser": "5.5.0",
+    "cron-validate": "1.5.3",
+    "js-tiktoken": "1.0.21",
+    "json-schema": "0.4.0",
+    "lodash.keys": "4.2.0",
+    "lodash.merge": "4.6.2",
+    "lodash.xor": "4.5.0",
+    "truncate-json": "3.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20.17.19",
-    "typescript": "^5.7.3"
+    "@types/node": "25.5.0",
+    "typescript": "5.8.3"
   }
 }

@@ -13,15 +13,16 @@ import {
 } from "@/src/components/ui/sheet";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/src/lib/general-utils";
-import { AgentType } from "@/src/lib/agent/registry/agents";
+import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import {
   AGENT_SUMMARIES,
   APPROVAL_LABELS,
   getGroupedToolsForAgent,
   type ApprovalMode,
-} from "@/src/lib/agent/registry/tool-metadata";
-import { Info, X } from "lucide-react";
+} from "@/src/lib/agent/agent-tools/tool-metadata";
+import { Info, X, GraduationCap } from "lucide-react";
 import React, { useMemo } from "react";
+import { useAgentContext } from "./AgentContextProvider";
 
 const APPROVAL_STYLES: Record<ApprovalMode, string> = {
   auto: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
@@ -41,7 +42,11 @@ export function AgentCapabilities({
   compact = false,
 }: AgentCapabilitiesProps) {
   const summary = AGENT_SUMMARIES[agentType];
-  const groups = useMemo(() => getGroupedToolsForAgent(agentType), [agentType]);
+  const { loadedSkills } = useAgentContext();
+  const groups = useMemo(
+    () => getGroupedToolsForAgent(agentType, loadedSkills),
+    [agentType, loadedSkills],
+  );
   const toolCount = useMemo(() => groups.reduce((acc, g) => acc + g.tools.length, 0), [groups]);
 
   return (
@@ -88,6 +93,24 @@ export function AgentCapabilities({
           </SheetHeader>
 
           <div className="space-y-5 pt-5">
+            {loadedSkills.length > 0 && (
+              <div className="rounded-xl bg-muted/30 border border-border/30 p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <GraduationCap className="w-3.5 h-3.5 text-muted-foreground/70" />
+                  <h4 className="text-xs font-medium text-muted-foreground/70">Loaded Skills</h4>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {loadedSkills.map((skill) => (
+                    <Badge
+                      key={skill}
+                      className="text-[10px] font-medium px-1.5 py-0 h-5 rounded-md bg-muted/60 text-muted-foreground border-border/40"
+                    >
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
             {groups.map((group) => (
               <div key={group.category}>
                 <h3 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider mb-2.5 px-1">

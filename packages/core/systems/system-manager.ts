@@ -1,5 +1,6 @@
 import {
   DocumentationFiles,
+  SystemEnvironment,
   FileStatus,
   findTemplateForSystem,
   ServiceMetadata,
@@ -9,6 +10,7 @@ import {
 } from "@superglue/shared";
 import { isMainThread, parentPort } from "worker_threads";
 import { DataStore } from "../datastore/types.js";
+import { isEEDataStore } from "../datastore/ee/types.js";
 import { DocumentationSearch } from "../documentation/documentation-search.js";
 import { getFileService, isFileStorageAvailable } from "../filestore/file-service.js";
 import { logMessage } from "../utils/logs.js";
@@ -102,6 +104,30 @@ export class SystemManager {
 
     try {
       const system = await this.getSystem();
+
+      // If this is a dev system, try to inherit documentation from the prod version (same ID)
+      if (system.environment === "dev") {
+        const prodSystem = await this.dataStore.getSystem({
+          id: system.id,
+          environment: "prod",
+          includeDocs: true,
+          orgId: this.orgId,
+        });
+        if (prodSystem && (prodSystem.documentation || prodSystem.openApiSchema)) {
+          this._documentation = {
+            content: prodSystem.documentation || undefined,
+            openApiSchema: prodSystem.openApiSchema || undefined,
+            isFetched: true,
+            fetchedAt: new Date(),
+          };
+          logMessage(
+            "info",
+            `Documentation inherited from production system for ${this.id}`,
+            this.metadata,
+          );
+          return this._documentation;
+        }
+      }
 
       const fileContent = await this.loadFileBasedDocumentation(system);
       let content = fileContent.docs;
@@ -373,6 +399,7 @@ export class SystemManager {
     tool: Tool,
     dataStore: DataStore,
     metadata: ServiceMetadata,
+    mode: SystemEnvironment = "prod",
   ): Promise<SystemManager[]> {
     const allIds = new Set(getToolSystemIds(tool));
 
@@ -380,11 +407,46 @@ export class SystemManager {
       return [];
     }
 
-    const systems = await dataStore.getManySystems({
-      ids: Array.from(allIds),
+    const systemIds = Array.from(allIds);
+
+    // Batch fetch systems with environment fallback
+    // In dev mode: prefer dev, fall back to prod
+    // In prod mode: prefer prod, fall back to dev
+    const preferredEnv = mode === "dev" ? "dev" : "prod";
+    const fallbackEnv = mode === "dev" ? "prod" : "dev";
+
+    // First batch: fetch all systems for preferred environment
+    const preferredSystems = await dataStore.getManySystems({
+      ids: systemIds,
+      environment: preferredEnv,
       includeDocs: false,
       orgId: metadata.orgId,
     });
+
+    const foundIds = new Set(preferredSystems.map((s) => s.id));
+    const missingIds = systemIds.filter((id) => !foundIds.has(id));
+
+    // Second batch: fetch fallback environment for systems not found in preferred
+    let fallbackSystems: System[] = [];
+    if (missingIds.length > 0) {
+      fallbackSystems = await dataStore.getManySystems({
+        ids: missingIds,
+        environment: fallbackEnv,
+        includeDocs: false,
+        orgId: metadata.orgId,
+      });
+    }
+
+    // Combine results - preferred systems take precedence (already filtered by foundIds)
+    const systems = [...preferredSystems, ...fallbackSystems];
+
+    // Log any systems that weren't found in either environment
+    const allFoundIds = new Set(systems.map((s) => s.id));
+    for (const systemId of systemIds) {
+      if (!allFoundIds.has(systemId)) {
+        logMessage("warn", `System ${systemId} not found`, { orgId: metadata.orgId });
+      }
+    }
 
     const managers = systems.map((i) => new SystemManager(i, dataStore, metadata));
 
@@ -395,6 +457,28 @@ export class SystemManager {
         await manager.refreshTokenIfNeeded();
       }),
     );
+
+    // EE: If this is an end user, merge end-user credentials for multi-tenancy systems
+    if (metadata.roleIds?.includes("enduser") && metadata.userId && isEEDataStore(dataStore)) {
+      await Promise.all(
+        managers.map(async (manager) => {
+          const system = manager.toSystemSync();
+          if (system.multiTenancyMode === "enabled") {
+            const endUserCreds = await dataStore.getEndUserCredentials({
+              endUserId: metadata.userId!,
+              systemId: system.id,
+              orgId: metadata.orgId!,
+            });
+            if (endUserCreds) {
+              // Merge end-user credentials over system template credentials
+              // End-user creds take precedence (e.g., their access_token over template client_id)
+              manager._system.credentials = { ...system.credentials, ...endUserCreds };
+              logMessage("debug", `Merged end-user credentials for system ${system.id}`, metadata);
+            }
+          }
+        }),
+      );
+    }
 
     return managers;
   }

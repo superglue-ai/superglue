@@ -19,7 +19,7 @@ import { useToast } from "@/src/hooks/use-toast";
 import { cn } from "@/src/lib/general-utils";
 import { getOAuthCallbackUrl, triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import { systemOptions, findTemplateForSystem, resolveOAuthCertAndKey } from "@superglue/shared";
+import { findTemplateForSystem, resolveOAuthCertAndKey } from "@superglue/shared";
 import { ChevronRight, Eye, EyeOff, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
@@ -87,7 +87,6 @@ export function AuthenticationSection() {
     setAuthType,
     setApiKeyCredentials,
     setOAuthFields,
-    setUseSuperglueOAuth,
     setMultiTenancyMode,
     saveSystem,
   } = useSystemConfig();
@@ -189,26 +188,17 @@ export function AuthenticationSection() {
 
   const getResolvedOAuthFields = useCallback(() => {
     const templateOAuth = getTemplateOAuth();
-    if (auth.useSuperglueOAuth && templateOAuth) {
-      // Prefer stored values over template
-      return {
-        ...auth.oauthFields,
-        client_id: auth.oauthFields.client_id || templateOAuth.client_id,
-        auth_url: auth.oauthFields.auth_url || templateOAuth.authUrl,
-        token_url: auth.oauthFields.token_url || templateOAuth.tokenUrl,
-        scopes: auth.oauthFields.scopes || templateOAuth.scopes,
-        grant_type: auth.oauthFields.grant_type || templateOAuth.grant_type,
-      };
-    }
-    return auth.oauthFields;
-  }, [auth.oauthFields, auth.useSuperglueOAuth, getTemplateOAuth]);
+    return {
+      ...auth.oauthFields,
+      auth_url: auth.oauthFields.auth_url || templateOAuth?.authUrl || "",
+      token_url: auth.oauthFields.token_url || templateOAuth?.tokenUrl || "",
+      scopes: auth.oauthFields.scopes || templateOAuth?.scopes || "",
+      grant_type: auth.oauthFields.grant_type || templateOAuth?.grant_type || "authorization_code",
+    };
+  }, [auth.oauthFields, getTemplateOAuth]);
 
   const isConnectDisabled = useCallback(() => {
     if (auth.authType !== "oauth") return true;
-    if (auth.useSuperglueOAuth) {
-      const templateOAuth = getTemplateOAuth();
-      return !templateOAuth?.client_id;
-    }
     const resolvedFields = getResolvedOAuthFields();
     const isClientCreds = resolvedFields.grant_type === "client_credentials";
     if (isClientCreds) {
@@ -227,19 +217,12 @@ export function AuthenticationSection() {
       resolvedFields.auth_url &&
       resolvedFields.scopes
     );
-  }, [auth.authType, auth.useSuperglueOAuth, getResolvedOAuthFields, getTemplateOAuth]);
+  }, [auth.authType, getResolvedOAuthFields]);
 
   const handleConnect = async () => {
     if (auth.authType !== "oauth") return;
     setConnectLoading(true);
     const resolvedFields = getResolvedOAuthFields();
-
-    const templateInfo = auth.useSuperglueOAuth
-      ? {
-          templateId: system.templateName,
-          clientId: resolvedFields.client_id,
-        }
-      : undefined;
 
     const handleOAuthError = (error: string) => {
       setConnectLoading(false);
@@ -279,18 +262,13 @@ export function AuthenticationSection() {
       auth.authType,
       handleOAuthError,
       true,
-      templateInfo,
+      undefined,
       handleOAuthSuccess,
       config.apiEndpoint,
       undefined,
       config.apiEndpoint,
     );
   };
-
-  const templateOAuth = getTemplateOAuth();
-  const hasTemplateClient = !!(
-    templateOAuth?.client_id && String(templateOAuth.client_id).trim().length > 0
-  );
 
   return (
     <div className="space-y-5">
@@ -399,48 +377,10 @@ export function AuthenticationSection() {
                   Template mode: each end user will authenticate using these settings.
                 </div>
               ) : null}
-              {hasTemplateClient && (
-                <div className="mt-4 pt-4 border-t border-border/40">
-                  <div className="text-sm font-medium">OAuth Provider</div>
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setUseSuperglueOAuth(true)}
-                      className={cn(
-                        "rounded-xl border p-3 text-left transition-colors",
-                        "bg-muted/30 border-border/50",
-                        "hover:bg-muted/40 hover:border-border/70",
-                        auth.useSuperglueOAuth && "ring-1 ring-primary/40",
-                      )}
-                    >
-                      <div className="text-sm font-medium">Use superglue preconfigured OAuth</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Preconfigured client for{" "}
-                        {systemOptions.find((o) => o.value === system.templateName)?.label}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUseSuperglueOAuth(false)}
-                      className={cn(
-                        "rounded-xl border p-3 text-left transition-colors",
-                        "bg-muted/30 border-border/50",
-                        "hover:bg-muted/40 hover:border-border/70",
-                        !auth.useSuperglueOAuth && "ring-1 ring-primary/40",
-                      )}
-                    >
-                      <div className="text-sm font-medium">Use your own OAuth app</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Provide client ID, secret, and endpoints below.
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          {!auth.useSuperglueOAuth && auth.oauthFields.grant_type === "authorization_code" && (
+          {auth.oauthFields.grant_type === "authorization_code" && (
             <div className="rounded-xl border border-border/50 bg-gradient-to-br from-muted/60 to-muted/30 p-4">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-medium">Redirect URI</Label>
@@ -457,190 +397,188 @@ export function AuthenticationSection() {
             </div>
           )}
 
-          {!auth.useSuperglueOAuth && (
-            <div className="space-y-4 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 p-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="client_id" className="text-xs font-medium">
-                    Client ID
-                  </Label>
+          <div className="space-y-4 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 p-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="client_id" className="text-xs font-medium">
+                  Client ID
+                </Label>
+                <Input
+                  id="client_id"
+                  value={auth.oauthFields.client_id}
+                  onChange={(e) => setOAuthFields({ client_id: e.target.value })}
+                  placeholder="Your OAuth app client ID"
+                  className="h-9 bg-background/50 border-border/60"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="client_secret" className="text-xs font-medium">
+                  Client Secret
+                </Label>
+                <div className="relative">
                   <Input
-                    id="client_id"
-                    value={auth.oauthFields.client_id}
-                    onChange={(e) => setOAuthFields({ client_id: e.target.value })}
-                    placeholder="Your OAuth app client ID"
-                    className="h-9 bg-background/50 border-border/60"
+                    id="client_secret"
+                    type={showClientSecret ? "text" : "password"}
+                    value={auth.oauthFields.client_secret}
+                    onChange={(e) => setOAuthFields({ client_secret: e.target.value })}
+                    placeholder="Your OAuth app client secret"
+                    className="h-9 pr-9 bg-background/50 border-border/60"
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
+                    onClick={() => setShowClientSecret(!showClientSecret)}
+                  >
+                    {showClientSecret ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="client_secret" className="text-xs font-medium">
-                    Client Secret
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="client_secret"
-                      type={showClientSecret ? "text" : "password"}
-                      value={auth.oauthFields.client_secret}
-                      onChange={(e) => setOAuthFields({ client_secret: e.target.value })}
-                      placeholder="Your OAuth app client secret"
-                      className="h-9 pr-9 bg-background/50 border-border/60"
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="grant_type" className="text-xs font-medium">
+                  Grant Type
+                </Label>
+                <Select
+                  value={auth.oauthFields.grant_type}
+                  onValueChange={(value: "authorization_code" | "client_credentials") =>
+                    setOAuthFields({ grant_type: value })
+                  }
+                >
+                  <SelectTrigger className="h-9 bg-background/50 border-border/60">
+                    <SelectValue placeholder="Select grant type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="authorization_code">Authorization Code</SelectItem>
+                    <SelectItem value="client_credentials">Client Credentials</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="scopes" className="text-xs font-medium">
+                  Scopes
+                </Label>
+                <Input
+                  id="scopes"
+                  value={auth.oauthFields.scopes}
+                  onChange={(e) => setOAuthFields({ scopes: e.target.value })}
+                  placeholder="e.g., read write"
+                  className="h-9 bg-background/50 border-border/60"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="auth_url" className="text-xs font-medium">
+                  Authorization URL
+                </Label>
+                <Input
+                  id="auth_url"
+                  value={auth.oauthFields.auth_url}
+                  onChange={(e) => setOAuthFields({ auth_url: e.target.value })}
+                  placeholder="OAuth authorization endpoint"
+                  className="h-9 bg-background/50 border-border/60"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="token_url" className="text-xs font-medium">
+                  Token URL
+                </Label>
+                <Input
+                  id="token_url"
+                  value={auth.oauthFields.token_url}
+                  onChange={(e) => setOAuthFields({ token_url: e.target.value })}
+                  placeholder="OAuth token endpoint"
+                  className="h-9 bg-background/50 border-border/60"
+                />
+              </div>
+            </div>
+
+            {auth.oauthFields.grant_type === "client_credentials" && (
+              <div className="flex justify-evenly pt-3 border-t border-border/30">
+                <div className="flex flex-col items-center">
+                  <Label className="text-xs font-medium mb-2">Client Certificate</Label>
+                  {auth.oauthFields.oauth_cert ? (
+                    <FileChip
+                      file={{
+                        name: certFileName || "Certificate",
+                        key: "oauth_cert",
+                        size: 0,
+                        status: "ready",
+                      }}
+                      onRemove={handleRemoveCert}
+                      size="large"
+                      rounded="sm"
+                      showOriginalName={true}
+                      showSize={false}
                     />
+                  ) : (
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
-                      onClick={() => setShowClientSecret(!showClientSecret)}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById("cert-file-upload")?.click()}
+                      className="bg-background/50"
                     >
-                      {showClientSecret ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      )}
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload
                     </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="grant_type" className="text-xs font-medium">
-                    Grant Type
-                  </Label>
-                  <Select
-                    value={auth.oauthFields.grant_type}
-                    onValueChange={(value: "authorization_code" | "client_credentials") =>
-                      setOAuthFields({ grant_type: value })
-                    }
-                  >
-                    <SelectTrigger className="h-9 bg-background/50 border-border/60">
-                      <SelectValue placeholder="Select grant type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="authorization_code">Authorization Code</SelectItem>
-                      <SelectItem value="client_credentials">Client Credentials</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="scopes" className="text-xs font-medium">
-                    Scopes
-                  </Label>
-                  <Input
-                    id="scopes"
-                    value={auth.oauthFields.scopes}
-                    onChange={(e) => setOAuthFields({ scopes: e.target.value })}
-                    placeholder="e.g., read write"
-                    className="h-9 bg-background/50 border-border/60"
+                  )}
+                  <input
+                    type="file"
+                    id="cert-file-upload"
+                    hidden
+                    accept=".crt,.pem,.cer"
+                    onChange={handleCertFileUpload}
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="auth_url" className="text-xs font-medium">
-                    Authorization URL
-                  </Label>
-                  <Input
-                    id="auth_url"
-                    value={auth.oauthFields.auth_url}
-                    onChange={(e) => setOAuthFields({ auth_url: e.target.value })}
-                    placeholder="OAuth authorization endpoint"
-                    className="h-9 bg-background/50 border-border/60"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="token_url" className="text-xs font-medium">
-                    Token URL
-                  </Label>
-                  <Input
-                    id="token_url"
-                    value={auth.oauthFields.token_url}
-                    onChange={(e) => setOAuthFields({ token_url: e.target.value })}
-                    placeholder="OAuth token endpoint"
-                    className="h-9 bg-background/50 border-border/60"
-                  />
-                </div>
-              </div>
-
-              {auth.oauthFields.grant_type === "client_credentials" && (
-                <div className="flex justify-evenly pt-3 border-t border-border/30">
-                  <div className="flex flex-col items-center">
-                    <Label className="text-xs font-medium mb-2">Client Certificate</Label>
-                    {auth.oauthFields.oauth_cert ? (
-                      <FileChip
-                        file={{
-                          name: certFileName || "Certificate",
-                          key: "oauth_cert",
-                          size: 0,
-                          status: "ready",
-                        }}
-                        onRemove={handleRemoveCert}
-                        size="large"
-                        rounded="sm"
-                        showOriginalName={true}
-                        showSize={false}
-                      />
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById("cert-file-upload")?.click()}
-                        className="bg-background/50"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload
-                      </Button>
-                    )}
-                    <input
-                      type="file"
-                      id="cert-file-upload"
-                      hidden
-                      accept=".crt,.pem,.cer"
-                      onChange={handleCertFileUpload}
+                <div className="flex flex-col items-center">
+                  <Label className="text-xs font-medium mb-2">Private Key</Label>
+                  {auth.oauthFields.oauth_key ? (
+                    <FileChip
+                      file={{
+                        name: keyFileName || "Private Key",
+                        key: "oauth_key",
+                        size: 0,
+                        status: "ready",
+                      }}
+                      onRemove={handleRemoveKey}
+                      size="large"
+                      rounded="sm"
+                      showOriginalName={true}
+                      showSize={false}
                     />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <Label className="text-xs font-medium mb-2">Private Key</Label>
-                    {auth.oauthFields.oauth_key ? (
-                      <FileChip
-                        file={{
-                          name: keyFileName || "Private Key",
-                          key: "oauth_key",
-                          size: 0,
-                          status: "ready",
-                        }}
-                        onRemove={handleRemoveKey}
-                        size="large"
-                        rounded="sm"
-                        showOriginalName={true}
-                        showSize={false}
-                      />
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById("key-file-upload")?.click()}
-                        className="bg-background/50"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload
-                      </Button>
-                    )}
-                    <input
-                      type="file"
-                      id="key-file-upload"
-                      hidden
-                      accept=".key,.pem"
-                      onChange={handleKeyFileUpload}
-                    />
-                  </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById("key-file-upload")?.click()}
+                      className="bg-background/50"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload
+                    </Button>
+                  )}
+                  <input
+                    type="file"
+                    id="key-file-upload"
+                    hidden
+                    accept=".key,.pem"
+                    onChange={handleKeyFileUpload}
+                  />
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
 
           {!isMultiTenancy && (
             <>

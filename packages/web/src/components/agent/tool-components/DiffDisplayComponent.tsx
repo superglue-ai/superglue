@@ -22,7 +22,7 @@ import {
   EnrichedDiff,
   formatTargetLabel,
 } from "@/src/lib/config-diff-utils";
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems } from "@/src/queries/systems";
 
 /**
  * Get icon for a diff target type (matches MiniStepCard icons)

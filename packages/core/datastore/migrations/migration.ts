@@ -16,6 +16,7 @@ export interface LegacyRunRow {
   request_source?: string;
   result_storage_uri?: string;
   user_id?: string;
+  execution_mode?: string;
 }
 
 // Re-export for backwards compatibility
@@ -114,6 +115,7 @@ export function extractRun(data: any, row: LegacyRunRow): Run {
     traceId: data.traceId,
     resultStorageUri: row.result_storage_uri || data.resultStorageUri || undefined,
     userId: row.user_id || data.userId || undefined,
+    executionMode: row.execution_mode || data.executionMode || undefined,
     metadata: {
       startedAt: startedAt.toISOString(),
       completedAt: completedAt?.toISOString(),

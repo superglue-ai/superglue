@@ -2,8 +2,10 @@ import {
   HttpMethod,
   RunStatus,
   Tool,
+  isRequestConfig,
   mapFailureBehavior,
   mapPaginationType,
+  validateToolStructure,
 } from "@superglue/shared";
 import { describe, expect, it } from "vitest";
 import { buildRunResponse } from "./tools.js";
@@ -39,6 +41,109 @@ describe("tools API helpers", () => {
 
     it("should return undefined for undefined input", () => {
       expect(mapFailureBehavior(undefined)).toBeUndefined();
+    });
+  });
+
+  describe("tool validation", () => {
+    it("should reject steps without an id", () => {
+      const result = validateToolStructure({
+        id: "list-drive-files",
+        instruction: "List files",
+        steps: [{}],
+      });
+
+      expect(result).toEqual({
+        valid: false,
+        error: "Step 1: missing 'id'",
+      });
+    });
+
+    it("should reject steps without a config", () => {
+      const result = validateToolStructure({
+        id: "list-drive-files",
+        instruction: "List files",
+        steps: [{ id: "listFiles" }],
+      });
+
+      expect(result).toEqual({
+        valid: false,
+        error: "Step 1 (listFiles): missing 'config'",
+      });
+    });
+
+    it("should reject request steps without a url", () => {
+      const result = validateToolStructure({
+        id: "list-drive-files",
+        instruction: "List files",
+        steps: [
+          {
+            id: "listFiles",
+            config: {
+              method: HttpMethod.GET,
+            },
+          },
+        ],
+      });
+
+      expect(result).toEqual({
+        valid: false,
+        error: "Step 1 (listFiles): request step missing 'url'",
+      });
+    });
+
+    it("should reject request steps with a non-string url", () => {
+      const result = validateToolStructure({
+        id: "list-drive-files",
+        instruction: "List files",
+        steps: [
+          {
+            id: "listFiles",
+            config: {
+              method: HttpMethod.GET,
+              url: 123,
+            },
+          },
+        ],
+      });
+
+      expect(result).toEqual({
+        valid: false,
+        error: "Step 1 (listFiles): request step missing 'url'",
+      });
+    });
+
+    it("should accept valid request steps", () => {
+      const result = validateToolStructure({
+        id: "list-drive-files",
+        instruction: "List files",
+        steps: [
+          {
+            id: "listFiles",
+            config: {
+              method: HttpMethod.GET,
+              url: "https://example.com/files",
+            },
+          },
+        ],
+      });
+
+      expect(result).toEqual({ valid: true });
+    });
+  });
+
+  describe("isRequestConfig", () => {
+    it("should return false for undefined config", () => {
+      expect(isRequestConfig(undefined)).toBe(false);
+      expect(isRequestConfig(null)).toBe(false);
+    });
+
+    it("should return true for url-based request configs without an explicit type", () => {
+      expect(
+        isRequestConfig({
+          url: "https://example.com/files",
+          method: HttpMethod.GET,
+        } as any),
+      ).toBe(true);
     });
   });
 
@@ -103,7 +208,7 @@ describe("tools API helpers", () => {
       expect(result.options).toEqual({ timeout: 30000 });
     });
 
-    it("should map stepResults", () => {
+    it("should map stepResults without data to reduce payload size", () => {
       const result = buildRunResponse({
         ...baseParams,
         stepResults: [
@@ -112,9 +217,10 @@ describe("tools API helpers", () => {
         ],
       });
 
+      // Data is excluded from step results to reduce response size
       expect(result.stepResults).toEqual([
-        { stepId: "step-1", success: true, data: { foo: "bar" }, error: undefined },
-        { stepId: "step-2", success: false, data: undefined, error: "Failed" },
+        { stepId: "step-1", success: true, error: undefined },
+        { stepId: "step-2", success: false, error: "Failed" },
       ]);
     });
 

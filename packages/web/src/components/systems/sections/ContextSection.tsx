@@ -1,6 +1,5 @@
 "use client";
 
-import { useConfig } from "@/src/app/config-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,9 +13,9 @@ import {
 import { FileContentViewer } from "@/src/components/ui/FileContentViewer";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { cn } from "@/src/lib/general-utils";
-import { tokenRegistry } from "@/src/lib/token-registry";
 import { formatBytes } from "@/src/lib/file-utils";
-import { ALLOWED_FILE_EXTENSIONS, SuperglueClient } from "@superglue/shared";
+import { useSuperglueClient } from "@/src/queries/use-client";
+import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
 import {
   Globe,
   Loader2,
@@ -33,7 +32,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSystemConfig } from "../context";
-import { useDocFiles, type DocFile } from "../hooks/use-doc-files";
+import { useDocFiles } from "../hooks/use-doc-files";
+import type { DocFile } from "@/src/queries/doc-files";
 import { useFilePreview } from "../hooks/use-file-preview";
 
 const BLOCKED_DOC_EXTENSIONS = [".zip", ".gz"];
@@ -271,17 +271,9 @@ function UsageInstructions({ value, onChange }: { value: string; onChange: (v: s
 
 export function ContextSection({ showRefreshButton = true }: { showRefreshButton?: boolean }) {
   const { context, system, setSpecificInstructions, setDocFileCount } = useSystemConfig();
-  const superglueConfig = useConfig();
 
-  const client = useMemo(
-    () =>
-      new SuperglueClient({
-        endpoint: superglueConfig.apiEndpoint,
-        apiKey: tokenRegistry.getToken(),
-        apiEndpoint: superglueConfig.apiEndpoint,
-      }),
-    [superglueConfig.apiEndpoint, superglueConfig.apiEndpoint],
-  );
+  const createClient = useSuperglueClient();
+  const client = useMemo(() => createClient(), [createClient]);
 
   const {
     docFiles,
@@ -297,7 +289,7 @@ export function ContextSection({ showRefreshButton = true }: { showRefreshButton
     handleAddUrl,
     handleConfirmDelete,
     refreshDocFiles,
-  } = useDocFiles(system.id, client);
+  } = useDocFiles(system.id);
 
   const { previewFile, previewContent, previewLoading, handlePreview, closePreview } =
     useFilePreview(client);

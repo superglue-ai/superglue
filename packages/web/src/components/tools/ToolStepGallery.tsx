@@ -2,9 +2,10 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { MiniCard, StatusIndicator, TriggerCard } from "@/src/components/ui/mini-card";
 import { SystemIcon } from "@/src/components/ui/system-icon";
+import { EnvironmentBadge } from "@/src/components/ui/environment-label";
 import { buildPreviousStepResults, cn } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { isRequestConfig, isTransformConfig, RequestStepConfig } from "@superglue/shared";
+import { isRequestConfig, isTransformConfig, RequestStepConfig, Tool } from "@superglue/shared";
 import {
   Blocks,
   Code2,
@@ -24,8 +25,10 @@ import { SpotlightStepCard, StepItem } from "./cards/SpotlightStepCard";
 import { useExecution, useToolConfig } from "./context";
 import { useGalleryNavigation } from "./hooks/use-gallery-navigation";
 import { InstructionDisplay } from "./shared/InstructionDisplay";
+import { UnsavedChangesCard } from "./UnsavedChangesCard";
 import { TriggersCard } from "./cards/TriggersCard";
 import { useRightSidebar } from "../sidebar/RightSidebarContext";
+import { useEnvironment } from "@/src/app/environment-context";
 
 const RUNNING_STATUS = {
   text: "Running",
@@ -56,6 +59,8 @@ export interface ToolStepGalleryProps {
   totalFileSize?: number;
   isPayloadValid?: boolean;
   embedded?: boolean;
+  // Unsaved changes props
+  savedTool?: Tool | null;
 }
 
 export function ToolStepGallery({
@@ -75,6 +80,7 @@ export function ToolStepGallery({
   totalFileSize,
   isPayloadValid = true,
   embedded = false,
+  savedTool,
 }: ToolStepGalleryProps) {
   // === CONTEXT ===
   const {
@@ -85,9 +91,11 @@ export function ToolStepGallery({
     inputSchema,
     outputSchema,
     outputTransform,
+    responseFilters,
     setSteps,
     setInstruction,
     isPayloadReferenced,
+    hasUnsavedChanges,
   } = useToolConfig();
 
   const {
@@ -101,6 +109,8 @@ export function ToolStepGallery({
     getStepStatusInfo,
   } = useExecution();
 
+  const { mode: environmentMode } = useEnvironment();
+
   // === DERIVED VALUES FROM CONTEXT ===
   const toolId = tool.id;
   const instruction = tool.instruction;
@@ -110,6 +120,43 @@ export function ToolStepGallery({
   const hasTransformCompleted = transformStatus === "completed";
   const hasTransformFailed = transformStatus === "failed";
   const isSavedTool = toolId && !toolId.startsWith("draft_") && toolId !== "new";
+
+  // Build current tool for diff comparison
+  const currentTool = useMemo((): Tool => {
+    let parsedInputSchema = null;
+    let parsedOutputSchema = null;
+    try {
+      if (inputSchema) parsedInputSchema = JSON.parse(inputSchema);
+    } catch {
+      // Invalid JSON
+    }
+    try {
+      if (outputSchema) parsedOutputSchema = JSON.parse(outputSchema);
+    } catch {
+      // Invalid JSON
+    }
+    return {
+      id: toolId,
+      steps,
+      inputSchema: parsedInputSchema,
+      outputSchema: parsedOutputSchema,
+      outputTransform,
+      instruction,
+      folder: tool.folder,
+      archived: tool.isArchived,
+      responseFilters: responseFilters.length > 0 ? responseFilters : undefined,
+    } as Tool;
+  }, [
+    toolId,
+    steps,
+    inputSchema,
+    outputSchema,
+    outputTransform,
+    instruction,
+    tool.folder,
+    tool.isArchived,
+    responseFilters,
+  ]);
 
   // Parse manual payload for categorized sources (memoized)
   const manualPayload = useMemo(() => {
@@ -372,12 +419,9 @@ export function ToolStepGallery({
   const onStepEdit = (stepId: string, updatedStep: any, isUserInitiated: boolean = false) => {
     // Suppress user-initiated edits during navigation to prevent spurious resets
     if (isNavigatingRef.current && isUserInitiated) {
-      if (originalOnStepEdit) {
-        originalOnStepEdit(stepId, updatedStep, false);
-      }
-    } else if (originalOnStepEdit) {
-      originalOnStepEdit(stepId, updatedStep, isUserInitiated);
+      return;
     }
+    originalOnStepEdit?.(stepId, updatedStep, isUserInitiated);
   };
 
   // === EXTERNAL NAVIGATION SIGNALS ===
@@ -413,15 +457,28 @@ export function ToolStepGallery({
             )}
           </div>
         </div>
-        {instruction && (
-          <div className="w-full">
-            <InstructionDisplay
-              instruction={instruction}
-              onSave={setInstruction}
-              showEditButton={true}
-            />
-          </div>
-        )}
+        <div className="flex items-start justify-between gap-4">
+          {instruction ? (
+            <div className="flex-1 min-w-0">
+              <InstructionDisplay
+                instruction={instruction}
+                onSave={setInstruction}
+                showEditButton={true}
+              />
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {savedTool && (
+            <div className="flex-shrink-0">
+              <UnsavedChangesCard
+                hasUnsavedChanges={hasUnsavedChanges}
+                savedTool={savedTool}
+                currentTool={currentTool}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Scrollable content section */}
@@ -646,10 +703,43 @@ export function ToolStepGallery({
                               ? (step.config as RequestStepConfig).systemId
                               : undefined;
                           const isTransformStep = isTransformConfig(step.config);
-                          const linkedSystem =
+
+                          // Find systems for this step - check both environments
+                          const devSystem =
                             stepSystemId && systems
-                              ? systems.find((sys) => sys.id === stepSystemId)
+                              ? systems.find(
+                                  (sys) => sys.id === stepSystemId && sys.environment === "dev",
+                                )
                               : undefined;
+                          const prodSystem =
+                            stepSystemId && systems
+                              ? systems.find(
+                                  (sys) => sys.id === stepSystemId && sys.environment === "prod",
+                                )
+                              : undefined;
+
+                          // Resolve which system to display based on environment mode
+                          // In dev mode: prefer dev, fall back to prod
+                          // In prod mode: prefer prod, fall back to dev
+                          const linkedSystem =
+                            environmentMode === "dev"
+                              ? devSystem || prodSystem
+                              : prodSystem || devSystem;
+
+                          // Determine environment badge to show:
+                          // - If both exist: show the one matching current mode
+                          // - If only one exists: show that one
+                          // - If none exist: no badge
+                          const systemEnvBadge: "dev" | "prod" | null = (() => {
+                            if (!stepSystemId || !linkedSystem) return null;
+                            if (devSystem && prodSystem) {
+                              // Both exist - show the one we're using based on mode
+                              return environmentMode === "dev" ? "dev" : "prod";
+                            }
+                            // Only one exists - show which one it is
+                            return linkedSystem.environment as "dev" | "prod";
+                          })();
+
                           const systemLabel =
                             linkedSystem?.name ||
                             stepSystemId ||
@@ -664,6 +754,9 @@ export function ToolStepGallery({
                                   </span>
                                 </div>
                                 <div className="absolute top-0 right-0 flex items-center gap-0.5 h-4">
+                                  {systemEnvBadge && (
+                                    <EnvironmentBadge type={systemEnvBadge} size="sm" />
+                                  )}
                                   {step?.modify === true && (
                                     <OctagonAlert
                                       className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400"
@@ -688,12 +781,14 @@ export function ToolStepGallery({
                                     )}
                                   </div>
                                   {systemLabel && (
-                                    <span
-                                      className="text-[9px] text-muted-foreground mt-1 truncate max-w-[140px]"
-                                      title={systemLabel}
-                                    >
-                                      {systemLabel}
-                                    </span>
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <span
+                                        className="text-[9px] text-muted-foreground truncate max-w-[100px]"
+                                        title={systemLabel}
+                                      >
+                                        {systemLabel}
+                                      </span>
+                                    </div>
                                   )}
                                   <span
                                     className="text-[11px] font-semibold mt-1 truncate max-w-[140px]"

@@ -1,19 +1,23 @@
-import { PostgresService } from "./postgres.js";
-import type { DataStore } from "./types.js";
+import { EEPostgresService } from "./ee/postgres.js";
+import { EEDataStore } from "./ee/types.js";
 
-let _dataStore: DataStore | null = null;
+let _dataStore: EEDataStore | null = null;
 
-export async function createDataStore(config: { type: "postgres" }): Promise<DataStore> {
+export async function createDataStore(config: { type: "postgres" }): Promise<EEDataStore> {
   if (config.type === "postgres") {
     const postgresConfig = getPostgresConfig();
-    _dataStore = new PostgresService(postgresConfig);
+    _dataStore = new EEPostgresService(postgresConfig);
     await _dataStore.ready();
     return _dataStore;
   }
   throw new Error(`Unsupported datastore type: ${config.type}.`);
 }
 
-export function getDataStore(): DataStore {
+/**
+ * Get the singleton datastore instance.
+ * Must be called after createDataStore() has been invoked.
+ */
+export function getDataStore(): EEDataStore {
   if (!_dataStore) {
     throw new Error("DataStore not initialized. Call createDataStore() first.");
   }

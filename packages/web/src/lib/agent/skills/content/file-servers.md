@@ -93,36 +93,14 @@ Uses `@awo00/smb2`. Connection lifecycle: create client → authenticate (domain
 
 All paths use forward slashes (`/`) — SMB library handles Windows conversion internally.
 
+Credentials must be injected into the URL using placeholders:
+
+```
+smb://<<systemId_username>>:<<systemId_password>>@fileserver.example.com/ShareName
+```
+
+For private systems via Secure Gateway, the host is `tunnelId.tunnel` (e.g., `my_tunnel.tunnel`).
+
 ## Return Value
 
 Single operation → result directly. Multiple operations → array of results.
-
-## Common Patterns
-
-### Download and process
-
-```json
-{ "operation": "get", "path": "incoming/<<(sourceData) => sourceData.currentItem.filename>>" }
-```
-
-### Upload results
-
-```json
-{
-  "operation": "put",
-  "path": "output/results.json",
-  "content": "<<(sourceData) => JSON.stringify(sourceData.processData.data)>>"
-}
-```
-
-### List then loop
-
-Step 1 lists files, step 2 uses data selector to loop over them:
-
-```javascript
-// Step 1: list files
-// body: {"operation": "list", "path": "incoming"}
-
-// Step 2 dataSelector: (sourceData) => sourceData.listFiles.data.filter(f => f.type === "file")
-// body: {"operation": "get", "path": "<<(sourceData) => sourceData.currentItem.path>>"}
-```

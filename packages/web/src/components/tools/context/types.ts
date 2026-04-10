@@ -46,6 +46,7 @@ export interface ToolConfigContextValue {
   setFilesAndPayloads: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
   markPayloadEdited: () => void;
   markCurrentStateAsBaseline: () => void;
+  setUnsavedChangesSuppressed: (suppressed: boolean) => void;
 
   addStep: (step: ToolStep, afterIndex?: number) => void;
   removeStep: (stepId: string) => void;
@@ -57,6 +58,7 @@ export interface ToolConfigContextValue {
   getStepSystem: (stepId: string) => System | undefined;
 
   isPayloadReferenced: boolean;
+  hasUnsavedChanges: boolean;
 }
 
 export type StepStatus = "pending" | "running" | "completed" | "failed" | "aborted";
@@ -84,11 +86,13 @@ export interface DataSelectorResult {
 
 export interface CategorizedVariables {
   credentials: string[];
+  systemUrls: string[];
   toolInputs: string[];
   fileInputs: string[];
   currentStepData: string[];
   previousStepData: string[];
   paginationVariables: string[];
+  contextVariables: string[];
 }
 
 export interface CategorizedSources {
@@ -97,6 +101,7 @@ export interface CategorizedSources {
   previousStepResults: Record<string, unknown>;
   currentItem: unknown;
   paginationData: Record<string, unknown>;
+  contextData: Record<string, unknown>;
 }
 
 export interface StepTemplateData {

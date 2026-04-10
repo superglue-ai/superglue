@@ -1,23 +1,29 @@
 "use client";
 
 import { useConfig } from "@/src/app/config-context";
-import { useSystems } from "@/src/app/systems-context";
+import { useInvalidateSystems } from "@/src/queries/systems";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import { ErrorMessage } from "@/src/components/ui/error-message";
 import { OAuthConnectButton } from "@/src/components/ui/oauth-connect-button";
-import { UserAction } from "@/src/lib/agent/agent-types";
+import { ToolMutation } from "@/src/lib/agent/agent-tools/tool-call-state";
 import { triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import { tokenRegistry } from "@/src/lib/token-registry";
-import { findTemplateForSystem, SuperglueClient, ToolCall } from "@superglue/shared";
+import { findTemplateForSystem, ToolCall } from "@superglue/shared";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 
 interface AuthenticateOAuthComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
+  onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
   sendAgentRequest?: (
     userMessage?: string,
-    options?: { userActions?: UserAction[] },
+    options?: {
+      hiddenStarterMessage?: string;
+      hideUserMessage?: boolean;
+      resumeToolCallId?: string;
+    },
   ) => Promise<void>;
   onAbortStream?: () => void;
 }
@@ -25,10 +31,12 @@ interface AuthenticateOAuthComponentProps {
 export function AuthenticateOAuthComponent({
   tool,
   onInputChange,
+  onToolMutation,
   sendAgentRequest,
 }: AuthenticateOAuthComponentProps) {
   const config = useConfig();
-  const { refreshSystems } = useSystems();
+  const invalidateSystems = useInvalidateSystems();
+  const createClient = useSuperglueClient();
   const [buttonState, setButtonState] = useState<"idle" | "loading" | "completed" | "error">(
     "idle",
   );
@@ -45,6 +53,7 @@ export function AuthenticateOAuthComponent({
 
   const requiresOAuth = output?.requiresOAuth === true;
   const systemId = output?.systemId || tool.input?.systemId;
+  const environment = output?.environment || tool.input?.environment || "prod";
   const oauthConfig = output?.oauthConfig || {};
   const system = output?.system;
 
@@ -54,30 +63,16 @@ export function AuthenticateOAuthComponent({
 
   const sendOAuthFailureEvent = useCallback(
     (error: string) => {
+      onToolMutation?.(tool.id, {
+        confirmationState: "oauth_failure",
+        confirmationData: { systemId, error },
+      });
       sendAgentRequest?.(undefined, {
-        userActions: [
-          {
-            type: "tool_event",
-            toolCallId: tool.id,
-            toolName: "authenticate_oauth",
-            event: "oauth_failure",
-            payload: { systemId, error },
-          },
-        ],
+        resumeToolCallId: tool.id,
       });
     },
-    [sendAgentRequest, tool.id, systemId],
+    [onToolMutation, sendAgentRequest, systemId, tool.id],
   );
-
-  const hasInitialFailure = output?.success === false && !requiresOAuth;
-  const initialFailureSentRef = useRef(false);
-
-  useEffect(() => {
-    if (hasInitialFailure && !initialFailureSentRef.current && output?.error) {
-      initialFailureSentRef.current = true;
-      sendOAuthFailureEvent(output.error);
-    }
-  }, [hasInitialFailure, output?.error, sendOAuthFailureEvent]);
 
   const handleOAuthClick = useCallback(async () => {
     if (!systemId || !oauthConfig) return;
@@ -89,11 +84,7 @@ export function AuthenticateOAuthComponent({
       let templateInfo: { templateId?: string; clientId?: string } | undefined;
       let resolvedClientSecret: string | undefined;
 
-      const client = new SuperglueClient({
-        endpoint: config.apiEndpoint,
-        apiKey: tokenRegistry.getToken(),
-        apiEndpoint: config.apiEndpoint,
-      });
+      const client = createClient();
       const freshSystem = await client.getSystem(systemId);
       resolvedClientSecret = freshSystem?.credentials?.client_secret;
 
@@ -121,17 +112,13 @@ export function AuthenticateOAuthComponent({
       const handleOAuthSuccess = async (tokens: any) => {
         if (tokens) {
           setButtonState("completed");
-          refreshSystems();
+          invalidateSystems();
+          onToolMutation?.(tool.id, {
+            confirmationState: "oauth_success",
+            confirmationData: { systemId, tokens },
+          });
           sendAgentRequest?.(undefined, {
-            userActions: [
-              {
-                type: "tool_event",
-                toolCallId: tool.id,
-                toolName: "authenticate_oauth",
-                event: "oauth_success",
-                payload: { systemId, tokens },
-              },
-            ],
+            resumeToolCallId: tool.id,
           });
         }
       };
@@ -169,9 +156,10 @@ export function AuthenticateOAuthComponent({
     oauthConfig,
     system,
     config.apiEndpoint,
-    config.apiEndpoint,
+    createClient,
     tool.id,
-    refreshSystems,
+    invalidateSystems,
+    onToolMutation,
     sendAgentRequest,
     sendOAuthFailureEvent,
   ]);
@@ -209,10 +197,15 @@ export function AuthenticateOAuthComponent({
     >
       <div className="space-y-4">
         {system && (
-          <div className="text-sm">
+          <div className="text-sm flex items-center gap-2">
             <span className="text-muted-foreground">System: </span>
             <span className="font-medium">{system.name || systemId}</span>
-            {system.url && <span className="text-muted-foreground ml-2">({system.url})</span>}
+            {environment === "dev" && (
+              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                DEV
+              </span>
+            )}
+            {system.url && <span className="text-muted-foreground">({system.url})</span>}
           </div>
         )}
 

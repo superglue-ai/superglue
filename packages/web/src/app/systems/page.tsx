@@ -1,7 +1,8 @@
 "use client";
 
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems, useInvalidateSystems } from "@/src/queries/systems";
 import { Button } from "@/src/components/ui/button";
+import { EnvironmentBadge, type EnvironmentType } from "@/src/components/ui/environment-label";
 import { Input } from "@/src/components/ui/input";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import {
@@ -29,83 +30,65 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  Clock,
-  Key,
   Loader2,
   Pencil,
   Plus,
-  RotateCw,
+  RefreshCw,
   Search,
+  Shield,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { cn } from "@/src/lib/general-utils";
 
 export const detectAuthType = (credentials: any): "oauth" | "apikey" | "none" => {
   if (!credentials || Object.keys(credentials).length === 0) return "none";
 
-  const oauthSpecificFields = [
-    "client_id",
-    "client_secret",
-    "auth_url",
-    "token_url",
-    "access_token",
-    "refresh_token",
-    "scopes",
-    "expires_at",
-    "token_type",
-  ];
-
   const allKeys = Object.keys(credentials);
-  const hasOAuthFields = allKeys.some((key) => oauthSpecificFields.includes(key));
 
-  if (hasOAuthFields) return "oauth";
-  return "apikey";
+  // OAuth requires client_id AND at least one OAuth URL (token_url or auth_url)
+  // This distinguishes from APIs that just happen to use client_id/client_secret naming
+  const hasClientId = allKeys.includes("client_id");
+  const hasOAuthUrl = allKeys.includes("token_url") || allKeys.includes("auth_url");
+
+  if (hasClientId && hasOAuthUrl) return "oauth";
+  return allKeys.length > 0 ? "apikey" : "none";
 };
 
-export const getAuthBadge = (
-  system: System,
-): {
-  type: "oauth-configured" | "oauth-incomplete" | "apikey" | "none";
-  label: string;
-  color: "blue" | "amber" | "green";
-  icon: "key" | "clock";
-} => {
+export const getAuthLabel = (system: System): string => {
   const status = getSystemAuthStatus(system);
 
   if (status.authType === "none") {
-    return { type: "none", label: status.label, color: "amber", icon: "key" };
+    return "Not set";
   }
 
   if (status.authType === "oauth") {
-    return status.isComplete
-      ? { type: "oauth-configured", label: status.label, color: "blue", icon: "key" }
-      : { type: "oauth-incomplete", label: status.label, color: "amber", icon: "clock" };
+    return "OAuth";
   }
 
-  // API Key
-  return status.isComplete
-    ? { type: "apikey", label: status.label, color: "green", icon: "key" }
-    : { type: "none", label: status.label, color: "amber", icon: "key" };
+  return "API Key";
 };
 
-type SortColumn = "id" | "url" | "updatedAt";
+type SortColumn = "id" | "url" | "updatedAt" | "environment";
 type SortDirection = "asc" | "desc";
+
+interface SystemWithEnvInfo extends System {
+  envState: EnvironmentType;
+  linkedDevSystem?: System;
+  linkedProdSystem?: System;
+}
 
 export default function SystemsPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { systems, loading: initialLoading, isRefreshing, refreshSystems } = useSystems();
+  const { systems, loading: initialLoading, isRefreshing, isTunnelConnected } = useSystems();
   const { openSystemPicker } = useSystemPickerModal();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-
-  useEffect(() => {
-    refreshSystems();
-  }, [refreshSystems]);
 
   useEffect(() => {
     const success = searchParams.get("success");
@@ -133,20 +116,79 @@ export default function SystemsPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Compute environment state for each system and group linked systems
+  const systemsWithEnvInfo = useMemo((): SystemWithEnvInfo[] => {
+    if (!systems) return [];
+
+    // With composite key model, systems are linked by having the same ID with different environments
+    // Group systems by ID to find linked pairs
+    const systemsById = new Map<string, System[]>();
+    for (const sys of systems) {
+      const existing = systemsById.get(sys.id) || [];
+      existing.push(sys);
+      systemsById.set(sys.id, existing);
+    }
+
+    const result: SystemWithEnvInfo[] = [];
+    const processedIds = new Set<string>();
+
+    for (const sys of systems) {
+      // Skip if we've already processed this ID (for linked systems, we show the prod one)
+      if (processedIds.has(sys.id)) continue;
+
+      const linkedSystems = systemsById.get(sys.id) || [sys];
+      const devSystem = linkedSystems.find((s) => s.environment === "dev");
+      const prodSystem = linkedSystems.find((s) => s.environment === "prod");
+
+      let envState: EnvironmentType;
+      let linkedDevSystem: System | undefined;
+      let linkedProdSystem: System | undefined;
+      let displaySystem: System;
+
+      // Database constraint ensures environment is always 'dev' or 'prod' (NOT NULL DEFAULT 'prod')
+      if (devSystem && prodSystem) {
+        envState = "both";
+        displaySystem = prodSystem;
+        linkedDevSystem = devSystem;
+      } else if (prodSystem) {
+        envState = "prod";
+        displaySystem = prodSystem;
+      } else if (devSystem) {
+        envState = "dev";
+        displaySystem = devSystem;
+      } else {
+        // Unreachable given DB constraints, but TypeScript needs exhaustive handling
+        envState = "prod";
+        displaySystem = sys;
+      }
+
+      processedIds.add(sys.id);
+
+      result.push({
+        ...displaySystem,
+        envState,
+        linkedDevSystem,
+        linkedProdSystem,
+      });
+    }
+
+    return result;
+  }, [systems]);
+
   const currentSystems = useMemo(() => {
-    let filtered =
-      systems?.filter((system) => {
-        if (!system) return false;
-        if (debouncedSearchTerm) {
-          const searchLower = debouncedSearchTerm.toLowerCase();
-          const searchableText = [system.id, system.name, system.url]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          if (!searchableText.includes(searchLower)) return false;
-        }
-        return true;
-      }) || [];
+    let filtered = systemsWithEnvInfo.filter((system) => {
+      if (!system) return false;
+
+      if (debouncedSearchTerm) {
+        const searchLower = debouncedSearchTerm.toLowerCase();
+        const searchableText = [system.id, system.name, system.url]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!searchableText.includes(searchLower)) return false;
+      }
+      return true;
+    });
 
     filtered = [...filtered].sort((a, b) => {
       const dir = sortDirection === "asc" ? 1 : -1;
@@ -161,25 +203,32 @@ export default function SystemsPage() {
             (new Date(a.updatedAt || a.createdAt).getTime() -
               new Date(b.updatedAt || b.createdAt).getTime())
           );
+        case "environment":
+          const envOrder = { none: 0, dev: 1, prod: 2, both: 3 };
+          return dir * (envOrder[a.envState] - envOrder[b.envState]);
         default:
           return 0;
       }
     });
 
     return filtered;
-  }, [systems, debouncedSearchTerm, sortColumn, sortDirection]);
+  }, [systemsWithEnvInfo, debouncedSearchTerm, sortColumn, sortDirection]);
 
   const handleEdit = (system: System) => {
-    router.push(`/systems/${encodeURIComponent(system.id)}`);
+    // Always pass the environment parameter to ensure we edit the correct one
+    const envParam = system.environment ? `?env=${system.environment}` : "";
+    router.push(`/systems/${encodeURIComponent(system.id)}${envParam}`);
   };
 
   const handleAdd = () => {
     openSystemPicker();
   };
 
+  const invalidateSystems = useInvalidateSystems();
+
   const handleRefresh = useCallback(async () => {
-    await refreshSystems();
-  }, [refreshSystems]);
+    await invalidateSystems();
+  }, [invalidateSystems]);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -219,7 +268,7 @@ export default function SystemsPage() {
     <div className="p-8 max-w-none w-full h-full flex flex-col overflow-hidden">
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2 flex-shrink-0">
         <h1 className="text-2xl font-bold">Systems</h1>
-        <div className="flex gap-4">
+        <div className="flex items-center gap-4">
           <Button className="rounded-xl" onClick={handleAdd}>
             <Plus className="mr-2 h-4 w-4" />
             Add System
@@ -258,12 +307,21 @@ export default function SystemsPage() {
                 onClick={() => handleSort("url")}
               >
                 <div className="flex items-center">
-                  API Endpoint
+                  System Endpoint
                   <SortIcon column="url" />
                 </div>
               </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort("environment")}
+              >
+                <div className="flex items-center">
+                  Environments
+                  <SortIcon column="environment" />
+                </div>
+              </TableHead>
               <TableHead>
-                <div className="flex items-center">Auth Status</div>
+                <div className="flex items-center">Auth</div>
               </TableHead>
               <TableHead
                 className="cursor-pointer hover:bg-muted/50 select-none"
@@ -275,36 +333,29 @@ export default function SystemsPage() {
                 </div>
               </TableHead>
               <TableHead className="text-right">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleRefresh}
-                        className="transition-transform"
-                      >
-                        <RotateCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Refresh Systems</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/50 transition-colors disabled:opacity-50 ml-auto"
+                  title="Refresh Systems"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {initialLoading && systems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-foreground inline-block" />
                 </TableCell>
               </TableRow>
             ) : currentSystems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <span>No results found</span>
                   </div>
@@ -312,31 +363,50 @@ export default function SystemsPage() {
               </TableRow>
             ) : (
               currentSystems.map((sys) => {
-                const badge = getAuthBadge(sys);
-                const colorClasses = {
-                  blue: "text-blue-600 dark:text-blue-300 bg-blue-500/10",
-                  amber: "text-amber-800 dark:text-amber-300 bg-amber-500/10",
-                  green: "text-green-800 dark:text-green-300 bg-green-500/10",
-                };
+                const authLabel = getAuthLabel(sys);
 
                 return (
-                  <TableRow key={sys.id} className="hover:bg-secondary">
+                  <TableRow key={`${sys.id}-${sys.environment}`} className="hover:bg-secondary">
                     <TableCell className="w-[60px]">
                       <div className="flex items-center justify-center">
                         <SystemIcon system={sys} size={16} />
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium max-w-[200px] truncate">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="truncate">{sys.name || sys.id}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{sys.name || sys.id}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    <TableCell className="font-medium max-w-[200px]">
+                      <div className="flex items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="min-w-0 truncate">{sys.name || sys.id}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{sys.name || sys.id}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        {sys.tunnel && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-muted-foreground bg-muted/50 whitespace-nowrap">
+                                  <Shield className="h-3 w-3" />
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full ${isTunnelConnected(sys.tunnel.tunnelId) ? "bg-green-500" : "bg-gray-400"}`}
+                                  />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  Private System ({sys.tunnel.tunnelId}) -{" "}
+                                  {isTunnelConnected(sys.tunnel.tunnelId)
+                                    ? "Connected"
+                                    : "Disconnected"}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-[300px]">
                       <span className="text-sm text-muted-foreground truncate block">
@@ -344,15 +414,11 @@ export default function SystemsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span
-                        className={`text-xs ${colorClasses[badge.color]} px-2 py-0.5 rounded flex items-center gap-1 w-fit whitespace-nowrap`}
-                      >
-                        {badge.icon === "clock" ? (
-                          <Clock className="h-3 w-3" />
-                        ) : (
-                          <Key className="h-3 w-3" />
-                        )}
-                        {badge.label}
+                      <EnvironmentBadge type={sys.envState} />
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {authLabel}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -362,7 +428,7 @@ export default function SystemsPage() {
                           ? new Date(sys.createdAt).toLocaleDateString()
                           : "-"}
                     </TableCell>
-                    <TableCell className="w-[140px]">
+                    <TableCell className="w-[180px]">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="glass"

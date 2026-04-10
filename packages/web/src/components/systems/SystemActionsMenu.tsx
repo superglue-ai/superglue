@@ -1,13 +1,11 @@
 "use client";
 
-import { useConfig } from "@/src/app/config-context";
-import { useSystems } from "@/src/app/systems-context";
-import { createSuperglueClient } from "@/src/lib/client-utils";
+import { useSystems, useDeleteSystem } from "@/src/queries/systems";
 import { cn } from "@/src/lib/general-utils";
 import { getToolBuilderPrompts } from "@/src/lib/agent/agent-context";
 import type { System } from "@superglue/shared";
-import { Hammer, MoreVertical, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Hammer, MoreVertical, Trash2, AlertTriangle } from "lucide-react";
+import { useState, useMemo } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,12 +39,24 @@ export function SystemActionsMenu({
   disabled = false,
   showLabel = false,
 }: SystemActionsMenuProps) {
-  const config = useConfig();
   const { openAgentModal } = useAgentModal();
   const { toast } = useToast();
-  const { refreshSystems } = useSystems();
+  const { systems } = useSystems();
+  const deleteSystem = useDeleteSystem();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Check for linked systems (same ID, different environment)
+  const linkedDevSystem = useMemo(() => {
+    return systems.find((s) => s.id === system.id && s.environment === "dev") || null;
+  }, [systems, system.id]);
+
+  const linkedProdSystem = useMemo(() => {
+    return systems.find((s) => s.id === system.id && s.environment === "prod") || null;
+  }, [systems, system.id]);
+
+  const isLinkedProd = system.environment === "prod" && !!linkedDevSystem;
+  const isLinkedDev = system.environment === "dev" && !!linkedProdSystem;
 
   const handleBuildTool = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,9 +66,19 @@ export function SystemActionsMenu({
 
   const handleDelete = async () => {
     try {
-      const client = createSuperglueClient(config.apiEndpoint);
-      await client.deleteSystem(system.id);
-      await refreshSystems();
+      // If this is a linked prod system, delete the dev system first
+      if (isLinkedProd && linkedDevSystem) {
+        await deleteSystem.mutateAsync({
+          id: linkedDevSystem.id,
+          options: { environment: linkedDevSystem.environment },
+        });
+      }
+
+      // Delete the current system with its environment
+      await deleteSystem.mutateAsync({
+        id: system.id,
+        options: { environment: system.environment },
+      });
       onDeleted?.();
     } catch (error) {
       console.error("Error deleting system:", error);
@@ -69,6 +89,57 @@ export function SystemActionsMenu({
       });
     }
   };
+
+  const getDeleteDialogContent = () => {
+    if (isLinkedProd) {
+      return {
+        title: "Delete Production System?",
+        description: (
+          <div className="space-y-3">
+            <p>
+              This production system has a linked development system:{" "}
+              <span className="font-medium">{linkedDevSystem?.name || linkedDevSystem?.id}</span>
+            </p>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Deleting this production system will also delete its linked development system. This
+                action cannot be undone.
+              </p>
+            </div>
+          </div>
+        ),
+        actionLabel: "Delete Both Systems",
+      };
+    }
+
+    if (isLinkedDev) {
+      return {
+        title: "Delete Development System?",
+        description: (
+          <p>
+            This will delete the development system "{system.name || system.id}". The linked
+            production system ({linkedProdSystem?.name || linkedProdSystem?.id}) will remain and
+            become a standalone production system.
+          </p>
+        ),
+        actionLabel: "Delete Dev System",
+      };
+    }
+
+    return {
+      title: "Delete System?",
+      description: (
+        <p>
+          Are you sure you want to delete the system "{system.name || system.id}"? This action
+          cannot be undone.
+        </p>
+      ),
+      actionLabel: "Delete",
+    };
+  };
+
+  const dialogContent = getDeleteDialogContent();
 
   return (
     <>
@@ -108,10 +179,9 @@ export function SystemActionsMenu({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete System?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the system "{system.id}"? This action cannot be
-              undone.
+            <AlertDialogTitle>{dialogContent.title}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>{dialogContent.description}</div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -121,8 +191,9 @@ export function SystemActionsMenu({
                 await handleDelete();
                 setDeleteDialogOpen(false);
               }}
+              className={isLinkedProd ? "bg-destructive hover:bg-destructive/90" : ""}
             >
-              Delete
+              {dialogContent.actionLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

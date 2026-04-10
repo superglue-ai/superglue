@@ -18,6 +18,7 @@ export const JavaScriptCodeEditor = React.memo(
     resizable = false,
     isTransformEditor = false,
     autoFormatOnMount = true,
+    placeholder,
   }: {
     value: string;
     onChange?: (value: string) => void;
@@ -28,6 +29,7 @@ export const JavaScriptCodeEditor = React.memo(
     resizable?: boolean;
     isTransformEditor?: boolean;
     autoFormatOnMount?: boolean;
+    placeholder?: string;
   }) => {
     const { theme, onMount } = useMonacoTheme();
     const { height: resizableHeight, resizeHandleProps } = useResizable({
@@ -75,7 +77,12 @@ export const JavaScriptCodeEditor = React.memo(
             </span>
           </div>
         )}
-        <div className="overflow-hidden pr-3" style={{ height: effectiveHeight }}>
+        <div className="overflow-hidden pr-3 relative" style={{ height: effectiveHeight }}>
+          {placeholder && !displayValue && (
+            <div className="absolute top-3 left-14 pl-1 text-muted-foreground/50 text-[11px] font-mono pointer-events-none z-10 whitespace-pre-wrap">
+              {placeholder}
+            </div>
+          )}
           <Editor
             height={effectiveHeight}
             defaultLanguage="javascript"

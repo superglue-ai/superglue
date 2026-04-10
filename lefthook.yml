@@ -2,8 +2,9 @@ pre-commit:
   parallel: true
   commands:
     prettier:
-      glob: "packages/**/*.{ts,tsx,js,jsx,json,md,mdx}"
+      glob: "{packages/**/*.{ts,tsx,js,jsx,json,md,mdx},scripts/**/*.{ts,tsx,js,jsx,json,md,mdx},*.{ts,tsx,js,jsx,json,md,mdx}}"
       run: npx prettier --write --ignore-path .gitignore {staged_files}
     secrets:
       glob: "**/*.{ts,tsx,js,jsx,json,md,mdx}"
+      exclude: "{packages/shared/seed-config.ts,packages/web/src/lib/agent/skills/content/**}"
       run: npx secretlint --maskSecrets {staged_files}

@@ -5,9 +5,7 @@ import { ChevronRight, ExternalLink, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "@/src/hooks/use-toast";
 import { loadToolTemplate } from "@/src/lib/tool-templates/tool-templates";
-import { tokenRegistry } from "@/src/lib/token-registry";
-import { SuperglueClient } from "@superglue/shared";
-import { useConfig } from "@/src/app/config-context";
+import { useUpsertTool } from "@/src/queries/tools";
 import { getSimpleIcon } from "@/src/lib/general-utils";
 
 type PopularTool = {
@@ -76,7 +74,7 @@ function shuffleWithSeed<T>(array: T[], seed: number): T[] {
   return result;
 }
 
-function getSystemPrompt(id: string, description: string, inputSchema: object): string {
+function buildHiddenStarterMessage(id: string, description: string, inputSchema: object): string {
   return `[SYSTEM] IMPORTANT: The user selected the pre-built tool "${id}"
 
 Description: ${description}
@@ -112,7 +110,7 @@ interface AgentWelcomeToolLibraryProps {
   onDismiss?: () => void;
   onStartPrompt: (
     userPrompt: string,
-    systemPrompt?: string,
+    hiddenStarterMessage?: string,
     options?: { hideUserMessage?: boolean },
   ) => void;
 }
@@ -122,7 +120,7 @@ export function AgentWelcomeToolLibrary({
   onStartPrompt,
 }: AgentWelcomeToolLibraryProps) {
   const [popularTools, setPopularTools] = useState<PopularTool[]>([]);
-  const config = useConfig();
+  const upsertTool = useUpsertTool();
 
   useEffect(() => {
     const currentHourSeed = Math.floor(Date.now() / (1000 * 60 * 60));
@@ -143,29 +141,26 @@ export function AgentWelcomeToolLibrary({
         return;
       }
 
-      const client = new SuperglueClient({
-        endpoint: config.apiEndpoint,
-        apiKey: tokenRegistry.getToken(),
-        apiEndpoint: config.apiEndpoint,
-      });
-
       const prefixedId = `template-${template.id}`;
-      await client.upsertWorkflow(prefixedId, {
-        instruction: template.instruction,
-        steps: template.steps,
-        inputSchema: template.inputSchema,
-        outputSchema: template.outputSchema,
-        outputTransform: template.outputTransform,
+      await upsertTool.mutateAsync({
+        id: prefixedId,
+        input: {
+          instruction: template.instruction,
+          steps: template.steps,
+          inputSchema: template.inputSchema,
+          outputSchema: template.outputSchema,
+          outputTransform: template.outputTransform,
+        },
       });
 
       onDismiss?.();
 
-      const systemPrompt = getSystemPrompt(
+      const hiddenStarterMessage = buildHiddenStarterMessage(
         prefixedId,
         template.description || template.instruction,
         template.inputSchema,
       );
-      onStartPrompt(`I want to test the "${prefixedId}" tool.`, systemPrompt, {
+      onStartPrompt(`I want to test the "${prefixedId}" tool.`, hiddenStarterMessage, {
         hideUserMessage: true,
       });
     } catch (error: any) {

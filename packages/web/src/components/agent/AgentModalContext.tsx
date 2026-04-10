@@ -16,7 +16,8 @@ import { AgentInterface } from "./AgentInterface";
 
 export interface AgentModalPrompt {
   userPrompt: string;
-  systemPrompt: string;
+  hiddenStarterMessage: string;
+  hideUserMessage?: boolean;
   chatTitle?: string;
   chatIcon?: string;
 }

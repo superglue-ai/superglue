@@ -1,6 +1,6 @@
 import { RequestSource, Run, RunStatus } from "@superglue/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mapRunToOpenAPI } from "./runs.js";
+import { buildListRunsRequest, listAuthorizedRunsPage, mapRunToOpenAPI } from "./runs.js";
 import type { AuthenticatedFastifyRequest } from "./types.js";
 
 // Mock logMessage to avoid console output during tests
@@ -214,121 +214,116 @@ describe("runs API", () => {
   });
 
   describe("listRuns handler", () => {
-    it("should list runs with pagination", async () => {
-      const mockRuns: Run[] = [
+    it("should build list run filters from query params", () => {
+      const result = buildListRunsRequest(
         {
-          runId: "run-1",
-          toolId: "tool-1",
-          status: RunStatus.SUCCESS,
-          metadata: { startedAt: "2024-01-01T10:00:00.000Z" },
+          toolId: "tool-specific",
+          search: "michael",
+          searchUserIds: "user-1,user-2",
+          startedAfter: "2026-03-16T00:00:00.000Z",
+          status: "success",
+          requestSources: "api,webhook",
+          page: "2",
+          limit: "25",
+          userId: "user-123",
+          systemId: "system-123",
         },
+        "org-123",
+      );
+
+      expect(result.page).toBe(2);
+      expect(result.limit).toBe(25);
+      expect(result.offset).toBe(25);
+      expect(result.includeTotal).toBe(true);
+      expect(result.filters).toEqual({
+        configId: "tool-specific",
+        search: "michael",
+        searchUserIds: ["user-1", "user-2"],
+        startedAfter: new Date("2026-03-16T00:00:00.000Z"),
+        status: RunStatus.SUCCESS,
+        requestSources: [RequestSource.API, RequestSource.WEBHOOK],
+        orgId: "org-123",
+        userId: "user-123",
+        systemId: "system-123",
+      });
+    });
+
+    it("should ignore invalid startedAfter values", () => {
+      const result = buildListRunsRequest(
         {
-          runId: "run-2",
-          toolId: "tool-1",
-          status: RunStatus.FAILED,
-          metadata: { startedAt: "2024-01-01T11:00:00.000Z" },
+          startedAfter: "not-a-date",
         },
-      ];
-      const request = createMockRequest({
-        query: { page: "1", limit: "10" },
+        "org-123",
+      );
+
+      expect(result.includeTotal).toBe(true);
+      expect(result.filters.startedAfter).toBeUndefined();
+    });
+
+    it("should allow callers to skip exact totals", () => {
+      const result = buildListRunsRequest(
+        {
+          includeTotal: "false",
+        },
+        "org-123",
+      );
+
+      expect(result.includeTotal).toBe(false);
+    });
+
+    it("should scope restricted users to allowed tool ids in a single datastore query", async () => {
+      const datastore = {
+        listRuns: vi.fn().mockResolvedValue({
+          items: [
+            {
+              runId: "allowed-1",
+              toolId: "tool-allowed",
+              status: RunStatus.SUCCESS,
+              metadata: { startedAt: "2024-01-01T10:00:00.000Z" },
+            },
+          ],
+          total: 2,
+        }),
+      };
+
+      const result = await listAuthorizedRunsPage({
+        datastore: datastore as any,
+        roles: [{ tools: ["tool-allowed", "tool-also-allowed"] } as any],
+        filters: { orgId: "org-123" },
+        limit: 1,
+        offset: 1,
       });
 
-      request.datastore.listRuns.mockResolvedValue({ items: mockRuns, total: 2 });
-
-      const result = await request.datastore.listRuns({
-        limit: 10,
-        offset: 0,
-        orgId: request.authInfo.orgId,
+      expect(datastore.listRuns).toHaveBeenCalledWith({
+        orgId: "org-123",
+        allowedToolIds: ["tool-allowed", "tool-also-allowed"],
+        limit: 1,
+        offset: 1,
       });
-
-      expect(result.items).toHaveLength(2);
+      expect(result.items.map((run) => run.runId)).toEqual(["allowed-1"]);
       expect(result.total).toBe(2);
+      expect(result.hasMore).toBe(false);
     });
 
-    it("should filter by toolId", async () => {
-      const request = createMockRequest({
-        query: { toolId: "tool-specific" },
+    it("should return no results without querying datastore when no tools are allowed", async () => {
+      const datastore = {
+        listRuns: vi.fn(),
+      };
+
+      const result = await listAuthorizedRunsPage({
+        datastore: datastore as any,
+        roles: [{ tools: [] } as any],
+        filters: { orgId: "org-123" },
+        limit: 25,
+        offset: 0,
       });
 
-      request.datastore.listRuns.mockResolvedValue({ items: [], total: 0 });
-
-      await request.datastore.listRuns({
-        configId: "tool-specific",
-        orgId: request.authInfo.orgId,
+      expect(datastore.listRuns).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        items: [],
+        total: 0,
+        hasMore: false,
       });
-
-      expect(request.datastore.listRuns).toHaveBeenCalledWith({
-        configId: "tool-specific",
-        orgId: "org-123",
-      });
-    });
-
-    it("should filter by status", async () => {
-      const request = createMockRequest({
-        query: { status: "success" },
-      });
-
-      request.datastore.listRuns.mockResolvedValue({ items: [], total: 0 });
-
-      await request.datastore.listRuns({
-        status: RunStatus.SUCCESS,
-        orgId: request.authInfo.orgId,
-      });
-
-      expect(request.datastore.listRuns).toHaveBeenCalledWith({
-        status: RunStatus.SUCCESS,
-        orgId: "org-123",
-      });
-    });
-
-    it("should filter by requestSources", async () => {
-      const request = createMockRequest({
-        query: { requestSources: "api,webhook" },
-      });
-
-      request.datastore.listRuns.mockResolvedValue({ items: [], total: 0 });
-
-      await request.datastore.listRuns({
-        requestSources: [RequestSource.API, RequestSource.WEBHOOK],
-        orgId: request.authInfo.orgId,
-      });
-
-      expect(request.datastore.listRuns).toHaveBeenCalledWith({
-        requestSources: [RequestSource.API, RequestSource.WEBHOOK],
-        orgId: "org-123",
-      });
-    });
-
-    it("should filter by single requestSource in requestSources", async () => {
-      const request = createMockRequest({
-        query: { requestSources: "scheduler" },
-      });
-
-      request.datastore.listRuns.mockResolvedValue({ items: [], total: 0 });
-
-      await request.datastore.listRuns({
-        requestSources: [RequestSource.SCHEDULER],
-        orgId: request.authInfo.orgId,
-      });
-
-      expect(request.datastore.listRuns).toHaveBeenCalledWith({
-        requestSources: [RequestSource.SCHEDULER],
-        orgId: "org-123",
-      });
-    });
-
-    it("should calculate hasMore correctly", () => {
-      // hasMore = offset + items.length < total
-      const offset = 0;
-      const items = [{ runId: "1" }, { runId: "2" }];
-      const total = 5;
-
-      const hasMore = offset + items.length < total;
-      expect(hasMore).toBe(true);
-
-      // When we have all items
-      const hasMore2 = 0 + 5 < 5;
-      expect(hasMore2).toBe(false);
     });
   });
 
@@ -366,7 +361,7 @@ describe("runs API", () => {
       // Handler would return 400 with message about status
     });
 
-    it("should return 400 when run is from scheduler", async () => {
+    it("should allow cancelling scheduler runs", async () => {
       const scheduledRun: Run = {
         runId: "run-123",
         toolId: "tool-456",
@@ -383,8 +378,35 @@ describe("runs API", () => {
         orgId: request.authInfo.orgId,
       });
 
+      expect(run!.status).toBe(RunStatus.RUNNING);
       expect(run!.requestSource).toBe(RequestSource.SCHEDULER);
-      // Handler would return 400 with message about scheduled runs
+
+      request.workerPools.toolExecution.abortTask("run-123");
+      expect(request.workerPools.toolExecution.abortTask).toHaveBeenCalledWith("run-123");
+    });
+
+    it("should accept already-aborted runs for forwarded requests", async () => {
+      const abortedRun: Run = {
+        runId: "run-123",
+        toolId: "tool-456",
+        status: RunStatus.ABORTED,
+        requestSource: RequestSource.SCHEDULER,
+        metadata: { startedAt: "2024-01-01T10:00:00.000Z" },
+      };
+      const request = createMockRequest({ params: { runId: "run-123" } });
+
+      request.datastore.getRun.mockResolvedValue(abortedRun);
+
+      const run = await request.datastore.getRun({
+        id: "run-123",
+        orgId: request.authInfo.orgId,
+      });
+
+      expect(run!.status).toBe(RunStatus.ABORTED);
+
+      request.workerPools.toolExecution.abortTask("run-123");
+      expect(request.workerPools.toolExecution.abortTask).toHaveBeenCalledWith("run-123");
+      expect(request.datastore.updateRun).not.toHaveBeenCalled();
     });
 
     it("should abort task and update run status on successful cancel", async () => {
