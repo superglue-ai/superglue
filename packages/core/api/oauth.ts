@@ -98,11 +98,19 @@ const getCliOAuthSecret: RouteHandler = async (request, reply) => {
 
   const orgId = authReq.authInfo.orgId;
 
-  // Derive an org-specific secret - never expose the raw master key
-  const derivedSecret = crypto
-    .createHash("sha256")
-    .update(`${masterKey}:cli-oauth-derived:${orgId}`)
-    .digest("hex");
+  const derivedSecret = await new Promise<string>((resolve, reject) => {
+    crypto.hkdf(
+      "sha256",
+      masterKey,
+      orgId,
+      "superglue-cli-oauth",
+      32,
+      (err, key) => {
+        if (err) return reject(err);
+        resolve(Buffer.from(key).toString("hex"));
+      },
+    );
+  });
 
   return addTraceHeader(reply, authReq.traceId)
     .code(200)

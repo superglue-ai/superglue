@@ -96,6 +96,8 @@ export const credentialEncryption = new CredentialEncryption();
 /** Constant-time comparison for secret tokens. */
 export function verifyInternalSecret(token: string | null, secret: string | undefined): boolean {
   if (!secret || !token) return false;
-  if (token.length !== secret.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  const tokenBuf = Buffer.from(token);
+  const secretBuf = Buffer.from(secret);
+  if (tokenBuf.length !== secretBuf.length) return false;
+  return crypto.timingSafeEqual(tokenBuf, secretBuf);
 }

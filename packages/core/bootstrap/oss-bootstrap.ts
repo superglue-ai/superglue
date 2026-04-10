@@ -59,17 +59,19 @@ export async function bootstrapOss(datastore: EEDataStore): Promise<void> {
   await datastore.deleteAllUserRoles({ userId: OSS_USER_ID, orgId: OSS_ORG_ID });
   await datastore.addUserRoles({ userId: OSS_USER_ID, roleIds: ["admin"], orgId: OSS_ORG_ID });
 
-  const existingKey = await datastore.getApiKeyByKey({ key: authToken });
-  if (
+  let existingKey = await datastore.getApiKeyByKey({ key: authToken });
+  const needsRecreate =
     existingKey &&
     (existingKey.orgId !== OSS_ORG_ID ||
       existingKey.userId !== OSS_USER_ID ||
-      existingKey.createdByUserId !== OSS_USER_ID)
-  ) {
-    await datastore.deleteApiKey({ id: existingKey.id, orgId: existingKey.orgId });
+      existingKey.createdByUserId !== OSS_USER_ID);
+
+  if (needsRecreate) {
+    await datastore.deleteApiKey({ id: existingKey!.id, orgId: existingKey!.orgId });
+    existingKey = null;
   }
 
-  if (!existingKey || existingKey.orgId !== OSS_ORG_ID || existingKey.userId !== OSS_USER_ID) {
+  if (!existingKey) {
     await datastore.createApiKey({
       orgId: OSS_ORG_ID,
       createdByUserId: OSS_USER_ID,

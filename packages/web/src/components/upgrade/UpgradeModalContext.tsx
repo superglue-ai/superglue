@@ -184,7 +184,7 @@ export function UpgradeModalContent() {
       const { data } = await authClient.getSession();
 
       if (!data?.user) {
-        router.push("/api-keys");
+        router.push("/setup");
         return;
       }
 

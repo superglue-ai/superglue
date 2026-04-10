@@ -62,7 +62,9 @@ export function addNullableToOptional(schema: JSONSchema, required = true): JSON
 
   // Process object properties
   if ((schema.type === "object" || schema.type?.includes("object")) && schema.properties) {
-    newSchema.additionalProperties = true;
+    if (!("additionalProperties" in schema)) {
+      newSchema.additionalProperties = true;
+    }
     const allRequired = new Set(Array.isArray(schema.required) ? schema.required : []);
     newSchema.required = Array.from(allRequired);
     newSchema.properties = Object.entries(schema.properties).reduce(

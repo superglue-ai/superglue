@@ -93,7 +93,7 @@
     "marked": "17.0.5",
     "monaco-editor": "0.55.1",
     "next": "16.2.2",
-    "openai": "4.104.0",
+    "openai": "6.34.0",
     "pako": "2.1.0",
     "pdfjs-dist": "5.5.207",
     "pkce-challenge": "6.0.0",

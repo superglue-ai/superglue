@@ -36,6 +36,23 @@ export class RateLimiter {
     if (!settings?.notifications) return;
 
     const rateLimit = settings.notifications.rateLimit;
+    if (!rateLimit) {
+      await this.datastore.upsertOrgSettings({
+        orgId,
+        settings: {
+          notifications: {
+            ...settings.notifications,
+            rateLimit: {
+              currentCount: 1,
+              maxPerHour: DEFAULT_MAX_PER_HOUR,
+              windowStart: new Date().toISOString(),
+            },
+          },
+        },
+      });
+      return;
+    }
+
     const windowStart = new Date(rateLimit.windowStart);
     const now = new Date();
     const hoursSinceWindowStart = (now.getTime() - windowStart.getTime()) / (1000 * 60 * 60);

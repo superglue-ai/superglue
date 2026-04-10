@@ -7,14 +7,14 @@
  * when sent to external APIs like Vercel AI. These are invalid UTF-8 sequences.
  */
 export function sanitizeUnpairedSurrogates(str: string): string {
-  return str.replace(/[\ud800-\udfff]/g, "");
+  return str.replace(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g, "");
 }
 
 /**
  * Convert Basic Auth credentials to Base64 if not already encoded
  */
 export function convertBasicAuthToBase64(headerValue: string): string {
-  if (!headerValue) return headerValue;
+  if (!headerValue || !headerValue.startsWith("Basic ")) return headerValue;
   const credentials = headerValue.substring("Basic ".length).trim();
   const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
 

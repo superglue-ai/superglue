@@ -6,5 +6,5 @@ pre-commit:
       run: npx prettier --write --ignore-path .gitignore {staged_files}
     secrets:
       glob: "**/*.{ts,tsx,js,jsx,json,md,mdx}"
-      exclude: "packages/shared/seed-config.ts|packages/web/src/lib/agent/skills/content/**"
+      exclude: "{packages/shared/seed-config.ts,packages/web/src/lib/agent/skills/content/**}"
       run: npx secretlint --maskSecrets {staged_files}

@@ -6,9 +6,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card";
-import { BrainCircuit, ClipboardList, Database, KeyRound } from "lucide-react";
+import {
+  AlertTriangle,
+  BrainCircuit,
+  CheckCircle2,
+  Database,
+  HardDrive,
+  KeyRound,
+  XCircle,
+} from "lucide-react";
 import { ModelProviderCard, SetupConfigRow } from "./setup-config-rows";
-import { getSetupReport } from "./setup-validation";
+import { getRecommendations } from "./setup-validation";
 import type { ProviderKey, ProviderSummary } from "./types";
 
 const ALLOWED_LLM: readonly ProviderKey[] = [
@@ -210,14 +218,31 @@ function getProviderSummary(providerRaw: string | undefined): ProviderSummary {
 
 const GLASS_CARD = "border-border/40 bg-card/40 backdrop-blur-xl min-w-0 overflow-hidden";
 
-export default function ApiKeysPage(): ReactElement {
-  const { blockers, warnings } = getSetupReport();
+const REC_STYLES = {
+  error: {
+    icon: XCircle,
+    bg: "bg-destructive/8 border-destructive/25",
+    iconClass: "text-destructive",
+  },
+  warning: {
+    icon: AlertTriangle,
+    bg: "bg-amber-500/8 border-amber-500/25",
+    iconClass: "text-amber-500",
+  },
+  info: {
+    icon: CheckCircle2,
+    bg: "bg-emerald-500/8 border-emerald-500/25",
+    iconClass: "text-emerald-500",
+  },
+} as const;
+
+export default function SetupPage(): ReactElement {
+  const recommendations = getRecommendations();
 
   const apiPort = getEnv("API_PORT") || "3002";
   const apiEndpoint = getEnv("API_ENDPOINT") || `http://localhost:${apiPort}`;
   const webPort = getEnv("WEB_PORT") || "3001";
   const appUrl = getEnv("SUPERGLUE_APP_URL") || `http://localhost:${webPort}`;
-  const mcpUrl = `${apiEndpoint.replace(/\/$/, "")}/mcp`;
   const restBase = `${apiEndpoint.replace(/\/$/, "")}/v1`;
 
   const authToken = getEnv("AUTH_TOKEN");
@@ -248,55 +273,23 @@ export default function ApiKeysPage(): ReactElement {
   return (
     <div className="min-w-0 p-4 sm:p-6 md:p-8">
       <div className="mx-auto max-w-5xl min-w-0 space-y-6">
-        <section>
-          <Card className={GLASS_CARD}>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base font-medium">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                Setup checklist
-              </CardTitle>
-              <CardDescription>
-                Blockers match what the API process expects to start cleanly; warnings are for file
-                uploads and related features.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="min-w-0 space-y-4 text-sm">
-              {blockers.length === 0 && warnings.length === 0 ? (
-                <p className="text-muted-foreground">No issues matched these checks.</p>
-              ) : null}
-              {blockers.length > 0 ? (
-                <div className="min-w-0 space-y-2">
-                  <div className="text-xs font-medium uppercase tracking-wide text-foreground/80">
-                    Must fix
-                  </div>
-                  <ul className="list-inside list-disc space-y-1.5 text-muted-foreground marker:text-foreground/50">
-                    {blockers.map((issue) => (
-                      <li key={issue.id}>
-                        <span className="font-medium text-foreground">{issue.title}</span>
-                        <span> — {issue.detail}</span>
-                      </li>
-                    ))}
-                  </ul>
+        {recommendations.length > 0 && (
+          <div className="space-y-2">
+            {recommendations.map((rec) => {
+              const style = REC_STYLES[rec.kind];
+              const Icon = style.icon;
+              return (
+                <div
+                  key={rec.id}
+                  className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm ${style.bg}`}
+                >
+                  <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${style.iconClass}`} />
+                  <span className="text-foreground/90">{rec.message}</span>
                 </div>
-              ) : null}
-              {warnings.length > 0 ? (
-                <div className="min-w-0 space-y-2 border-t border-border/40 pt-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-foreground/70">
-                    Recommended
-                  </div>
-                  <ul className="list-inside list-disc space-y-1.5 text-muted-foreground marker:text-foreground/40">
-                    {warnings.map((issue) => (
-                      <li key={issue.id}>
-                        <span className="font-medium text-foreground/90">{issue.title}</span>
-                        <span> — {issue.detail}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        </section>
+              );
+            })}
+          </div>
+        )}
 
         <section>
           <Card className={GLASS_CARD}>
@@ -318,7 +311,6 @@ export default function ApiKeysPage(): ReactElement {
                 statusHint={authToken ? null : "Required"}
               />
               <SetupConfigRow label="REST API base URL" value={restBase} copyText={restBase} />
-              <SetupConfigRow label="MCP endpoint URL" value={mcpUrl} copyText={mcpUrl} />
               <SetupConfigRow label="Web app URL" value={appUrl} copyText={appUrl} />
             </CardContent>
           </Card>
@@ -343,113 +335,120 @@ export default function ApiKeysPage(): ReactElement {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base font-medium">
                 <Database className="h-4 w-4 text-muted-foreground" />
-                Datastore & object storage
+                Datastore
+              </CardTitle>
+              <CardDescription>PostgreSQL connection used for all persistent data.</CardDescription>
+            </CardHeader>
+            <CardContent className="min-w-0">
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                <SetupConfigRow
+                  label="Postgres connection"
+                  value={postgresConnection}
+                  copyText={postgresConfigured ? postgresConnection : undefined}
+                  statusHint={postgresConfigured ? null : "Incomplete"}
+                />
+                <SetupConfigRow
+                  label="POSTGRES_PASSWORD"
+                  value={maskSecret(getEnv("POSTGRES_PASSWORD"))}
+                  statusHint={getEnv("POSTGRES_PASSWORD") ? null : "Missing"}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section>
+          <Card className={GLASS_CARD}>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base font-medium">
+                <HardDrive className="h-4 w-4 text-muted-foreground" />
+                Object storage
               </CardTitle>
               <CardDescription>
-                Postgres plus S3-compatible file storage. S3 is required to support system knowledge
-                bases.
+                S3-compatible storage for file uploads and system knowledge bases. Optional if you
+                don't use these features.
               </CardDescription>
             </CardHeader>
-            <CardContent className="min-w-0 space-y-6">
-              <div className="min-w-0 space-y-2">
-                <div className="text-xs font-medium text-muted-foreground">Postgres</div>
+            <CardContent className="min-w-0">
+              {fileProvider === "aws" ? (
                 <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                  <SetupConfigRow label="FILE_STORAGE_PROVIDER" value="aws" copyText="aws" />
                   <SetupConfigRow
-                    label="Postgres connection"
-                    value={postgresConnection}
-                    copyText={postgresConfigured ? postgresConnection : undefined}
-                    statusHint={postgresConfigured ? null : "Incomplete"}
+                    label="AWS_REGION"
+                    value={
+                      getEnv("AWS_REGION")
+                        ? awsRegionEffective
+                        : `${awsRegionEffective} (default if unset)`
+                    }
+                    copyText={awsRegionEffective}
                   />
                   <SetupConfigRow
-                    label="POSTGRES_PASSWORD"
-                    value={maskSecret(getEnv("POSTGRES_PASSWORD"))}
-                    statusHint={getEnv("POSTGRES_PASSWORD") ? null : "Missing"}
+                    label="AWS_BUCKET_NAME"
+                    value={awsBucket || "Not set"}
+                    copyText={awsBucket}
+                    statusHint={awsBucket ? null : "Missing"}
+                  />
+                  <SetupConfigRow
+                    label="AWS_BUCKET_PREFIX"
+                    value={getEnv("AWS_BUCKET_PREFIX") || "—"}
+                    copyText={getEnv("AWS_BUCKET_PREFIX")}
+                  />
+                  <SetupConfigRow
+                    label="AWS_ACCESS_KEY_ID"
+                    value={maskSecret(awsKey)}
+                    copyText={awsKey}
+                    statusHint={awsKey ? null : "Missing"}
+                  />
+                  <SetupConfigRow
+                    label="AWS_SECRET_ACCESS_KEY"
+                    value={maskSecret(awsSecret)}
+                    statusHint={awsSecret ? null : "Missing"}
                   />
                 </div>
-              </div>
-
-              <div className="min-w-0 space-y-2 border-t border-border/35 pt-4">
-                <div className="text-xs font-medium text-muted-foreground">Object storage</div>
-                {fileProvider === "aws" ? (
-                  <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                    <SetupConfigRow label="FILE_STORAGE_PROVIDER" value="aws" copyText="aws" />
-                    <SetupConfigRow
-                      label="AWS_REGION"
-                      value={
-                        getEnv("AWS_REGION")
-                          ? awsRegionEffective
-                          : `${awsRegionEffective} (default if unset)`
-                      }
-                      copyText={awsRegionEffective}
-                    />
-                    <SetupConfigRow
-                      label="AWS_BUCKET_NAME"
-                      value={awsBucket || "Not set"}
-                      copyText={awsBucket}
-                      statusHint={awsBucket ? null : "Missing"}
-                    />
-                    <SetupConfigRow
-                      label="AWS_BUCKET_PREFIX"
-                      value={getEnv("AWS_BUCKET_PREFIX") || "—"}
-                      copyText={getEnv("AWS_BUCKET_PREFIX")}
-                    />
-                    <SetupConfigRow
-                      label="AWS_ACCESS_KEY_ID"
-                      value={maskSecret(awsKey)}
-                      copyText={awsKey}
-                      statusHint={awsKey ? null : "Missing"}
-                    />
-                    <SetupConfigRow
-                      label="AWS_SECRET_ACCESS_KEY"
-                      value={maskSecret(awsSecret)}
-                      statusHint={awsSecret ? null : "Missing"}
-                    />
-                  </div>
-                ) : fileProvider === "minio" ? (
-                  <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                    <SetupConfigRow label="FILE_STORAGE_PROVIDER" value="minio" copyText="minio" />
-                    <SetupConfigRow
-                      label="S3_ENDPOINT"
-                      value={s3Endpoint || "Not set"}
-                      copyText={s3Endpoint}
-                      statusHint={s3Endpoint ? null : "Missing"}
-                    />
-                    <SetupConfigRow
-                      label="S3_PUBLIC_ENDPOINT"
-                      value={getEnv("S3_PUBLIC_ENDPOINT") || "—"}
-                      copyText={getEnv("S3_PUBLIC_ENDPOINT")}
-                    />
-                    <SetupConfigRow
-                      label="MINIO_BUCKET_NAME"
-                      value={minioBucket || "Not set"}
-                      copyText={minioBucket}
-                      statusHint={minioBucket ? null : "Missing"}
-                    />
-                    <SetupConfigRow
-                      label="MINIO_BUCKET_PREFIX"
-                      value={getEnv("MINIO_BUCKET_PREFIX") || "—"}
-                      copyText={getEnv("MINIO_BUCKET_PREFIX")}
-                    />
-                    <SetupConfigRow
-                      label="MINIO_ROOT_USER"
-                      value={maskSecret(minioUser)}
-                      copyText={minioUser}
-                      statusHint={minioUser ? null : "Missing"}
-                    />
-                    <SetupConfigRow
-                      label="MINIO_ROOT_PASSWORD"
-                      value={maskSecret(minioPass)}
-                      statusHint={minioPass ? null : "Missing"}
-                    />
-                  </div>
-                ) : (
+              ) : fileProvider === "minio" ? (
+                <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                  <SetupConfigRow label="FILE_STORAGE_PROVIDER" value="minio" copyText="minio" />
                   <SetupConfigRow
-                    label="FILE_STORAGE_PROVIDER"
-                    value={fileProvider}
-                    statusHint="Unsupported"
+                    label="S3_ENDPOINT"
+                    value={s3Endpoint || "Not set"}
+                    copyText={s3Endpoint}
+                    statusHint={s3Endpoint ? null : "Missing"}
                   />
-                )}
-              </div>
+                  <SetupConfigRow
+                    label="S3_PUBLIC_ENDPOINT"
+                    value={getEnv("S3_PUBLIC_ENDPOINT") || "—"}
+                    copyText={getEnv("S3_PUBLIC_ENDPOINT")}
+                  />
+                  <SetupConfigRow
+                    label="MINIO_BUCKET_NAME"
+                    value={minioBucket || "Not set"}
+                    copyText={minioBucket}
+                    statusHint={minioBucket ? null : "Missing"}
+                  />
+                  <SetupConfigRow
+                    label="MINIO_BUCKET_PREFIX"
+                    value={getEnv("MINIO_BUCKET_PREFIX") || "—"}
+                    copyText={getEnv("MINIO_BUCKET_PREFIX")}
+                  />
+                  <SetupConfigRow
+                    label="MINIO_ROOT_USER"
+                    value={maskSecret(minioUser)}
+                    copyText={minioUser}
+                    statusHint={minioUser ? null : "Missing"}
+                  />
+                  <SetupConfigRow
+                    label="MINIO_ROOT_PASSWORD"
+                    value={maskSecret(minioPass)}
+                    statusHint={minioPass ? null : "Missing"}
+                  />
+                </div>
+              ) : (
+                <SetupConfigRow
+                  label="FILE_STORAGE_PROVIDER"
+                  value={fileProvider}
+                  statusHint="Unsupported"
+                />
+              )}
             </CardContent>
           </Card>
         </section>

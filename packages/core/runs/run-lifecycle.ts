@@ -320,7 +320,8 @@ export class RunLifecycleManager {
         const storageUri = generateRunResultsUri(results.runId, this.orgId);
         if (!storageUri) return;
 
-        // Update run with storage URI
+        await getRunResultsService().storeResults(storageUri, results, { orgId: this.orgId });
+
         await this.datastore.updateRun({
           id: results.runId,
           orgId: this.orgId,
@@ -328,9 +329,6 @@ export class RunLifecycleManager {
             resultStorageUri: storageUri,
           },
         });
-
-        // Upload to S3 with full (non-truncated) payload and result
-        await getRunResultsService().storeResults(storageUri, results, { orgId: this.orgId });
 
         logMessage("debug", `Stored run results to S3: ${storageUri}`, this.metadata);
       } catch (err) {

@@ -27,7 +27,7 @@ const baseNavItems: {
   { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
   { icon: Blocks, label: "Systems", href: "/systems" },
-  { icon: Settings2, label: "Setup", href: "/api-keys" },
+  { icon: Settings2, label: "Setup", href: "/setup" },
 ];
 
 const docsNavItem = {

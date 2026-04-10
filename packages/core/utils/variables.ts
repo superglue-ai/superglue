@@ -45,7 +45,7 @@ export function replaceVariablesSimple(template: string, payload: Record<string,
       resolvedValue = JSON.stringify(resolvedValue);
     }
 
-    result = result.replace(match[0], String(resolvedValue));
+    result = result.replace(match[0], resolvedValue === undefined ? "" : String(resolvedValue));
   }
 
   return oldReplaceVariables(result, payload);

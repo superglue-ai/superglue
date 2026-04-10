@@ -29,7 +29,11 @@ const poolCache = new Map<string, PoolCacheEntry>();
  * Get or create a connection pool
  */
 function getOrCreatePool(connectionString: string, poolConfig: PoolConfig): Pool {
-  const cacheKey = connectionString;
+  const configForKey = {
+    ssl: poolConfig.ssl,
+    statement_timeout: poolConfig.statement_timeout,
+  };
+  const cacheKey = `${connectionString}::${JSON.stringify(configForKey)}`;
   const existingEntry = poolCache.get(cacheKey);
 
   if (existingEntry) {

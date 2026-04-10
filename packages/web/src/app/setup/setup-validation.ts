@@ -199,6 +199,76 @@ function objectStorageIssues(): SetupIssue[] {
   return out;
 }
 
+export type Recommendation = {
+  id: string;
+  kind: "error" | "warning" | "info";
+  message: string;
+};
+
+export function getRecommendations(): Recommendation[] {
+  const recs: Recommendation[] = [];
+
+  if (!env("AUTH_TOKEN") && !env("NEXT_PUBLIC_SUPERGLUE_API_KEY")) {
+    recs.push({
+      id: "no-auth",
+      kind: "error",
+      message: "No API token configured — REST and MCP endpoints will reject all requests.",
+    });
+  } else if (!env("AUTH_TOKEN") && env("NEXT_PUBLIC_SUPERGLUE_API_KEY")) {
+    recs.push({
+      id: "legacy-auth",
+      kind: "warning",
+      message:
+        "Using NEXT_PUBLIC_SUPERGLUE_API_KEY (client-visible). Prefer AUTH_TOKEN for server-side authentication.",
+    });
+  }
+
+  if (!env("MASTER_ENCRYPTION_KEY")) {
+    recs.push({
+      id: "no-encryption",
+      kind: "warning",
+      message: "MASTER_ENCRYPTION_KEY not set — system credentials will be stored in plaintext.",
+    });
+  }
+
+  const llm = llmIssue();
+  if (llm) {
+    recs.push({
+      id: llm.id,
+      kind: "error",
+      message: `${llm.title}: ${llm.detail}`,
+    });
+  }
+
+  const pg = postgresIssue();
+  if (pg) {
+    recs.push({
+      id: pg.id,
+      kind: "error",
+      message: `Postgres connection incomplete — set ${pg.detail}`,
+    });
+  }
+
+  const storageIssues = objectStorageIssues();
+  for (const si of storageIssues) {
+    recs.push({
+      id: si.id,
+      kind: "warning",
+      message: `${si.title}: ${si.detail}`,
+    });
+  }
+
+  if (recs.length === 0) {
+    recs.push({
+      id: "all-good",
+      kind: "info",
+      message: "Everything looks good — all core services are configured.",
+    });
+  }
+
+  return recs;
+}
+
 export function getSetupReport(): { blockers: SetupIssue[]; warnings: SetupIssue[] } {
   const blockers: SetupIssue[] = [];
   const warnings: SetupIssue[] = [];
@@ -206,8 +276,8 @@ export function getSetupReport(): { blockers: SetupIssue[]; warnings: SetupIssue
   const a = authIssue();
   if (a) blockers.push(a);
 
-  const pg = postgresIssue();
-  if (pg) blockers.push(pg);
+  const pgIssue = postgresIssue();
+  if (pgIssue) blockers.push(pgIssue);
 
   const llm = llmIssue();
   if (llm) blockers.push(llm);
