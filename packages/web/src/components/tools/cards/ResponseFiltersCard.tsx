@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/src/components/ui/select";
 import { Switch } from "@/src/components/ui/switch";
+import { generateUUID } from "@/src/lib/client-utils";
 import { FilterAction, FilterTarget, RemoveScope, ResponseFilter } from "@superglue/shared";
 import {
   AlertTriangle,
@@ -158,7 +159,7 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
   const addPresetFilter = useCallback(
     (preset: (typeof PRESETS)[0]) => {
       const newFilter: ResponseFilter = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         name: preset.name,
         enabled: true,
         target: preset.target,
@@ -173,7 +174,7 @@ export function ResponseFiltersCard({ filters, onChange, disabled }: ResponseFil
 
   const addCustomFilter = useCallback(() => {
     const newFilter: ResponseFilter = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       name: "",
       enabled: true,
       target: FilterTarget.VALUES,

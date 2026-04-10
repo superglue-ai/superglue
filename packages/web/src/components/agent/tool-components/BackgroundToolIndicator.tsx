@@ -54,11 +54,15 @@ const BACKGROUND_TOOL_CONFIG: Record<string, BackgroundToolConfig> = {
     label: "Found templates",
     activeLabel: "Finding templates...",
   },
-  read_skill: {
+  load_skill: {
     icon: GraduationCap,
     label: (tool: ToolCall) => {
       const loaded = tool.output?.loaded as string[] | undefined;
-      if (loaded?.length) return `Loaded ${loaded.join(", ")}`;
+      const includedTools = tool.output?.toolsLoaded as string[] | undefined;
+      if (loaded?.length) {
+        const base = `Loaded ${loaded.join(", ")}`;
+        return includedTools?.length ? `${base} (+${includedTools.length} tools)` : base;
+      }
       return "Loaded skills";
     },
     activeLabel: "Loading skills...",
@@ -67,6 +71,11 @@ const BACKGROUND_TOOL_CONFIG: Record<string, BackgroundToolConfig> = {
     icon: Eye,
     label: "Inspected tool",
     activeLabel: "Inspecting tool...",
+  },
+  inspect_system: {
+    icon: Eye,
+    label: "Inspected system",
+    activeLabel: "Inspecting system...",
   },
 };
 

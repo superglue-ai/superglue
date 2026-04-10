@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, getSimpleIcon } from "@/src/lib/general-utils";
+import { cn, getSimpleIcon, formatLabel } from "@/src/lib/general-utils";
 import { useTheme } from "@/src/hooks/use-theme";
 import { systems, SystemConfig } from "@superglue/shared";
 import { useRef, useMemo, useState, useCallback, useEffect } from "react";
@@ -28,13 +28,6 @@ function adjustColorForDarkMode(hex: string): string {
     return `${newR.toString(16).padStart(2, "0")}${newG.toString(16).padStart(2, "0")}${newB.toString(16).padStart(2, "0")}`;
   }
   return hex;
-}
-
-function formatLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
 }
 
 interface SystemCarouselProps {

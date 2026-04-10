@@ -15,26 +15,51 @@ export interface SSESubscription {
 export class SSELogSubscriptionManager {
   private apiEndpoint: string;
   private apiKey: string;
+  private onInfrastructureError?: () => void;
   private controllers: Map<string, AbortController> = new Map();
 
-  constructor(apiEndpoint: string, apiKey: string) {
+  constructor(apiEndpoint: string, apiKey: string, onInfrastructureError?: () => void) {
     this.apiEndpoint = apiEndpoint.replace(/\/$/, "");
     this.apiKey = apiKey;
+    this.onInfrastructureError = onInfrastructureError;
   }
 
   async subscribeToLogs(options: SSELogSubscriptionOptions = {}): Promise<SSESubscription> {
     const controller = new AbortController();
     const subscriptionId = Math.random().toString(36).substring(2, 15);
     this.controllers.set(subscriptionId, controller);
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
 
     const params = new URLSearchParams();
     if (options.traceId) params.set("traceId", options.traceId);
 
     const url = `${this.apiEndpoint}/v1/logs/stream${params.toString() ? `?${params}` : ""}`;
 
-    const cleanup = () => this.controllers.delete(subscriptionId);
+    const clearRetry = () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
+    };
 
-    const startStream = async () => {
+    const cleanup = () => {
+      closed = true;
+      clearRetry();
+      this.controllers.delete(subscriptionId);
+    };
+
+    const scheduleRetry = (attempt: number) => {
+      if (closed || controller.signal.aborted) return;
+      clearRetry();
+      const delayMs = Math.min(1000 * 2 ** attempt, 10000);
+      retryTimeout = setTimeout(() => {
+        void startStream(attempt + 1);
+      }, delayMs);
+    };
+
+    const startStream = async (attempt: number = 0) => {
+      if (closed || controller.signal.aborted) return;
       try {
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${this.apiKey}` },
@@ -42,8 +67,15 @@ export class SSELogSubscriptionManager {
         });
 
         if (!response.ok || !response.body) {
+          const error = new Error(`SSE connection failed: ${response.status}`);
+          if (response.status >= 500) {
+            this.onInfrastructureError?.();
+            options.onError?.(error);
+            scheduleRetry(attempt);
+            return;
+          }
           cleanup();
-          options.onError?.(new Error(`SSE connection failed: ${response.status}`));
+          options.onError?.(error);
           return;
         }
 
@@ -71,12 +103,21 @@ export class SSELogSubscriptionManager {
           }
         }
 
+        if (!closed && !controller.signal.aborted) {
+          scheduleRetry(0);
+          return;
+        }
+
         cleanup();
         options.onComplete?.();
       } catch (error: any) {
-        cleanup();
-        if (error.name === "AbortError") return;
+        if (error.name === "AbortError") {
+          cleanup();
+          return;
+        }
+        this.onInfrastructureError?.();
         options.onError?.(error);
+        scheduleRetry(attempt);
       }
     };
 
@@ -86,8 +127,8 @@ export class SSELogSubscriptionManager {
       unsubscribe: () => {
         const ctrl = this.controllers.get(subscriptionId);
         if (ctrl) {
+          cleanup();
           ctrl.abort();
-          this.controllers.delete(subscriptionId);
         }
       },
     };

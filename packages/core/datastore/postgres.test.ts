@@ -133,6 +133,88 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         expect(items.map((run) => run.runId).sort()).toEqual(["run1", "run3"]);
       });
 
+      it("should list runs filtered by search text in payload", async () => {
+        const run1: Run = {
+          ...testRun,
+          runId: "run-search-1",
+          toolPayload: { user_email: "hi@example.com", name: "Example Person" },
+        };
+        const run2: Run = {
+          ...testRun,
+          runId: "run-search-2",
+          toolPayload: { user_email: "other@example.com", name: "Another Person" },
+        };
+
+        await store.createRun({ run: run1, orgId: testOrgId });
+        await store.createRun({ run: run2, orgId: testOrgId });
+
+        const { items, total } = await store.listRuns({
+          limit: 10,
+          offset: 0,
+          search: "hi@example.com",
+          orgId: testOrgId,
+        });
+
+        expect(items).toHaveLength(1);
+        expect(total).toBe(1);
+        expect(items[0].runId).toBe("run-search-1");
+      });
+
+      it("should list runs filtered by matched search user ids", async () => {
+        const run1: Run = {
+          ...testRun,
+          runId: "run-user-search-1",
+          userId: "user-123",
+        };
+        const run2: Run = {
+          ...testRun,
+          runId: "run-user-search-2",
+          userId: "user-999",
+        };
+
+        await store.createRun({ run: run1, orgId: testOrgId });
+        await store.createRun({ run: run2, orgId: testOrgId });
+
+        const { items, total } = await store.listRuns({
+          limit: 10,
+          offset: 0,
+          search: "michael",
+          searchUserIds: ["user-123"],
+          orgId: testOrgId,
+        });
+
+        expect(items).toHaveLength(1);
+        expect(total).toBe(1);
+        expect(items[0].runId).toBe("run-user-search-1");
+      });
+
+      it("should list runs filtered by startedAfter", async () => {
+        const run1: Run = {
+          ...testRun,
+          runId: "run-started-after-1",
+          metadata: { startedAt: new Date("2026-03-10T10:00:00.000Z").toISOString() },
+        };
+        const run2: Run = {
+          ...testRun,
+          runId: "run-started-after-2",
+          metadata: { startedAt: new Date("2026-03-20T10:00:00.000Z").toISOString() },
+        };
+
+        await store.createRun({ run: run1, orgId: testOrgId });
+        await store.createRun({ run: run2, orgId: testOrgId });
+
+        const { items, total } = await store.listRuns({
+          limit: 10,
+          offset: 0,
+          startedAfter: new Date("2026-03-15T00:00:00.000Z"),
+          orgId: testOrgId,
+        });
+
+        expect(items).toHaveLength(1);
+        expect(total).toBe(1);
+        expect(items[0].runId).toBe("run-started-after-2");
+      });
+
       it("should store and retrieve requestSource correctly", async () => {
         const runWithSource: Run = {
           ...testRun,
@@ -739,6 +821,29 @@ if (!testConfig.host || !testConfig.user || !testConfig.password) {
         const expectedTime = new Date(newNextRunAt.getTime() + timezoneOffsetMs);
 
         expect(retrieved[0].nextRunAt.getTime()).toEqual(expectedTime.getTime());
+      });
+
+      it("should only allow one claim for the same due workflow schedule", async () => {
+        await store.upsertWorkflow({
+          id: testWorkflow.id,
+          workflow: testWorkflow,
+          orgId: testOrgId,
+        });
+        await store.upsertToolSchedule({ schedule: testWorkflowSchedule });
+
+        const firstClaim = await store.updateScheduleNextRun({
+          id: testWorkflowSchedule.id,
+          nextRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          lastRunAt: new Date(),
+        });
+        const secondClaim = await store.updateScheduleNextRun({
+          id: testWorkflowSchedule.id,
+          nextRunAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+          lastRunAt: new Date(),
+        });
+
+        expect(firstClaim).toBe(true);
+        expect(secondClaim).toBe(false);
       });
 
       it("should return false if workflow schedule is not found", async () => {

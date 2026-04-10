@@ -43,10 +43,11 @@ export function downloadJson(
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
+    link.setAttribute("data-download", "true");
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    link.dispatchEvent(
+      new MouseEvent("click", { bubbles: false, cancelable: false, view: window }),
+    );
 
     URL.revokeObjectURL(url);
   } catch (error) {

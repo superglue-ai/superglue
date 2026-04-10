@@ -6,7 +6,6 @@ import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { formatBytes } from "@/src/lib/file-utils";
 import { isEmptyData } from "@/src/lib/general-utils";
 import { buildCategorizedSources } from "@/src/lib/templating-utils";
-import { DownloadButton } from "@superglue/web/src/components/tools/shared/download-button";
 import {
   Code2,
   FileBracesCorner,
@@ -21,10 +20,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { JavaScriptCodeEditor } from "../../editors/JavaScriptCodeEditor";
-import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
+import { JsonEditor } from "../../editors/JsonEditor";
 import { useExecution, useToolConfig } from "../context";
 import { useDataProcessor } from "../hooks/use-data-processor";
-import { CopyButton } from "../shared/CopyButton";
 import { ResponseFiltersCard } from "./ResponseFiltersCard";
 import { useRightSidebar } from "../../sidebar/RightSidebarContext";
 
@@ -76,8 +74,6 @@ export const FinalTransformMiniStepCard = ({
   const [activeTab, setActiveTab] = useState("transform");
   const [localTransform, setLocalTransform] = useState(transform || "");
   const [localSchema, setLocalSchema] = useState(outputSchema || "");
-  const [inputViewMode, setInputViewMode] = useState<"preview" | "schema">("preview");
-  const [outputViewMode, setOutputViewMode] = useState<"preview" | "schema">("preview");
   const [schemaInitialized, setSchemaInitialized] = useState(false);
   const [isPendingExecution, setIsPendingExecution] = useState(false);
   const isInternalChangeRef = useRef(false);
@@ -120,56 +116,16 @@ export const FinalTransformMiniStepCard = ({
 
   const outputProcessor = useDataProcessor(transformResult, activeTab === "output");
 
-  // Re-trigger schema computation when data changes and we're viewing schema
-  useEffect(() => {
-    if (activeTab === "output" && outputViewMode === "schema" && transformResult) {
-      outputProcessor.computeSchema();
-    }
-  }, [transformResult, outputViewMode, activeTab, outputProcessor]);
-
-  useEffect(() => {
-    if (activeTab === "inputs" && inputViewMode === "schema" && stepInputs) {
-      inputProcessor.computeSchema();
-    }
-  }, [stepInputs, inputViewMode, activeTab, inputProcessor]);
-
   const inputData = {
-    displayString:
-      inputViewMode === "schema"
-        ? inputProcessor.schema?.displayString || ""
-        : inputProcessor.preview?.displayString || "",
-    truncated:
-      inputViewMode === "schema"
-        ? inputProcessor.schema?.truncated || false
-        : inputProcessor.preview?.truncated || false,
+    displayString: inputProcessor.preview?.displayString || "",
+    truncated: inputProcessor.preview?.truncated || false,
     bytes: inputProcessor.bytes,
   };
 
   const outputData = {
-    displayString:
-      outputViewMode === "schema"
-        ? outputProcessor.schema?.displayString || ""
-        : outputProcessor.preview?.displayString || "",
-    truncated:
-      outputViewMode === "schema"
-        ? outputProcessor.schema?.truncated || false
-        : outputProcessor.preview?.truncated || false,
+    displayString: outputProcessor.preview?.displayString || "",
+    truncated: outputProcessor.preview?.truncated || false,
     bytes: outputProcessor.bytes,
-  };
-
-  // Trigger schema computation when switching to schema view
-  const handleInputViewModeChange = (mode: "preview" | "schema") => {
-    setInputViewMode(mode);
-    if (mode === "schema") {
-      inputProcessor.computeSchema();
-    }
-  };
-
-  const handleOutputViewModeChange = (mode: "preview" | "schema") => {
-    setOutputViewMode(mode);
-    if (mode === "schema") {
-      outputProcessor.computeSchema();
-    }
   };
 
   function handleTransformChange(value: string): void {
@@ -305,7 +261,7 @@ export const FinalTransformMiniStepCard = ({
               </div>
             ) : (
               <>
-                <JsonCodeEditor
+                <JsonEditor
                   value={inputData.displayString}
                   readOnly={true}
                   minHeight="150px"
@@ -313,38 +269,16 @@ export const FinalTransformMiniStepCard = ({
                   resizable={true}
                   overlay={
                     <div className="flex items-center gap-2">
-                      {(inputProcessor.isComputingPreview || inputProcessor.isComputingSchema) && (
+                      {inputProcessor.isComputingPreview && (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                       )}
-                      <Tabs
-                        value={inputViewMode}
-                        onValueChange={(v) => handleInputViewModeChange(v as "preview" | "schema")}
-                        className="w-auto"
-                      >
-                        <TabsList className="h-6 rounded-md">
-                          <TabsTrigger
-                            value="preview"
-                            className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
-                          >
-                            Preview
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="schema"
-                            className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
-                          >
-                            Schema
-                          </TabsTrigger>
-                        </TabsList>
-                      </Tabs>
                       <span className="text-[10px] text-muted-foreground">
                         {formatBytes(inputData.bytes)}
                       </span>
-                      <CopyButton getData={() => stepInputs} />
-                      <DownloadButton data={stepInputs} filename="transform_step_inputs.json" />
                     </div>
                   }
                 />
-                {inputData.truncated && inputViewMode === "preview" && (
+                {inputData.truncated && (
                   <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
                     Preview truncated for display performance
                   </div>
@@ -361,6 +295,7 @@ export const FinalTransformMiniStepCard = ({
               maxHeight="500px"
               resizable={true}
               isTransformEditor={true}
+              autoFormatOnMount={false}
             />
           </TabsContent>
           <TabsContent value="schema" className="mt-0">
@@ -414,44 +349,17 @@ export const FinalTransformMiniStepCard = ({
                 </div>
               ) : (
                 <>
-                  <JsonCodeEditor
+                  <JsonEditor
                     value={outputData.displayString}
                     readOnly
-                    minHeight="150px"
+                    minHeight="250px"
                     maxHeight="600px"
                     resizable={true}
                     overlay={
                       <div className="flex items-center gap-2">
-                        {outputProcessor.isComputingSchema && (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        )}
-                        <Tabs
-                          value={outputViewMode}
-                          onValueChange={(v) =>
-                            handleOutputViewModeChange(v as "preview" | "schema")
-                          }
-                          className="w-auto"
-                        >
-                          <TabsList className="h-6 rounded-md">
-                            <TabsTrigger
-                              value="preview"
-                              className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
-                            >
-                              Preview
-                            </TabsTrigger>
-                            <TabsTrigger
-                              value="schema"
-                              className="h-5 px-2 text-[11px] rounded-md data-[state=active]:rounded-md"
-                            >
-                              Schema
-                            </TabsTrigger>
-                          </TabsList>
-                        </Tabs>
                         <span className="text-[10px] text-muted-foreground">
                           {formatBytes(outputData.bytes)}
                         </span>
-                        <CopyButton getData={() => transformResult} />
-                        <DownloadButton data={transformResult} filename="tool_result.json" />
                       </div>
                     }
                   />
@@ -460,10 +368,9 @@ export const FinalTransformMiniStepCard = ({
                       ⚠ No data returned. Is this expected?
                     </div>
                   )}
-                  {outputData.truncated && outputViewMode === "preview" && (
+                  {outputData.truncated && (
                     <div className="mt-2 text-xs text-amber-600 dark:text-amber-300">
-                      Preview truncated for display performance. Use download button to get full
-                      data.
+                      Preview truncated for display performance. Download for full data. data.
                     </div>
                   )}
                 </>

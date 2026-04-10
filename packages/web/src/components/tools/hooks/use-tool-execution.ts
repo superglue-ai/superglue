@@ -1,8 +1,7 @@
-import { useConfig } from "@/src/app/config-context";
+import { useEnvironment } from "@/src/app/environment-context";
 import { useToast } from "@/src/hooks/use-toast";
 import {
   abortExecution,
-  createSuperglueClient,
   executeOutputTransform,
   executeSingleStep,
   executeToolStepByStep,
@@ -10,13 +9,14 @@ import {
   shouldDebounceAbort,
   type StepExecutionResult,
 } from "@/src/lib/client-utils";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import {
   computeStepOutput,
   isAbortError,
   wrapDataSelectorWithLimit,
 } from "@/src/lib/general-utils";
-import { Tool, ToolResult } from "@superglue/shared";
-import { useRef } from "react";
+import { isRequestConfig, isTransformConfig, Tool, ToolResult } from "@superglue/shared";
+import { useMemo, useRef } from "react";
 import { useExecution, useToolConfig } from "../context";
 import type { StepStatus, TransformStatus } from "../context/types";
 
@@ -44,15 +44,36 @@ export function useToolExecution(
   const { onExecute, onStopExecution, embedded } = options;
   const { setFocusStepId, setShowStepOutputSignal, setNavigateToFinalSignal } = navigationCallbacks;
 
-  const config = useConfig();
+  const createClient = useSuperglueClient();
+  const { mode: environmentMode } = useEnvironment();
   const { toast } = useToast();
-  const { tool, steps, payload, setSteps, setOutputTransform, responseFilters } = useToolConfig();
+  const { tool, steps, payload, setSteps, setOutputTransform, responseFilters, systems } =
+    useToolConfig();
   const toolId = tool.id;
   const outputTransform = tool.outputTransform || "";
   const outputSchema = tool.outputSchema ? JSON.stringify(tool.outputSchema) : "";
   const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
+
+  // Extract system IDs from request steps. For transform-only tools or output transforms
+  // that need credentials, fall back to systems explicitly associated with this tool context.
+  const systemIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const step of steps) {
+      if (step.config && isRequestConfig(step.config) && step.config.systemId) {
+        ids.add(step.config.systemId);
+      }
+    }
+    // If no request steps reference systems but systems are configured in the tool context,
+    // include them for transform/output transform credential access
+    if (ids.size === 0 && systems.length > 0) {
+      for (const sys of systems) {
+        ids.add(sys.id);
+      }
+    }
+    return Array.from(ids);
+  }, [steps, systems]);
 
   const {
     setStepResult,
@@ -81,7 +102,7 @@ export function useToolExecution(
     const runIdToAbort = currentRunIdRef.current;
     if (runIdToAbort) {
       markAsStopping();
-      const client = createSuperglueClient(config.apiEndpoint);
+      const client = createClient();
       await abortExecution(client, runIdToAbort);
     }
 
@@ -119,7 +140,7 @@ export function useToolExecution(
 
     return executeWithRunId(
       async () => {
-        const client = createSuperglueClient(config.apiEndpoint);
+        const client = createClient();
 
         const originalDataSelector = steps[idx]?.dataSelector;
         let stepToExecute = steps[idx];
@@ -139,6 +160,8 @@ export function useToolExecution(
         }
 
         const currentStepResultsMap = stepResultsMap;
+        // Pass systemIds for transform steps so they can access system credentials
+        const stepSystemIds = isTransformConfig(stepToExecute.config) ? systemIds : undefined;
         const single = await executeSingleStep({
           client,
           step: stepToExecute,
@@ -147,6 +170,8 @@ export function useToolExecution(
           onRunIdGenerated: (singleRunId) => {
             currentRunIdRef.current = singleRunId;
           },
+          mode: environmentMode,
+          systemIds: stepSystemIds,
         });
 
         const sid = steps[idx].id;
@@ -190,7 +215,7 @@ export function useToolExecution(
       });
 
       const parsedSchema = schemaStr && schemaStr.trim() ? JSON.parse(schemaStr) : null;
-      const client = createSuperglueClient(config.apiEndpoint);
+      const client = createClient();
       const result = await executeOutputTransform({
         client,
         outputTransform: transformStr || outputTransform,
@@ -229,7 +254,6 @@ export function useToolExecution(
     handleBeforeStepExecution: (stepIndex: number, step: any) => Promise<boolean>,
   ) => {
     const runId = generateUUID();
-    const startedAt = new Date();
     executionCompletedRef.current = false;
     shouldAbortRef.current = false;
     currentRunIdRef.current = runId;
@@ -239,8 +263,6 @@ export function useToolExecution(
     setFocusStepId(null);
 
     let finalToolConfig: Tool | null = null;
-    let runStatus: "success" | "failed" | "aborted" = "success";
-    let runError: string | undefined;
     let wr: ToolResult | null = null;
 
     try {
@@ -264,7 +286,7 @@ export function useToolExecution(
 
       setCurrentExecutingStepIndex(0);
 
-      const client = createSuperglueClient(config.apiEndpoint);
+      const client = createClient();
       const state = await executeToolStepByStep({
         client,
         tool: executionTool,
@@ -297,6 +319,8 @@ export function useToolExecution(
         onStepRunIdChange: (stepRunId: string) => {
           currentRunIdRef.current = stepRunId;
         },
+        mode: environmentMode,
+        systemIds,
       });
 
       if (state.currentTool.steps) {
@@ -351,7 +375,6 @@ export function useToolExecution(
 
       if (state.failedSteps.length === 0 && state.abortedSteps.length === 0 && !state.interrupted) {
         setNavigateToFinalSignal(Date.now());
-        runStatus = "success";
       } else {
         const firstProblematicStep = state.failedSteps[0] || state.abortedSteps[0];
         if (firstProblematicStep) {
@@ -367,13 +390,6 @@ export function useToolExecution(
             setFocusStepId(lastExecutedStepId);
             setShowStepOutputSignal(Date.now());
           }
-        }
-
-        if (state.abortedSteps.length > 0) {
-          runStatus = "aborted";
-        } else if (state.failedSteps.length > 0) {
-          runStatus = "failed";
-          runError = state.stepResults[state.failedSteps[0]]?.error;
         }
       }
 
@@ -397,41 +413,7 @@ export function useToolExecution(
         description: error.message,
         variant: "destructive",
       });
-      runStatus = "failed";
-      runError = error.message;
     } finally {
-      const completedAt = new Date();
-
-      // Create run entry in database after execution completes
-      if (finalToolConfig || toolId) {
-        try {
-          const client = createSuperglueClient(config.apiEndpoint);
-          await client.createRun({
-            toolId,
-            toolConfig:
-              finalToolConfig ||
-              ({
-                id: toolId,
-                steps,
-                outputTransform,
-                outputSchema: outputSchema ? JSON.parse(outputSchema) : null,
-                inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
-                instruction: instructions,
-              } as Tool),
-            toolResult: wr?.data,
-            stepResults: wr?.stepResults,
-            toolPayload: computedPayload,
-            status: runStatus,
-            error: runError,
-            startedAt,
-            completedAt,
-          });
-        } catch (createRunError) {
-          // Don't fail the execution if run creation fails, just log it
-          console.error("Failed to create run entry:", createRunError);
-        }
-      }
-
       executionCompletedRef.current = true;
       currentRunIdRef.current = null;
       setLoading(false);

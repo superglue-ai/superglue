@@ -10,7 +10,7 @@ import { useResizable } from "@/src/hooks/use-resizable";
 import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
 import { FileBraces, FileBracesCorner, FileJson, Upload } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { JsonCodeEditor } from "../../editors/JsonCodeEditor";
+import { JsonEditor } from "../../editors/JsonEditor";
 import { useToolConfig } from "../context";
 
 export interface PayloadItem {
@@ -90,10 +90,7 @@ export const PayloadSpotlight = ({
     }
     try {
       const parsed = JSON.parse(fullInputSchema);
-      if (parsed?.properties?.payload) {
-        return parsed.properties.payload;
-      }
-      return parsed;
+      return parsed?.properties?.payload || parsed;
     } catch {
       return null;
     }
@@ -179,7 +176,7 @@ export const PayloadSpotlight = ({
                   <span className="text-xs font-medium text-muted-foreground">Manual Payload</span>
                   <HelpTooltip text="Edit your manual JSON input here. This will be merged with file data." />
                 </div>
-                <JsonCodeEditor
+                <JsonEditor
                   value={localPayload}
                   onChange={(val) => handlePayloadChange(val || "")}
                   readOnly={false}
@@ -198,7 +195,7 @@ export const PayloadSpotlight = ({
                   </span>
                   <HelpTooltip text="This is the final payload that will be sent when the tool executes, combining your manual input with parsed file data." />
                 </div>
-                <JsonCodeEditor
+                <JsonEditor
                   value={JSON.stringify(payload.computedPayload, null, 2)}
                   readOnly={true}
                   minHeight="200px"
@@ -212,7 +209,7 @@ export const PayloadSpotlight = ({
             </div>
           ) : (
             <div>
-              <JsonCodeEditor
+              <JsonEditor
                 value={localPayload}
                 onChange={(val) => handlePayloadChange(val || "")}
                 readOnly={false}
@@ -264,14 +261,8 @@ export const PayloadSpotlight = ({
             onChange={(value) => {
               if (value && value.trim() !== "") {
                 try {
-                  const payloadSchema = JSON.parse(value);
-                  const fullSchema = {
-                    type: "object",
-                    properties: {
-                      payload: payloadSchema,
-                    },
-                  };
-                  handleSchemaChange(JSON.stringify(fullSchema, null, 2));
+                  JSON.parse(value);
+                  handleSchemaChange(value);
                 } catch (e) {
                   handleSchemaChange(value);
                 }

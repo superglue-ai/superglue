@@ -1,6 +1,7 @@
 import {
   composeUrl,
   DiscoveryRun,
+  DocumentationFiles,
   FileReference,
   FileStatus,
   NotificationSettings,
@@ -14,6 +15,7 @@ import {
 import jsonpatch from "fast-json-patch";
 import { Pool, PoolConfig } from "pg";
 import { credentialEncryption } from "../utils/encryption.js";
+import { escapeSqlLikePattern } from "../utils/string.js";
 import { logMessage } from "../utils/logs.js";
 import { extractRun, normalizeTool } from "./migrations/migration.js";
 import type {
@@ -30,6 +32,49 @@ import type {
 export class PostgresService implements DataStore {
   protected pool: Pool;
   protected initPromise: Promise<void>;
+
+  /**
+   * Ensures orgId is provided. In hosted deployment, orgId should always come from JWT.
+   * Throws an error if orgId is missing to prevent accidental data leakage.
+   */
+  private requireOrgId(orgId: string | undefined, operation: string): string {
+    if (orgId === undefined || orgId === null) {
+      throw new Error(`orgId is required for ${operation}`);
+    }
+    return orgId;
+  }
+
+  /**
+   * Maps a database row to a System object.
+   * Centralizes the mapping logic to avoid duplication across methods.
+   */
+  private mapRowToSystem(row: any, includeDocs: boolean = false): System {
+    const url = row.url || (row.url_host ? composeUrl(row.url_host, row.url_path || "") : "");
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      url,
+      credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
+      documentationUrl: row.documentation_url,
+      documentation: includeDocs ? row.documentation : undefined,
+      documentationPending: row.documentation_pending,
+      openApiUrl: row.open_api_url,
+      openApiSchema: includeDocs ? row.open_api_schema : undefined,
+      specificInstructions: row.specific_instructions,
+      documentationKeywords: row.documentation_keywords,
+      icon: row.icon,
+      metadata: row.metadata,
+      templateName: row.template_name,
+      documentationFiles: row.documentation_files || {},
+      multiTenancyMode: row.multi_tenancy_mode || "disabled",
+      tunnel: row.tunnel || undefined,
+      version: row.version,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      environment: row.environment || undefined,
+    };
+  }
 
   constructor(config: PoolConfig) {
     this.pool = new Pool({
@@ -82,56 +127,39 @@ export class PostgresService implements DataStore {
     ids: string[];
     includeDocs?: boolean;
     orgId?: string;
+    environment?: "dev" | "prod"; // Filter by environment
   }): Promise<System[]> {
-    const { ids, includeDocs = true, orgId } = params;
+    const { ids, includeDocs = true, orgId, environment } = params;
+    const validOrgId = this.requireOrgId(orgId, "getManySystems");
     const client = await this.pool.connect();
     try {
       let query;
+      let queryParams: any[];
+
+      // Build environment condition
+      const envCondition = environment ? "AND i.environment = $3" : "";
+      queryParams = environment ? [ids, validOrgId, environment] : [ids, validOrgId];
+
       if (includeDocs) {
         query = `SELECT i.id, i.name, i.type, i.url, i.url_host, i.url_path, i.credentials, 
                         i.documentation_url, i.documentation_pending,
                         i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.multi_tenancy_mode, i.tunnel, i.version, i.created_at, i.updated_at,
+                        i.environment,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
-                 WHERE i.id = ANY($1) AND i.org_id = $2`;
+                 WHERE i.id = ANY($1) AND i.org_id = $2 ${envCondition}`;
       } else {
         query = `SELECT id, name, type, url, url_host, url_path, credentials, 
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at
-                 FROM integrations WHERE id = ANY($1) AND org_id = $2`;
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at,
+                        environment
+                 FROM integrations WHERE id = ANY($1) AND org_id = $2 ${envCondition ? envCondition.replace("i.", "") : ""}`;
       }
 
-      const result = await client.query(query, [ids, orgId || ""]);
+      const result = await client.query(query, queryParams);
 
-      return result.rows.map((row: any) => {
-        const url = row.url || (row.url_host ? composeUrl(row.url_host, row.url_path || "") : "");
-        const system: System = {
-          id: row.id,
-          name: row.name,
-          type: row.type,
-          url,
-          credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
-          documentationUrl: row.documentation_url,
-          documentation: includeDocs ? row.documentation : undefined,
-          documentationPending: row.documentation_pending,
-          openApiUrl: row.open_api_url,
-          openApiSchema: includeDocs ? row.open_api_schema : undefined,
-          specificInstructions: row.specific_instructions,
-          documentationKeywords: row.documentation_keywords,
-          icon: row.icon,
-          metadata: row.metadata,
-          templateName: row.template_name,
-          documentationFiles: row.documentation_files || {},
-          multiTenancyMode: row.multi_tenancy_mode || "disabled",
-          tunnel: row.tunnel || undefined,
-          version: row.version,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        };
-
-        return system;
-      });
+      return result.rows.map((row: any) => this.mapRowToSystem(row, includeDocs));
     } finally {
       client.release();
     }
@@ -162,7 +190,7 @@ export class PostgresService implements DataStore {
           config_id VARCHAR(255),
           org_id VARCHAR(255),
           status VARCHAR(50),
-          request_source VARCHAR(50) CHECK (request_source IN ('api','frontend','scheduler','mcp','tool-chain','webhook')),
+          request_source VARCHAR(50) CHECK (request_source IN ('api','frontend','scheduler','mcp','tool-chain','webhook','cli')),
           data JSONB NOT NULL,
           started_at TIMESTAMP,
           completed_at TIMESTAMP,
@@ -186,13 +214,14 @@ export class PostgresService implements DataStore {
       await client.query(`
         DO $$
         BEGIN
-          IF NOT EXISTS (
+          IF EXISTS (
             SELECT 1 FROM pg_constraint WHERE conname = 'runs_request_source_check'
           ) THEN
-            ALTER TABLE runs
-              ADD CONSTRAINT runs_request_source_check
-              CHECK (request_source IN ('api','frontend','scheduler','mcp','tool-chain','webhook'));
+            ALTER TABLE runs DROP CONSTRAINT runs_request_source_check;
           END IF;
+          ALTER TABLE runs
+            ADD CONSTRAINT runs_request_source_check
+            CHECK (request_source IN ('api','frontend','scheduler','mcp','tool-chain','webhook','cli'));
         END
         $$;
       `);
@@ -234,7 +263,8 @@ export class PostgresService implements DataStore {
       await client.query(`
     CREATE TABLE IF NOT EXISTS integrations (
       id VARCHAR(255) NOT NULL,
-      org_id VARCHAR(255),
+      org_id VARCHAR(255) NOT NULL,
+      environment VARCHAR(50) NOT NULL DEFAULT 'prod', -- 'dev' = development, 'prod' = production
       name VARCHAR(255),
       type VARCHAR(100),
       url_host VARCHAR(500),
@@ -250,19 +280,19 @@ export class PostgresService implements DataStore {
       version VARCHAR(50),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (id, org_id)
+      PRIMARY KEY (id, environment, org_id)
     )
   `);
 
-      // New table for large integration fields
+      // New table for large integration fields (legacy - documentation now stored in S3)
+      // Note: This table is shared across environments since documentation is the same for dev/prod
       await client.query(`
     CREATE TABLE IF NOT EXISTS integration_details (
       integration_id VARCHAR(255) NOT NULL,
-      org_id VARCHAR(255),
+      org_id VARCHAR(255) NOT NULL,
       documentation TEXT,
       open_api_schema TEXT,
-      PRIMARY KEY (integration_id, org_id),
-      FOREIGN KEY (integration_id, org_id) REFERENCES integrations(id, org_id) ON DELETE CASCADE
+      PRIMARY KEY (integration_id, org_id)
     )
   `);
 
@@ -279,6 +309,56 @@ export class PostgresService implements DataStore {
         `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS multi_tenancy_mode VARCHAR(50) DEFAULT 'disabled'`,
       );
       await client.query(`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS tunnel JSONB`);
+
+      // Environment column for dev/prod systems
+      await client.query(
+        `ALTER TABLE integrations ADD COLUMN IF NOT EXISTS environment VARCHAR(50)`,
+      );
+
+      // Migrate existing systems to 'prod' (default environment)
+      await client.query(
+        `UPDATE integrations SET environment = 'prod' WHERE environment IS NULL OR environment = ''`,
+      );
+      // Set default and NOT NULL constraint for environment column
+      await client.query(`ALTER TABLE integrations ALTER COLUMN environment SET DEFAULT 'prod'`);
+      await client.query(`ALTER TABLE integrations ALTER COLUMN environment SET NOT NULL`);
+
+      // Migrate primary key to composite (id, environment, org_id) if not already done
+      // Check if the current primary key includes environment
+      const pkCheck = await client.query(`
+        SELECT a.attname
+        FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = 'integrations'::regclass AND i.indisprimary
+        ORDER BY array_position(i.indkey, a.attnum)
+      `);
+      const pkColumns = pkCheck.rows.map((r: any) => r.attname);
+
+      // If environment is not in the primary key, we need to migrate
+      if (!pkColumns.includes("environment")) {
+        // First, drop any foreign key constraints that reference the integrations primary key
+        await client.query(`
+          ALTER TABLE integration_details 
+          DROP CONSTRAINT IF EXISTS integration_details_integration_id_org_id_fkey
+        `);
+        await client.query(`
+          ALTER TABLE integration_details 
+          DROP CONSTRAINT IF EXISTS integration_details_integration_id_fkey
+        `);
+
+        // Drop the old primary key constraint (use CASCADE to handle any remaining dependencies)
+        await client.query(`
+          ALTER TABLE integrations DROP CONSTRAINT IF EXISTS integrations_pkey CASCADE
+        `);
+
+        // Add the new composite primary key
+        await client.query(`
+          ALTER TABLE integrations ADD PRIMARY KEY (id, environment, org_id)
+        `);
+      }
+
+      // Add execution_mode column to runs table
+      await client.query(`ALTER TABLE runs ADD COLUMN IF NOT EXISTS execution_mode VARCHAR(20)`);
 
       // Integration templates table for Superglue OAuth credentials (and potentially further fields in the future)
       await client.query(`
@@ -316,6 +396,7 @@ export class PostgresService implements DataStore {
                 options JSONB,
                 last_run_at TIMESTAMPTZ,
                 next_run_at TIMESTAMPTZ NOT NULL,
+                created_by_user_id TEXT,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id, org_id),
@@ -323,15 +404,33 @@ export class PostgresService implements DataStore {
              )
             `);
 
+      await client.query(
+        `ALTER TABLE workflow_schedules ADD COLUMN IF NOT EXISTS created_by_user_id TEXT`,
+      );
+
       await client.query(`
                 CREATE TABLE IF NOT EXISTS integration_oauth (
                     uid TEXT PRIMARY KEY,
+                    org_id VARCHAR(255) NOT NULL DEFAULT '',
                     client_id TEXT NOT NULL,
                     client_secret TEXT NOT NULL,
                     expires_at TIMESTAMP NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             `);
+
+      // Add org_id column to integration_oauth if it doesn't exist (migration for existing tables)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'integration_oauth' AND column_name = 'org_id'
+          ) THEN
+            ALTER TABLE integration_oauth ADD COLUMN org_id VARCHAR(255) NOT NULL DEFAULT '';
+          END IF;
+        END $$;
+      `);
 
       await client.query(`
                 CREATE TABLE IF NOT EXISTS discovery_runs (
@@ -411,6 +510,10 @@ export class PostgresService implements DataStore {
       await client.query(
         `CREATE INDEX IF NOT EXISTS idx_integrations_url_host ON integrations(url_host)`,
       );
+      // Index for environment-based lookups (used by listSystems with mode filtering)
+      await client.query(
+        `CREATE INDEX IF NOT EXISTS idx_integrations_org_env ON integrations(org_id, id, environment)`,
+      );
       await client.query(
         `CREATE INDEX IF NOT EXISTS idx_integration_details_integration_id ON integration_details(integration_id, org_id)`,
       );
@@ -437,21 +540,37 @@ export class PostgresService implements DataStore {
       await client.query(`
         CREATE TABLE IF NOT EXISTS api_keys (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          org_id UUID NOT NULL,
+          org_id TEXT NOT NULL,
           key VARCHAR(255) NOT NULL UNIQUE,
-          user_id TEXT,
-          created_by_user_id TEXT,
+          user_id TEXT NOT NULL,
+          created_by_user_id TEXT NOT NULL,
           mode VARCHAR(20) DEFAULT 'backend',
           is_active BOOLEAN DEFAULT true,
-          is_restricted BOOLEAN DEFAULT false,
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
+      await client.query(`
+        DO $$
+        DECLARE
+          current_type TEXT;
+        BEGIN
+          SELECT data_type INTO current_type
+          FROM information_schema.columns
+          WHERE table_name = 'api_keys'
+            AND column_name = 'org_id'
+            AND table_schema = 'public';
+
+          IF current_type = 'uuid' THEN
+            ALTER TABLE api_keys
+            ALTER COLUMN org_id TYPE TEXT
+            USING org_id::text;
+          END IF;
+        END
+        $$;
+      `);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_org_id ON api_keys(org_id)`);
-      await client.query(
-        `CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id) WHERE user_id IS NOT NULL`,
-      );
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)`);
     } finally {
       client.release();
     }
@@ -487,14 +606,18 @@ export class PostgresService implements DataStore {
     return result;
   }
 
-  private async getWorkflowConfig(id: string, orgId?: string): Promise<Tool | null> {
+  private async getWorkflowConfig(
+    id: string,
+    orgId?: string,
+    includeArchived = true,
+  ): Promise<Tool | null> {
     if (!id) return null;
     const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        "SELECT data FROM configurations WHERE id = $1 AND type = 'workflow' AND org_id = $2",
-        [id, orgId || ""],
-      );
+      const query = includeArchived
+        ? "SELECT data FROM configurations WHERE id = $1 AND type = 'workflow' AND org_id = $2"
+        : "SELECT data FROM configurations WHERE id = $1 AND type = 'workflow' AND org_id = $2 AND (data->>'archived' IS NULL OR (data->>'archived')::boolean IS NOT TRUE)";
+      const result = await client.query(query, [id, orgId || ""]);
       return result.rows[0] ? { ...this.parseDates(result.rows[0].data), id } : null;
     } finally {
       client.release();
@@ -505,17 +628,21 @@ export class PostgresService implements DataStore {
     limit = 10,
     offset = 0,
     orgId?: string,
+    includeArchived = false,
   ): Promise<{ items: Tool[]; total: number }> {
     const client = await this.pool.connect();
+    const archivedFilter = includeArchived
+      ? ""
+      : " AND (data->>'archived' IS NULL OR (data->>'archived')::boolean IS NOT TRUE)";
     try {
       const countResult = await client.query(
-        "SELECT COUNT(*) FROM configurations WHERE type = 'workflow' AND org_id = $1",
+        `SELECT COUNT(*) FROM configurations WHERE type = 'workflow' AND org_id = $1${archivedFilter}`,
         [orgId || ""],
       );
       const total = parseInt(countResult.rows[0].count);
 
       const result = await client.query(
-        "SELECT id, data FROM configurations WHERE type = 'workflow' AND org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+        `SELECT id, data FROM configurations WHERE type = 'workflow' AND org_id = $1${archivedFilter} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
         [orgId || "", limit, offset],
       );
 
@@ -544,11 +671,12 @@ export class PostgresService implements DataStore {
   async getRun(params: { id: string; orgId?: string }): Promise<Run | null> {
     const { id, orgId } = params;
     if (!id) return null;
+    const validOrgId = this.requireOrgId(orgId, "getRun");
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        "SELECT id, config_id, data, started_at, completed_at, request_source, result_storage_uri, user_id FROM runs WHERE id = $1 AND org_id = $2",
-        [id, orgId || ""],
+        "SELECT id, config_id, data, started_at, completed_at, request_source, result_storage_uri, user_id, execution_mode FROM runs WHERE id = $1 AND org_id = $2",
+        [id, validOrgId],
       );
       if (!result.rows[0]) return null;
 
@@ -561,6 +689,7 @@ export class PostgresService implements DataStore {
         request_source: row.request_source,
         result_storage_uri: row.result_storage_uri,
         user_id: row.user_id,
+        execution_mode: row.execution_mode,
       });
     } finally {
       client.release();
@@ -571,6 +700,11 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     configId?: string;
+    allowedToolIds?: string[];
+    includeTotal?: boolean;
+    search?: string;
+    searchUserIds?: string[];
+    startedAfter?: Date;
     status?: RunStatus;
     requestSources?: RequestSource[];
     orgId?: string;
@@ -581,69 +715,116 @@ export class PostgresService implements DataStore {
       limit = 10,
       offset = 0,
       configId,
+      allowedToolIds,
+      includeTotal = true,
+      search,
+      searchUserIds,
+      startedAfter,
       status,
       requestSources,
       orgId,
       userId,
       systemId,
     } = params || {};
+    const validOrgId = this.requireOrgId(orgId, "listRuns");
     const client = await this.pool.connect();
     try {
-      let selectQuery = `
-                SELECT 
-                    id, config_id, data, started_at, completed_at, request_source, result_storage_uri, user_id,
-                    COUNT(*) OVER() as total_count
-                FROM runs
-                WHERE org_id = $1
-            `;
-      const queryParams: (string | string[])[] = [orgId || ""];
+      const queryParams: unknown[] = [validOrgId];
+      const whereClauses = ["org_id = $1"];
+      const nextParam = (value: unknown) => {
+        queryParams.push(value);
+        return `$${queryParams.length}`;
+      };
 
       if (configId) {
-        selectQuery += " AND config_id = $2";
-        queryParams.push(configId);
+        whereClauses.push(`config_id = ${nextParam(configId)}`);
+      }
+
+      if (allowedToolIds && allowedToolIds.length > 0) {
+        whereClauses.push(`config_id = ANY(${nextParam(allowedToolIds)})`);
+      }
+
+      if (startedAfter) {
+        whereClauses.push(`started_at >= ${nextParam(startedAfter.toISOString())}`);
+      }
+
+      if (search?.trim()) {
+        const searchParam = nextParam(`%${escapeSqlLikePattern(search.trim())}%`);
+        const searchClauses = [
+          `id ILIKE ${searchParam} ESCAPE '\\'`,
+          `config_id ILIKE ${searchParam} ESCAPE '\\'`,
+          `COALESCE(user_id, '') ILIKE ${searchParam} ESCAPE '\\'`,
+          `COALESCE(data->'tool'->>'name', '') ILIKE ${searchParam} ESCAPE '\\'`,
+          `COALESCE(data->'toolPayload', '{}'::jsonb)::text ILIKE ${searchParam} ESCAPE '\\'`,
+          `COALESCE(data->>'error', '') ILIKE ${searchParam} ESCAPE '\\'`,
+        ];
+
+        if (searchUserIds && searchUserIds.length > 0) {
+          searchClauses.push(`COALESCE(user_id, '') = ANY(${nextParam(searchUserIds)})`);
+        }
+
+        whereClauses.push(`(${searchClauses.join(" OR ")})`);
       }
 
       if (status !== undefined) {
-        const paramIndex = queryParams.length + 1;
-        selectQuery += ` AND data->>'status' = $${paramIndex}`;
-        queryParams.push(status);
+        whereClauses.push(`status = ${nextParam(status)}`);
       }
 
       if (requestSources !== undefined && requestSources.length > 0) {
-        const paramIndex = queryParams.length + 1;
-        selectQuery += ` AND request_source = ANY($${paramIndex})`;
-        queryParams.push(requestSources);
+        whereClauses.push(`request_source = ANY(${nextParam(requestSources)})`);
       }
 
       if (userId !== undefined) {
-        const paramIndex = queryParams.length + 1;
-        selectQuery += ` AND user_id = $${paramIndex}`;
-        queryParams.push(userId);
+        whereClauses.push(`user_id = ${nextParam(userId)}`);
       }
 
       if (systemId !== undefined) {
-        // Filter by systemId - check if any step uses this system
-        // Guard against null/non-array steps values which would crash jsonb_array_elements
-        const paramIndex = queryParams.length + 1;
-        selectQuery += ` AND jsonb_typeof(data->'tool'->'steps') = 'array' AND EXISTS (
+        // Guard against null/non-array steps values which would crash jsonb_array_elements.
+        whereClauses.push(`jsonb_typeof(data->'tool'->'steps') = 'array'`);
+        whereClauses.push(`EXISTS (
           SELECT 1 FROM jsonb_array_elements(data->'tool'->'steps') AS step
-          WHERE step->'config'->>'systemId' = $${paramIndex}
-        )`;
-        queryParams.push(systemId);
+          WHERE step->'config'->>'systemId' = ${nextParam(systemId)}
+        )`);
       }
 
-      selectQuery +=
-        " ORDER BY started_at DESC LIMIT $" +
-        (queryParams.length + 1) +
-        " OFFSET $" +
-        (queryParams.length + 2);
-      queryParams.push(String(limit), String(offset));
+      const limitParam = nextParam(includeTotal ? limit : limit + 1);
+      const offsetParam = nextParam(offset);
+      const selectColumns = [
+        "id",
+        "config_id",
+        "data",
+        "started_at",
+        "completed_at",
+        "request_source",
+        "result_storage_uri",
+        "user_id",
+        "execution_mode",
+      ];
+      if (includeTotal) {
+        selectColumns.push("COUNT(*) OVER() as total_count");
+      }
+
+      const selectQuery = `
+                SELECT
+                    ${selectColumns.join(", ")}
+                FROM runs
+                WHERE ${whereClauses.join("\n                  AND ")}
+                ORDER BY started_at DESC
+                LIMIT ${limitParam}
+                OFFSET ${offsetParam}
+            `;
 
       const result = await client.query(selectQuery, queryParams);
 
-      const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
+      const pagedRows =
+        includeTotal || result.rows.length <= limit ? result.rows : result.rows.slice(0, limit);
+      const total = includeTotal
+        ? result.rows.length > 0
+          ? parseInt(result.rows[0].total_count)
+          : 0
+        : offset + pagedRows.length + (result.rows.length > limit ? 1 : 0);
 
-      const items = result.rows.map((row) =>
+      const items = pagedRows.map((row) =>
         extractRun(row.data, {
           id: row.id,
           config_id: row.config_id,
@@ -652,6 +833,7 @@ export class PostgresService implements DataStore {
           request_source: row.request_source,
           result_storage_uri: row.result_storage_uri,
           user_id: row.user_id,
+          execution_mode: row.execution_mode,
         }),
       );
 
@@ -669,8 +851,8 @@ export class PostgresService implements DataStore {
     try {
       const result = await client.query(
         `
-                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at, result_storage_uri, user_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                INSERT INTO runs (id, config_id, org_id, status, request_source, data, started_at, completed_at, result_storage_uri, user_id, execution_mode)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 ON CONFLICT (id, org_id) DO NOTHING
             `,
         [
@@ -684,6 +866,7 @@ export class PostgresService implements DataStore {
           run.metadata.completedAt ?? null,
           null, // Storage URI will be set later if enabled
           run.userId ?? null,
+          run.executionMode ?? null,
         ],
       );
 
@@ -784,7 +967,7 @@ export class PostgresService implements DataStore {
         [orgId],
       );
 
-      const validSources = ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook"];
+      const validSources = ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook", "cli"];
       const runsTotal: PrometheusRunMetrics["runsTotal"] = totals.rows
         .map((r: any) => {
           const status = String(r.status || "").toLowerCase() as PrometheusRunStatusLabel;
@@ -830,9 +1013,14 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async getWorkflow(params: { id: string; orgId?: string }): Promise<Tool | null> {
-    const { id, orgId } = params;
-    const workflow = await this.getWorkflowConfig(id, orgId);
+  async getWorkflow(params: {
+    id: string;
+    orgId?: string;
+    includeArchived?: boolean;
+  }): Promise<Tool | null> {
+    const { id, orgId, includeArchived = true } = params;
+    const validOrgId = this.requireOrgId(orgId, "getWorkflow");
+    const workflow = await this.getWorkflowConfig(id, validOrgId, includeArchived);
     return workflow ? normalizeTool(workflow) : null;
   }
 
@@ -840,9 +1028,11 @@ export class PostgresService implements DataStore {
     limit?: number;
     offset?: number;
     orgId?: string;
+    includeArchived?: boolean;
   }): Promise<{ items: Tool[]; total: number }> {
-    const { limit = 10, offset = 0, orgId } = params || {};
-    const result = await this.listWorkflowConfigs(limit, offset, orgId);
+    const { limit = 10, offset = 0, orgId, includeArchived = false } = params || {};
+    const validOrgId = this.requireOrgId(orgId, "listWorkflows");
+    const result = await this.listWorkflowConfigs(limit, offset, validOrgId, includeArchived);
     return { items: result.items.map(normalizeTool), total: result.total };
   }
 
@@ -852,8 +1042,9 @@ export class PostgresService implements DataStore {
     orgId?: string;
     userId?: string;
   }): Promise<Tool> {
-    const { id, workflow, orgId = "", userId } = params;
+    const { id, workflow, orgId, userId } = params;
     if (!id || !workflow) return null;
+    const validOrgId = this.requireOrgId(orgId, "upsertWorkflow");
 
     const client = await this.pool.connect();
     try {
@@ -862,7 +1053,7 @@ export class PostgresService implements DataStore {
       // Check if tool already exists - if so, archive current version
       const existingResult = await client.query(
         "SELECT data FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
-        [id, "workflow", orgId],
+        [id, "workflow", validOrgId],
       );
 
       if (existingResult.rows.length > 0) {
@@ -876,7 +1067,7 @@ export class PostgresService implements DataStore {
           // Get next version number
           const versionResult = await client.query(
             "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM tool_history WHERE tool_id = $1 AND org_id = $2",
-            [id, orgId],
+            [id, validOrgId],
           );
           const nextVersion = versionResult.rows[0].next_version;
 
@@ -884,7 +1075,13 @@ export class PostgresService implements DataStore {
           await client.query(
             `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id)
              VALUES ($1, $2, $3, $4, $5)`,
-            [id, orgId, nextVersion, JSON.stringify(normalizeTool(existingTool)), userId || null],
+            [
+              id,
+              validOrgId,
+              nextVersion,
+              JSON.stringify(normalizeTool(existingTool)),
+              userId || null,
+            ],
           );
         }
       }
@@ -896,7 +1093,7 @@ export class PostgresService implements DataStore {
          VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
          ON CONFLICT (id, type, org_id) 
          DO UPDATE SET data = $5, version = $4, integration_ids = $6, updated_at = CURRENT_TIMESTAMP`,
-        [id, orgId, "workflow", version, JSON.stringify(workflow), []],
+        [id, validOrgId, "workflow", version, JSON.stringify(workflow), []],
       );
 
       await client.query("COMMIT");
@@ -911,11 +1108,13 @@ export class PostgresService implements DataStore {
 
   async deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean> {
     const { id, orgId } = params;
-    return this.deleteWorkflowConfig(id, orgId);
+    const validOrgId = this.requireOrgId(orgId, "deleteWorkflow");
+    return this.deleteWorkflowConfig(id, validOrgId);
   }
 
   async renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool> {
-    const { oldId, newId, orgId = "" } = params;
+    const { oldId, newId, orgId } = params;
+    const validOrgId = this.requireOrgId(orgId, "renameWorkflow");
     const client = await this.pool.connect();
 
     try {
@@ -924,7 +1123,7 @@ export class PostgresService implements DataStore {
       // 1. Check if newId already exists
       const existingCheck = await client.query(
         "SELECT id FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
-        [newId, "workflow", orgId],
+        [newId, "workflow", validOrgId],
       );
 
       if (existingCheck.rows.length > 0) {
@@ -934,7 +1133,7 @@ export class PostgresService implements DataStore {
       // 2. Get old workflow
       const oldWorkflowResult = await client.query(
         "SELECT data FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
-        [oldId, "workflow", orgId],
+        [oldId, "workflow", validOrgId],
       );
 
       if (oldWorkflowResult.rows.length === 0) {
@@ -957,7 +1156,7 @@ export class PostgresService implements DataStore {
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           newId,
-          orgId,
+          validOrgId,
           "workflow",
           newWorkflow.version || null,
           newWorkflow,
@@ -972,20 +1171,20 @@ export class PostgresService implements DataStore {
         `UPDATE workflow_schedules 
                  SET workflow_id = $1, updated_at = CURRENT_TIMESTAMP 
                  WHERE workflow_id = $2 AND workflow_type = 'workflow' AND org_id = $3`,
-        [newId, oldId, orgId],
+        [newId, oldId, validOrgId],
       );
 
       // 5. Migrate tool_history to new tool_id
       await client.query(
         `UPDATE tool_history SET tool_id = $1 WHERE tool_id = $2 AND org_id = $3`,
-        [newId, oldId, orgId],
+        [newId, oldId, validOrgId],
       );
 
       // 6. Delete old workflow
       await client.query("DELETE FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3", [
         oldId,
         "workflow",
-        orgId,
+        validOrgId,
       ]);
 
       await client.query("COMMIT");
@@ -1101,11 +1300,11 @@ export class PostgresService implements DataStore {
 
       if (params.toolId) {
         query =
-          "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2";
+          "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_by_user_id, created_at, updated_at FROM workflow_schedules WHERE workflow_id = $1 AND org_id = $2";
         queryParams = [params.toolId, params.orgId];
       } else {
         query =
-          "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE org_id = $1";
+          "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_by_user_id, created_at, updated_at FROM workflow_schedules WHERE org_id = $1";
         queryParams = [params.orgId];
       }
 
@@ -1126,7 +1325,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const query =
-        "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2";
+        "SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_by_user_id, created_at, updated_at FROM workflow_schedules WHERE id = $1 AND org_id = $2";
 
       const queryResult = await client.query(query, [id, orgId || ""]);
       if (!queryResult.rows[0]) {
@@ -1143,8 +1342,8 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const query = `
-                INSERT INTO workflow_schedules (id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+                INSERT INTO workflow_schedules (id, org_id, workflow_id, workflow_type, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_by_user_id, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
                 ON CONFLICT (id, org_id)
                 DO UPDATE SET 
                     cron_expression = $5,
@@ -1169,6 +1368,7 @@ export class PostgresService implements DataStore {
         JSON.stringify(schedule.options),
         schedule.lastRunAt ? schedule.lastRunAt.toISOString() : null,
         schedule.nextRunAt ? schedule.nextRunAt.toISOString() : null,
+        schedule.createdByUserId || null,
       ]);
     } finally {
       client.release();
@@ -1193,7 +1393,7 @@ export class PostgresService implements DataStore {
 
     // We check for schedules that are enabled and have a next run time that is in the past (all timestamps in the database are in UTC)
     try {
-      const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP at time zone 'utc'`;
+      const query = `SELECT id, org_id, workflow_id, cron_expression, timezone, enabled, payload, options, last_run_at, next_run_at, created_by_user_id, created_at, updated_at FROM workflow_schedules WHERE enabled = true AND next_run_at <= CURRENT_TIMESTAMP at time zone 'utc'`;
       const queryResult = await client.query(query);
 
       return queryResult.rows.map(this.mapToolSchedule);
@@ -1209,8 +1409,13 @@ export class PostgresService implements DataStore {
   }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
-      const query =
-        "UPDATE workflow_schedules SET next_run_at = $1, last_run_at = $2 WHERE id = $3";
+      const query = `
+        UPDATE workflow_schedules
+        SET next_run_at = $1, last_run_at = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+          AND enabled = true
+          AND next_run_at <= CURRENT_TIMESTAMP
+      `;
       const result = await client.query(query, [
         params.nextRunAt ? params.nextRunAt.toISOString() : null,
         params.lastRunAt ? params.lastRunAt.toISOString() : null,
@@ -1232,6 +1437,7 @@ export class PostgresService implements DataStore {
       enabled: row.enabled,
       payload: row.payload,
       options: row.options,
+      createdByUserId: row.created_by_user_id || undefined,
       lastRunAt: row.last_run_at,
       nextRunAt: row.next_run_at,
       createdAt: row.created_at,
@@ -1244,57 +1450,46 @@ export class PostgresService implements DataStore {
     id: string;
     includeDocs?: boolean;
     orgId?: string;
+    environment?: "dev" | "prod"; // If not specified, defaults to 'prod' (via ORDER BY environment DESC)
   }): Promise<System | null> {
-    const { id, includeDocs = true, orgId } = params;
+    const { id, includeDocs = true, orgId, environment } = params;
     if (!id) return null;
+    const validOrgId = this.requireOrgId(orgId, "getSystem");
     const client = await this.pool.connect();
     try {
       let query;
+      let queryParams: any[];
+
+      // Build environment condition
+      const envConditionWithAlias = environment ? "AND i.environment = $3" : "";
+      const envConditionNoAlias = environment ? "AND environment = $3" : "";
+      queryParams = environment ? [id, validOrgId, environment] : [id, validOrgId];
+
       if (includeDocs) {
-        query = `SELECT i.id, i.name, i.type, i.url, i.url_host, i.url_path, i.credentials, 
+        query = `SELECT i.id, i.name, i.type, i.url, i.url_host, i.url_path, i.credentials,
                         i.documentation_url, i.documentation_pending,
                         i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.multi_tenancy_mode, i.tunnel, i.version, i.created_at, i.updated_at,
+                        i.environment,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
-                 WHERE i.id = $1 AND i.org_id = $2`;
+                 WHERE i.id = $1 AND i.org_id = $2 ${envConditionWithAlias}
+                 ORDER BY i.environment DESC
+                 LIMIT 1`;
       } else {
-        query = `SELECT id, name, type, url, url_host, url_path, credentials, 
+        query = `SELECT id, name, type, url, url_host, url_path, credentials,
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at
-                 FROM integrations WHERE id = $1 AND org_id = $2`;
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at,
+                        environment
+                 FROM integrations WHERE id = $1 AND org_id = $2 ${envConditionNoAlias}
+                 ORDER BY environment DESC
+                 LIMIT 1`;
       }
 
-      const result = await client.query(query, [id, orgId || ""]);
+      const result = await client.query(query, queryParams);
       if (!result.rows[0]) return null;
 
-      const row = result.rows[0] as any;
-      const url = row.url || (row.url_host ? composeUrl(row.url_host, row.url_path || "") : "");
-      const system: System = {
-        id: row.id,
-        name: row.name,
-        type: row.type,
-        url,
-        credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
-        documentationUrl: row.documentation_url,
-        documentation: includeDocs ? row.documentation : undefined,
-        documentationPending: row.documentation_pending,
-        openApiUrl: row.open_api_url,
-        openApiSchema: includeDocs ? row.open_api_schema : undefined,
-        specificInstructions: row.specific_instructions,
-        documentationKeywords: row.documentation_keywords,
-        icon: row.icon,
-        metadata: row.metadata,
-        templateName: row.template_name,
-        documentationFiles: row.documentation_files || {},
-        multiTenancyMode: row.multi_tenancy_mode || "disabled",
-        tunnel: row.tunnel || undefined,
-        version: row.version,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      };
-
-      return system;
+      return this.mapRowToSystem(result.rows[0], includeDocs);
     } finally {
       client.release();
     }
@@ -1305,72 +1500,92 @@ export class PostgresService implements DataStore {
     offset?: number;
     includeDocs?: boolean;
     orgId?: string;
+    mode?: "dev" | "prod" | "all";
   }): Promise<{ items: System[]; total: number }> {
-    const { limit = 10, offset = 0, includeDocs = false, orgId } = params || {};
+    const { limit = 10, offset = 0, includeDocs = false, orgId, mode } = params || {};
+    const validOrgId = this.requireOrgId(orgId, "listSystems");
     const client = await this.pool.connect();
     try {
+      // Build WHERE clause based on mode
+      // With composite key model: systems are linked by having same id + different environment
+      let whereClause = "org_id = $1";
+      if (mode === "prod") {
+        // Prod mode: show prod systems + standalone dev systems (dev with no prod counterpart)
+        whereClause += ` AND (
+          environment = 'prod' 
+          OR (environment = 'dev' AND NOT EXISTS (
+            SELECT 1 FROM integrations prod 
+            WHERE prod.id = integrations.id 
+            AND prod.org_id = integrations.org_id 
+            AND prod.environment = 'prod'
+          ))
+        )`;
+      } else if (mode === "dev") {
+        // Dev mode: show dev systems + prod systems that don't have a linked dev
+        whereClause += ` AND (
+          environment = 'dev'
+          OR (
+            environment = 'prod'
+            AND NOT EXISTS (
+              SELECT 1 FROM integrations dev 
+              WHERE dev.id = integrations.id 
+              AND dev.org_id = integrations.org_id 
+              AND dev.environment = 'dev'
+            )
+          )
+        )`;
+      }
+      // mode === "all" or undefined: no additional filtering, return all systems
+
       const countResult = await client.query(
-        "SELECT COUNT(*) FROM integrations WHERE org_id = $1",
-        [orgId || ""],
+        `SELECT COUNT(*) FROM integrations WHERE ${whereClause}`,
+        [validOrgId],
       );
       const total = parseInt(countResult.rows[0].count);
 
       let query;
       if (includeDocs) {
-        query = `SELECT i.id, i.name, i.type, i.url, i.url_host, i.url_path, i.credentials, 
+        query = `SELECT i.id, i.name, i.type, i.url, i.url_host, i.url_path, i.credentials,
                         i.documentation_url, i.documentation_pending,
                         i.open_api_url, i.specific_instructions, i.documentation_keywords, i.icon, i.metadata, i.template_name, i.documentation_files, i.multi_tenancy_mode, i.tunnel, i.version, i.created_at, i.updated_at,
+                        i.environment,
                         d.documentation, d.open_api_schema
                  FROM integrations i
                  LEFT JOIN integration_details d ON i.id = d.integration_id AND i.org_id = d.org_id
-                 WHERE i.org_id = $1 
+                 WHERE i.${whereClause.replace(/integrations\./g, "i.")}
                  ORDER BY i.created_at DESC LIMIT $2 OFFSET $3`;
       } else {
-        query = `SELECT id, name, type, url, url_host, url_path, credentials, 
+        query = `SELECT id, name, type, url, url_host, url_path, credentials,
                         documentation_url, documentation_pending,
-                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at
-                 FROM integrations WHERE org_id = $1 
+                        open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at,
+                        environment
+                 FROM integrations WHERE ${whereClause}
                  ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
       }
 
-      const result = await client.query(query, [orgId || "", limit, offset]);
+      const result = await client.query(query, [validOrgId, limit, offset]);
 
-      const items = result.rows.map((row: any) => {
-        const system: System = {
-          id: row.id,
-          name: row.name,
-          type: row.type,
-          url: row.url || (row.url_host ? composeUrl(row.url_host, row.url_path || "") : ""),
-          credentials: row.credentials ? credentialEncryption.decrypt(row.credentials) : {},
-          documentationUrl: row.documentation_url,
-          documentation: includeDocs ? row.documentation : undefined,
-          documentationPending: row.documentation_pending,
-          openApiUrl: row.open_api_url,
-          openApiSchema: includeDocs ? row.open_api_schema : undefined,
-          specificInstructions: row.specific_instructions,
-          documentationKeywords: row.documentation_keywords,
-          icon: row.icon,
-          metadata: row.metadata,
-          templateName: row.template_name,
-          documentationFiles: row.documentation_files || {},
-          multiTenancyMode: row.multi_tenancy_mode || "disabled",
-          tunnel: row.tunnel || undefined,
-          version: row.version,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        };
-
-        return system;
-      });
+      const items = result.rows.map((row: any) => this.mapRowToSystem(row, includeDocs));
       return { items, total };
     } finally {
       client.release();
     }
   }
 
-  async upsertSystem(params: { id: string; system: System; orgId?: string }): Promise<System> {
+  async upsertSystem(params: {
+    id: string;
+    system: System;
+    orgId?: string;
+    environment?: "dev" | "prod";
+  }): Promise<System> {
     const { id, system, orgId } = params;
     if (!id || !system) return null;
+
+    // IMPORTANT: environment must be explicitly provided or taken from the system object.
+    // We cannot default to 'prod' because ON CONFLICT uses (id, environment, org_id).
+    // If caller wants to update a dev system but doesn't pass environment, we'd create a new prod system.
+    const environment = params.environment ?? system.environment ?? "prod";
+
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -1381,38 +1596,40 @@ export class PostgresService implements DataStore {
         : null;
 
       // Insert/update main system record (uses integrations table)
+      // ON CONFLICT uses the composite key (id, environment, org_id)
       await client.query(
         `
         INSERT INTO integrations (
-            id, org_id, name, type, url, credentials,
+            id, org_id, environment, name, type, url, credentials,
             documentation_url, documentation_pending,
             open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
         )
-        ON CONFLICT (id, org_id) 
+        ON CONFLICT (id, environment, org_id) 
         DO UPDATE SET 
-            name = $3,
-            type = $4,
-            url = $5,
-            credentials = $6,
-            documentation_url = $7,
-            documentation_pending = $8,
-            open_api_url = $9,
-            specific_instructions = $10,
-            documentation_keywords = $11,
-            icon = $12,
-            metadata = $13,
-            template_name = $14,
-            documentation_files = $15,
-            multi_tenancy_mode = $16,
-            tunnel = $17,
-            version = $18,
-            updated_at = $20
+            name = $4,
+            type = $5,
+            url = $6,
+            credentials = $7,
+            documentation_url = $8,
+            documentation_pending = $9,
+            open_api_url = $10,
+            specific_instructions = $11,
+            documentation_keywords = $12,
+            icon = $13,
+            metadata = $14,
+            template_name = $15,
+            documentation_files = $16,
+            multi_tenancy_mode = $17,
+            tunnel = $18,
+            version = $19,
+            updated_at = $21
       `,
         [
           id,
           orgId || "",
+          environment,
           system.name,
           system.type,
           system.url,
@@ -1434,7 +1651,7 @@ export class PostgresService implements DataStore {
         ],
       );
 
-      // Insert/update details if any large fields are provided
+      // Insert/update details if any large fields are provided (legacy - shared across environments)
       if (system.documentation || system.openApiSchema) {
         await client.query(
           `
@@ -1460,6 +1677,35 @@ export class PostgresService implements DataStore {
     }
   }
 
+  async updateSystemDocumentationFiles(params: {
+    id: string;
+    documentationFiles: DocumentationFiles;
+    orgId?: string;
+  }): Promise<void> {
+    const { id, documentationFiles, orgId } = params;
+    if (!id) throw new Error("System id is required");
+    const validOrgId = this.requireOrgId(orgId, "updateSystemDocumentationFiles");
+    await this.pool.query(
+      `UPDATE integrations SET documentation_files = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+      [JSON.stringify(documentationFiles), id, validOrgId],
+    );
+  }
+
+  async hasOtherSystemEnvironments(params: {
+    id: string;
+    excludeEnvironment: "dev" | "prod";
+    orgId?: string;
+  }): Promise<boolean> {
+    const { id, excludeEnvironment, orgId } = params;
+    if (!id) return false;
+    const validOrgId = this.requireOrgId(orgId, "hasOtherSystemEnvironments");
+    const result = await this.pool.query(
+      `SELECT 1 FROM integrations WHERE id = $1 AND org_id = $2 AND environment != $3 LIMIT 1`,
+      [id, validOrgId, excludeEnvironment],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async createSystem(params: { system: System; orgId?: string }): Promise<System> {
     const { system, orgId } = params;
     if (!system?.id) throw new Error("System id is required");
@@ -1474,17 +1720,19 @@ export class PostgresService implements DataStore {
       const result = await client.query(
         `
         INSERT INTO integrations (
-            id, org_id, name, type, url, credentials,
+            id, org_id, environment, name, type, url, credentials,
             documentation_url, documentation_pending,
-            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version, created_at, updated_at
+            open_api_url, specific_instructions, documentation_keywords, icon, metadata, template_name, documentation_files, multi_tenancy_mode, tunnel, version,
+            created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
         )
         RETURNING id
       `,
         [
           system.id,
           orgId || "",
+          system.environment || "prod",
           system.name,
           system.type,
           system.url,
@@ -1510,12 +1758,16 @@ export class PostgresService implements DataStore {
         throw new Error("Failed to create system");
       }
 
+      // Insert details if any large fields are provided (legacy - shared across environments)
       if (system.documentation || system.openApiSchema) {
         await client.query(
           `
             INSERT INTO integration_details (
                 integration_id, org_id, documentation, open_api_schema
             ) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (integration_id, org_id) DO UPDATE SET
+                documentation = COALESCE($3, integration_details.documentation),
+                open_api_schema = COALESCE($4, integration_details.open_api_schema)
           `,
           [system.id, orgId || "", system.documentation, system.openApiSchema],
         );
@@ -1538,8 +1790,9 @@ export class PostgresService implements DataStore {
     id: string;
     system: Partial<System>;
     orgId?: string;
+    environment?: "dev" | "prod"; // Which environment version to update
   }): Promise<System | null> {
-    const { id, system, orgId } = params;
+    const { id, system, orgId, environment } = params;
     if (!id) throw new Error("System id is required");
     const client = await this.pool.connect();
     try {
@@ -1548,6 +1801,35 @@ export class PostgresService implements DataStore {
       const encryptedCredentials = system.credentials
         ? credentialEncryption.encrypt(system.credentials)
         : null;
+
+      // Build query with parameterized environment condition (avoid SQL injection)
+      const queryParams: any[] = [
+        id,
+        orgId || "",
+        system.name,
+        system.type,
+        system.url,
+        encryptedCredentials,
+        system.documentationUrl,
+        system.documentationPending,
+        system.openApiUrl,
+        system.specificInstructions,
+        system.documentationKeywords,
+        system.icon,
+        system.metadata ? JSON.stringify(system.metadata) : null,
+        system.templateName,
+        system.documentationFiles ? JSON.stringify(system.documentationFiles) : null,
+        system.multiTenancyMode,
+        system.tunnel ? JSON.stringify(system.tunnel) : null,
+        system.version,
+        new Date(),
+      ];
+
+      let envCondition = "";
+      if (environment) {
+        queryParams.push(environment);
+        envCondition = `AND environment = $${queryParams.length}`;
+      }
 
       const result = await client.query(
         `
@@ -1569,30 +1851,10 @@ export class PostgresService implements DataStore {
             tunnel = COALESCE($17, tunnel),
             version = COALESCE($18, version),
             updated_at = $19
-        WHERE id = $1 AND org_id = $2
+        WHERE id = $1 AND org_id = $2 ${envCondition}
         RETURNING *
       `,
-        [
-          id,
-          orgId || "",
-          system.name,
-          system.type,
-          system.url,
-          encryptedCredentials,
-          system.documentationUrl,
-          system.documentationPending,
-          system.openApiUrl,
-          system.specificInstructions,
-          system.documentationKeywords,
-          system.icon,
-          system.metadata ? JSON.stringify(system.metadata) : null,
-          system.templateName,
-          system.documentationFiles ? JSON.stringify(system.documentationFiles) : null,
-          system.multiTenancyMode,
-          system.tunnel ? JSON.stringify(system.tunnel) : null,
-          system.version,
-          new Date(),
-        ],
+        queryParams,
       );
 
       if (result.rowCount === 0) {
@@ -1600,6 +1862,9 @@ export class PostgresService implements DataStore {
         return null;
       }
 
+      const row = result.rows[0];
+
+      // Update details if any large fields are provided (legacy - shared across environments)
       if (system.documentation || system.openApiSchema) {
         await client.query(
           `
@@ -1617,32 +1882,7 @@ export class PostgresService implements DataStore {
 
       await client.query("COMMIT");
 
-      const row = result.rows[0];
-      const decryptedCredentials = row.credentials
-        ? credentialEncryption.decrypt(row.credentials)
-        : {};
-
-      return {
-        id: row.id,
-        name: row.name,
-        type: row.type,
-        url: row.url || (row.url_host ? composeUrl(row.url_host, row.url_path || "") : ""),
-        credentials: decryptedCredentials,
-        documentationUrl: row.documentation_url,
-        documentationPending: row.documentation_pending,
-        openApiUrl: row.open_api_url,
-        specificInstructions: row.specific_instructions,
-        documentationKeywords: row.documentation_keywords,
-        icon: row.icon,
-        metadata: row.metadata,
-        templateName: row.template_name,
-        documentationFiles: row.documentation_files,
-        multiTenancyMode: row.multi_tenancy_mode || "disabled",
-        tunnel: row.tunnel || undefined,
-        version: row.version,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      };
+      return this.mapRowToSystem(row, false);
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -1651,23 +1891,80 @@ export class PostgresService implements DataStore {
     }
   }
 
-  async deleteSystem(params: { id: string; orgId?: string }): Promise<boolean> {
-    const { id, orgId } = params;
+  async deleteSystem(params: {
+    id: string;
+    orgId?: string;
+    environment?: "dev" | "prod";
+  }): Promise<boolean> {
+    const { id, orgId, environment } = params;
     if (!id) return false;
+    const validOrgId = this.requireOrgId(orgId, "deleteSystem");
     const client = await this.pool.connect();
     try {
-      // Delete integration_details first due to foreign key constraint
-      await client.query(
-        "DELETE FROM integration_details WHERE integration_id = $1 AND org_id = $2",
-        [id, orgId || ""],
+      // Build parameterized query (avoid SQL injection)
+      const queryParams: any[] = [id, validOrgId];
+      let envCondition = "";
+      if (environment) {
+        queryParams.push(environment);
+        envCondition = `AND environment = $${queryParams.length}`;
+      }
+
+      // Delete the system (from integrations table)
+      const result = await client.query(
+        `DELETE FROM integrations WHERE id = $1 AND org_id = $2 ${envCondition}`,
+        queryParams,
       );
 
-      // Then delete the system (from integrations table)
-      const result = await client.query("DELETE FROM integrations WHERE id = $1 AND org_id = $2", [
-        id,
-        orgId || "",
-      ]);
+      // Only delete integration_details (legacy docs) if no more systems with this id exist
+      // This is because documentation is shared across environments
+      if (!environment) {
+        // Deleting all environments - safe to delete details
+        await client.query(
+          `DELETE FROM integration_details WHERE integration_id = $1 AND org_id = $2`,
+          [id, validOrgId],
+        );
+      } else {
+        // Check if any systems with this id still exist
+        const remaining = await client.query(
+          `SELECT 1 FROM integrations WHERE id = $1 AND org_id = $2 LIMIT 1`,
+          [id, validOrgId],
+        );
+        if (remaining.rowCount === 0) {
+          // No more systems with this id - safe to delete details
+          await client.query(
+            `DELETE FROM integration_details WHERE integration_id = $1 AND org_id = $2`,
+            [id, validOrgId],
+          );
+        }
+      }
+
       return result.rowCount > 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  async hasLinkedNonProdSystems(params: { orgId?: string }): Promise<boolean> {
+    const { orgId } = params;
+    const validOrgId = this.requireOrgId(orgId, "hasLinkedNonProdSystems");
+    const client = await this.pool.connect();
+    try {
+      // Check if there are any systems with both dev and prod environments (same id, different environment)
+      const result = await client.query(
+        `SELECT EXISTS(
+          SELECT 1 FROM integrations dev
+          WHERE dev.org_id = $1 
+          AND dev.environment = 'dev'
+          AND EXISTS (
+            SELECT 1 FROM integrations prod
+            WHERE prod.id = dev.id
+            AND prod.org_id = dev.org_id
+            AND prod.environment = 'prod'
+          )
+        ) as has_linked`,
+        [validOrgId],
+      );
+      return result.rows[0]?.has_linked || false;
     } finally {
       client.release();
     }
@@ -1680,12 +1977,13 @@ export class PostgresService implements DataStore {
   }): Promise<boolean> {
     const { templateId, userSystemId, orgId } = params;
     if (!templateId || !userSystemId) return false;
+    const validOrgId = this.requireOrgId(orgId, "copyTemplateDocumentationToUserSystem");
     const client = await this.pool.connect();
     try {
       // Copy the template documentation (identified by the org_id == 'template') to the user system
       const result = await client.query(
         "INSERT INTO integration_details (integration_id, org_id, documentation, open_api_schema) SELECT $1::text, $2::text, documentation, open_api_schema FROM integration_details WHERE integration_id = $3 AND org_id = $4",
-        [userSystemId, orgId || "", templateId, "template"],
+        [userSystemId, validOrgId, templateId, "template"],
       );
       // return true, if we inserted at least one row
       return result.rowCount > 0;
@@ -1806,6 +2104,7 @@ export class PostgresService implements DataStore {
 
   async cacheOAuthSecret(params: {
     uid: string;
+    orgId: string;
     clientId: string;
     clientSecret: string;
     ttlMs: number;
@@ -1817,13 +2116,14 @@ export class PostgresService implements DataStore {
       const encryptedSecret = encrypted?.secret || params.clientSecret;
 
       await client.query(
-        `INSERT INTO integration_oauth (uid, client_id, client_secret, expires_at)
-                 VALUES ($1, $2, $3, $4)
+        `INSERT INTO integration_oauth (uid, org_id, client_id, client_secret, expires_at)
+                 VALUES ($1, $2, $3, $4, $5)
                  ON CONFLICT (uid) DO UPDATE SET
+                    org_id = EXCLUDED.org_id,
                     client_id = EXCLUDED.client_id,
                     client_secret = EXCLUDED.client_secret,
                     expires_at = EXCLUDED.expires_at`,
-        [params.uid, params.clientId, encryptedSecret, expiresAt],
+        [params.uid, params.orgId, params.clientId, encryptedSecret, expiresAt],
       );
     } finally {
       client.release();
@@ -1832,14 +2132,15 @@ export class PostgresService implements DataStore {
 
   async getOAuthSecret(params: {
     uid: string;
+    orgId: string;
   }): Promise<{ clientId: string; clientSecret: string } | null> {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
         `SELECT client_id, client_secret, expires_at
                  FROM integration_oauth
-                 WHERE uid = $1`,
-        [params.uid],
+                 WHERE uid = $1 AND org_id = $2`,
+        [params.uid, params.orgId],
       );
 
       if (result.rows.length === 0) {
@@ -1849,11 +2150,17 @@ export class PostgresService implements DataStore {
       const row = result.rows[0];
 
       if (new Date(row.expires_at) <= new Date()) {
-        await client.query("DELETE FROM integration_oauth WHERE uid = $1", [params.uid]);
+        await client.query("DELETE FROM integration_oauth WHERE uid = $1 AND org_id = $2", [
+          params.uid,
+          params.orgId,
+        ]);
         return null;
       }
 
-      await client.query("DELETE FROM integration_oauth WHERE uid = $1", [params.uid]);
+      await client.query("DELETE FROM integration_oauth WHERE uid = $1 AND org_id = $2", [
+        params.uid,
+        params.orgId,
+      ]);
       const decrypted = credentialEncryption.decrypt({ secret: row.client_secret });
 
       return {
@@ -2381,16 +2688,14 @@ export class PostgresService implements DataStore {
   }
 
   // API Key Methods
-  private mapApiKeyRow(row: any): ApiKeyRecord {
+  protected mapApiKeyRow(row: any): ApiKeyRecord {
     return {
       id: row.id,
       orgId: row.org_id,
       key: row.key,
-      userId: row.user_id || undefined,
-      createdByUserId: row.created_by_user_id || undefined,
-      mode: row.mode || "backend",
+      userId: row.user_id ?? "",
+      createdByUserId: row.created_by_user_id ?? "",
       isActive: row.is_active,
-      isRestricted: row.is_restricted || false,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
@@ -2401,7 +2706,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `SELECT id, org_id, key, user_id, created_by_user_id, mode, is_active, is_restricted, created_at, updated_at
+        `SELECT id, org_id, key, user_id, created_by_user_id, is_active, created_at, updated_at
          FROM api_keys WHERE org_id = $1 ORDER BY created_at DESC`,
         [orgId],
       );
@@ -2416,7 +2721,7 @@ export class PostgresService implements DataStore {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `SELECT id, org_id, key, user_id, created_by_user_id, mode, is_active, is_restricted, created_at, updated_at
+        `SELECT id, org_id, key, user_id, created_by_user_id, is_active, created_at, updated_at
          FROM api_keys WHERE key = $1`,
         [key],
       );
@@ -2428,22 +2733,15 @@ export class PostgresService implements DataStore {
   }
 
   async createApiKey(params: CreateApiKeyParams): Promise<ApiKeyRecord> {
-    const {
-      orgId,
-      createdByUserId,
-      isRestricted,
-      key = crypto.randomUUID().replace(/-/g, ""),
-      userId,
-      mode = "backend",
-    } = params;
+    const { orgId, createdByUserId, key = crypto.randomUUID().replace(/-/g, ""), userId } = params;
 
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO api_keys (org_id, key, user_id, created_by_user_id, mode, is_active, is_restricted)
-         VALUES ($1, $2, $3, $4, $5, true, $6)
-         RETURNING id, org_id, key, user_id, created_by_user_id, mode, is_active, is_restricted, created_at, updated_at`,
-        [orgId, key, userId || null, createdByUserId, mode, isRestricted],
+        `INSERT INTO api_keys (org_id, key, user_id, created_by_user_id, is_active)
+         VALUES ($1, $2, $3, $4, true)
+         RETURNING id, org_id, key, user_id, created_by_user_id, is_active, created_at, updated_at`,
+        [orgId, key, userId, createdByUserId],
       );
       return this.mapApiKeyRow(result.rows[0]);
     } finally {
@@ -2455,10 +2753,8 @@ export class PostgresService implements DataStore {
     id: string;
     orgId: string;
     isActive?: boolean;
-    isRestricted?: boolean;
-    userId?: string;
   }): Promise<ApiKeyRecord | null> {
-    const { id, orgId, isActive, isRestricted, userId } = params;
+    const { id, orgId, isActive } = params;
     const client = await this.pool.connect();
     try {
       const setClauses: string[] = ["updated_at = NOW()"];
@@ -2469,20 +2765,12 @@ export class PostgresService implements DataStore {
         setClauses.push(`is_active = $${paramCount++}`);
         values.push(isActive);
       }
-      if (isRestricted !== undefined) {
-        setClauses.push(`is_restricted = $${paramCount++}`);
-        values.push(isRestricted);
-      }
-      if (userId !== undefined) {
-        setClauses.push(`user_id = $${paramCount++}`);
-        values.push(userId);
-      }
 
       values.push(id, orgId);
 
       const result = await client.query(
         `UPDATE api_keys SET ${setClauses.join(", ")} WHERE id = $${paramCount++} AND org_id = $${paramCount++}
-         RETURNING id, org_id, key, user_id, created_by_user_id, mode, is_active, is_restricted, created_at, updated_at`,
+         RETURNING id, org_id, key, user_id, created_by_user_id, is_active, created_at, updated_at`,
         values,
       );
 

@@ -19,4 +19,5 @@ export { RawPageContentStrategy } from "./processing-raw-content.js";
 export { OpenApiLinkExtractorStrategy } from "./openapi-link-extractor.js";
 export { DirectOpenApiStrategy } from "./openapi-direct.js";
 export { SwaggerUIStrategy } from "./openapi-swaggerui.js";
+export { SwaggerHubStrategy } from "./openapi-swaggerhub.js";
 export { HtmlLinkExtractorStrategy } from "./openapi-html-link-extractor.js";

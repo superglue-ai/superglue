@@ -8,5 +8,5 @@
     }
   },
   "include": ["./**/*"],
-  "exclude": ["**/*.test.ts"]
+  "exclude": ["**/*.test.ts", "deno-runtime/**/*"]
 }

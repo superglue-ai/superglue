@@ -3,12 +3,14 @@ import {
   RequestSource,
   RunStatus,
   ServiceMetadata,
-  SuggestedTool,
   Tool,
   ToolResult,
   generateUniqueId,
   getToolSystemIds,
+  getBaseRoleId,
+  validateToolStructure,
 } from "@superglue/shared";
+import { JsonStreamStringify } from "json-stream-stringify";
 import { parseJSON } from "../files/index.js";
 import {
   executeTool,
@@ -16,15 +18,18 @@ import {
   ToolExecutionContext,
   ToolChainCallback,
 } from "../tools/tool-execution-service.js";
-import { ToolFinder } from "../tools/tool-finder.js";
 import { logMessage } from "../utils/logs.js";
+import { resolveUserEmailIfNeeded } from "../utils/user-lookup.js";
+import { applyResponseFilters } from "../tools/response-filters.js";
 import { filterToolsByPermissionAsync, checkToolExecutionPermissionAsync } from "./ee/index.js";
+import { isEEDataStore } from "../datastore/ee/types.js";
 import { registerApiModule } from "./registry.js";
 import {
   addTraceHeader,
   mapRunStatusToOpenAPI,
   normalizeSchema,
   parsePaginationParams,
+  resolveClientRequestSource,
   sendError,
 } from "./response-helpers.js";
 import type {
@@ -72,10 +77,11 @@ export function buildRunResponse(params: {
     toolPayload,
     data,
     error,
+    // Exclude step data to reduce response size (can be 2x-5x smaller)
+    // Full step results available via resultStorageUri if needed
     stepResults: stepResults?.map((sr) => ({
       stepId: sr.stepId,
       success: sr.success,
-      data: sr.data,
       error: sr.error,
     })),
     options: options as Record<string, unknown>,
@@ -102,17 +108,24 @@ function createToolChainCallback(
     resultData: unknown,
     credentials?: Record<string, string>,
     options?: RequestOptions,
+    mode?: "dev" | "prod",
   ) => {
     // Fire-and-forget chain execution
-    executeToolByIdAsync(authReq, chainToolId, resultData, credentials, options, metadata).catch(
-      (error) => {
-        logMessage(
-          "error",
-          `Tool chain execution failed for ${chainToolId}: ${error.message || String(error)}`,
-          metadata,
-        );
-      },
-    );
+    executeToolByIdAsync(
+      authReq,
+      chainToolId,
+      resultData,
+      credentials,
+      options,
+      metadata,
+      mode,
+    ).catch((error) => {
+      logMessage(
+        "error",
+        `Tool chain execution failed for ${chainToolId}: ${error.message || String(error)}`,
+        metadata,
+      );
+    });
   };
 }
 
@@ -127,6 +140,7 @@ async function executeToolByIdAsync(
   credentials: Record<string, string> | undefined,
   options: RequestOptions | undefined,
   metadata: ServiceMetadata,
+  mode?: "dev" | "prod",
 ): Promise<void> {
   const tool = await authReq.datastore.getWorkflow({
     id: toolId,
@@ -159,7 +173,7 @@ async function executeToolByIdAsync(
     requestSource: RequestSource.TOOL_CHAIN,
   };
 
-  // Execute with chain callback for nested chains
+  // Execute with chain callback for nested chains, propagating mode
   await executeToolAsync(ctx, {
     tool,
     payload: payload as Record<string, unknown>,
@@ -167,72 +181,49 @@ async function executeToolByIdAsync(
     requestOptions: options,
     userId: metadata.userId,
     onToolChain: createToolChainCallback(authReq, metadata),
+    mode,
   });
 }
 
 // GET /tools - List tools
 const listTools: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
-  const query = request.query as { page?: string; limit?: string };
+  const query = request.query as { page?: string; limit?: string; includeArchived?: string };
+  const includeArchived = query.includeArchived === "true";
 
   const { page, limit, offset } = parsePaginationParams(query);
 
-  const isRestricted = authReq.authInfo.isRestricted;
-  const endUserId = authReq.authInfo.isRestricted ? authReq.authInfo.userId : undefined;
-
-  // If restricted OR has endUserId (multi-tenancy), we need to filter
-  if (isRestricted || endUserId) {
-    // Fetch all tools for filtering
-    const result = await authReq.datastore.listWorkflows({
-      limit: 10000, // Fetch all
-      offset: 0,
-      orgId: authReq.authInfo.orgId,
-    });
-
-    // Apply consolidated permission filter (API key scopes + end-user scopes + multi-tenancy)
-    // Map tools to include computed systemIds
-    const toolsWithSystemIds = result.items.map((tool) => ({
-      ...tool,
-      systemIds: getToolSystemIds(tool),
-    }));
-    const filteredItems = await filterToolsByPermissionAsync(
-      {
-        isRestricted,
-        allowedSystems: authReq.authInfo.allowedSystems,
-        endUserId,
-        orgId: authReq.authInfo.orgId,
-        dataStore: authReq.datastore,
-      },
-      toolsWithSystemIds,
-    );
-
-    const total = filteredItems.length;
-    const paginatedItems = filteredItems.slice(offset, offset + limit);
-    const hasMore = offset + paginatedItems.length < total;
-
-    return addTraceHeader(reply, authReq.traceId).code(200).send({
-      data: paginatedItems,
-      page,
-      limit,
-      total,
-      hasMore,
-    });
-  }
-
-  // Unrestricted keys use normal pagination
   const result = await authReq.datastore.listWorkflows({
-    limit,
-    offset,
+    limit: 10000,
+    offset: 0,
     orgId: authReq.authInfo.orgId,
+    includeArchived,
   });
 
-  const hasMore = offset + result.items.length < result.total;
+  // Apply consolidated permission filter (API key scopes + RBAC + multi-tenancy)
+  const toolsWithSystemIds = result.items.map((tool) => ({
+    ...tool,
+    systemIds: getToolSystemIds(tool),
+  }));
+  const filteredItems = await filterToolsByPermissionAsync(
+    {
+      userId: authReq.authInfo.userId,
+      orgId: authReq.authInfo.orgId,
+      roles: authReq.authInfo.roles,
+      dataStore: authReq.datastore,
+    },
+    toolsWithSystemIds,
+  );
+
+  const total = filteredItems.length;
+  const paginatedItems = filteredItems.slice(offset, offset + limit);
+  const hasMore = offset + paginatedItems.length < total;
 
   return addTraceHeader(reply, authReq.traceId).code(200).send({
-    data: result.items,
+    data: paginatedItems,
     page,
     limit,
-    total: result.total,
+    total,
     hasMore,
   });
 };
@@ -261,23 +252,8 @@ const runTool: RouteHandler = async (request, reply) => {
   const body = request.body as RunToolRequestBody | undefined;
 
   const traceId = body?.options?.traceId || authReq.traceId;
-  const metadata: ServiceMetadata = {
-    orgId: authReq.authInfo.orgId,
-    traceId,
-    userId: authReq.authInfo.userId,
-    isRestricted: authReq.authInfo.isRestricted,
-  };
 
-  // Source attribution:
-  // - default: api (REST API calls are always API unless explicitly overridden)
-  // - frontend/mcp: only if client explicitly asks for it
-  // Note: userId presence doesn't indicate frontend - API keys can have associated users
-  let requestSource: RequestSource = RequestSource.API;
-  if (body?.options?.requestSource === RequestSource.MCP) {
-    requestSource = RequestSource.MCP;
-  } else if (body?.options?.requestSource === RequestSource.FRONTEND) {
-    requestSource = RequestSource.FRONTEND;
-  }
+  const requestSource = resolveClientRequestSource(body?.options?.requestSource);
 
   // Idempotency check
   if (body?.runId) {
@@ -302,10 +278,9 @@ const runTool: RouteHandler = async (request, reply) => {
   // EE: Check all permissions (API key scopes + end-user system scopes + multi-tenancy)
   const permCheck = await checkToolExecutionPermissionAsync(
     {
-      isRestricted: authReq.authInfo.isRestricted,
-      allowedSystems: authReq.authInfo.allowedSystems,
-      endUserId: authReq.authInfo.isRestricted ? authReq.authInfo.userId : undefined,
+      userId: authReq.authInfo.userId,
       orgId: authReq.authInfo.orgId,
+      roles: authReq.authInfo.roles,
       dataStore: authReq.datastore,
     },
     { id: tool.id, systemIds: getToolSystemIds(tool) },
@@ -326,6 +301,26 @@ const runTool: RouteHandler = async (request, reply) => {
     tool.outputSchema = parseJSON(tool.outputSchema);
   }
 
+  const toolValidation = validateToolStructure(tool);
+  if (toolValidation.valid === false) {
+    return sendError(reply, 400, toolValidation.error);
+  }
+
+  // Lazy resolve user email - only fetch if tool config references sg_auth_email
+  const userEmail = await resolveUserEmailIfNeeded({
+    toolConfig: tool,
+    userId: authReq.authInfo.userId,
+    existingEmail: authReq.authInfo.userEmail,
+  });
+
+  const metadata: ServiceMetadata = {
+    orgId: authReq.authInfo.orgId,
+    traceId,
+    userId: authReq.authInfo.userId,
+    userEmail,
+    roleIds: authReq.authInfo.roles.map((r) => r.id),
+  };
+
   const requestOptions: RequestOptions = {
     webhookUrl: body?.options?.webhookUrl,
     timeout: body?.options?.timeout,
@@ -341,7 +336,11 @@ const runTool: RouteHandler = async (request, reply) => {
   };
 
   const sendResponse = (statusCode: number, run: OpenAPIRun) => {
-    return addTraceHeader(reply, metadata.traceId).code(statusCode).send(run);
+    const jsonStream = new JsonStreamStringify(run);
+    addTraceHeader(reply, metadata.traceId)
+      .code(statusCode)
+      .header("Content-Type", "application/json");
+    return reply.send(jsonStream);
   };
 
   // Async execution - fire and forget, return 202 immediately
@@ -354,6 +353,7 @@ const runTool: RouteHandler = async (request, reply) => {
       runId: body?.runId,
       userId: metadata.userId,
       onToolChain: createToolChainCallback(authReq, metadata),
+      mode: body?.options?.mode || "prod",
     });
 
     (authReq as any)._telemetry = {
@@ -387,6 +387,7 @@ const runTool: RouteHandler = async (request, reply) => {
     runId: body?.runId,
     userId: metadata.userId,
     onToolChain: createToolChainCallback(authReq, metadata),
+    mode: body?.options?.mode || "prod",
   });
 
   const status = result.success ? RunStatus.SUCCESS : RunStatus.FAILED;
@@ -425,18 +426,20 @@ interface RunToolConfigRequestBody {
   credentials?: Record<string, unknown>;
   options?: {
     timeout?: number;
+    requestSource?: string;
   };
   runId?: string;
 }
 
-// POST /tools/run - Execute a tool by providing full config (no run record)
-// This endpoint is for SDK/playground testing - it doesn't create a run record
+// POST /tools/run - Execute a tool by providing full config
+// Creates a run record when ?createRun=true query param is passed
 const runToolConfig: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const body = request.body as RunToolConfigRequestBody;
+  const query = request.query as Record<string, string>;
 
   const traceId = authReq.traceId;
-  const metadata: ServiceMetadata = { orgId: authReq.authInfo.orgId, traceId };
+  const createRun = query.createRun === "true";
 
   if (!body?.tool) {
     return sendError(reply, 400, "Tool configuration is required");
@@ -448,7 +451,6 @@ const runToolConfig: RouteHandler = async (request, reply) => {
 
   const tool = body?.tool as Tool;
 
-  // Parse schemas if strings
   if (tool.inputSchema && typeof tool.inputSchema === "string") {
     tool.inputSchema = parseJSON(tool.inputSchema);
   }
@@ -456,28 +458,64 @@ const runToolConfig: RouteHandler = async (request, reply) => {
     tool.outputSchema = parseJSON(tool.outputSchema);
   }
 
-  // For non-run executions, prefix runId with orgId for abort tracking uniqueness
-  const clientRunId = body?.runId || crypto.randomUUID();
-  const internalRunId = `${authReq.authInfo.orgId}:${clientRunId}`;
+  if (createRun && body?.runId) {
+    const existingRun = await authReq.datastore.getRun({
+      id: body.runId,
+      orgId: authReq.authInfo.orgId,
+    });
+    if (existingRun) {
+      return sendError(reply, 409, `Run with id ${body.runId} already exists`);
+    }
+  }
 
-  // Build execution context
+  const clientRunId = body?.runId || crypto.randomUUID();
+  const internalRunId = createRun ? clientRunId : `${authReq.authInfo.orgId}:${clientRunId}`;
+
+  if (createRun && !tool.id) {
+    tool.id = `inline-${clientRunId}`;
+  }
+
+  const toolValidation = validateToolStructure(tool);
+  if (toolValidation.valid === false) {
+    return sendError(reply, 400, toolValidation.error);
+  }
+
+  // Lazy resolve user email - only fetch if tool config references sg_auth_email
+  const userEmail = await resolveUserEmailIfNeeded({
+    toolConfig: tool,
+    userId: authReq.authInfo.userId,
+    existingEmail: authReq.authInfo.userEmail,
+  });
+
+  const metadata: ServiceMetadata = {
+    orgId: authReq.authInfo.orgId,
+    traceId,
+    userEmail,
+    userId: authReq.authInfo.userId,
+    roleIds: authReq.authInfo.roles.map((r) => r.id),
+  };
+
+  const requestSource = resolveClientRequestSource(body?.options?.requestSource);
+
   const ctx: ToolExecutionContext = {
     datastore: authReq.datastore,
     workerPools: authReq.workerPools,
     orgId: authReq.authInfo.orgId,
     metadata,
-    requestSource: RequestSource.API,
+    requestSource,
   };
 
-  // Execute without creating a run record
   const result = await executeTool(ctx, {
     tool,
     payload: body?.payload || {},
     credentials: body?.credentials as Record<string, string> | undefined,
     requestOptions: { timeout: body?.options?.timeout },
-    createRun: false,
+    createRun,
     runId: internalRunId,
+    ...(createRun && { userId: metadata.userId }),
   });
+
+  const status = result.success ? RunStatus.SUCCESS : RunStatus.FAILED;
 
   (authReq as any)._telemetry = {
     toolSuccess: result.success,
@@ -485,24 +523,36 @@ const runToolConfig: RouteHandler = async (request, reply) => {
     requestSource: RequestSource.API,
   };
 
-  // Return the client-facing runId (without orgId prefix)
-  return addTraceHeader(reply, traceId)
-    .code(200)
-    .send({
-      runId: clientRunId,
-      success: result.success,
-      data: result.data,
-      error: result.error,
-      stepResults: result.stepResults,
-      tool: result.tool || tool,
-    });
+  const response = buildRunResponse({
+    runId: clientRunId,
+    tool: result.tool || tool,
+    status,
+    toolPayload: body?.payload,
+    data: result.data,
+    error: result.error,
+    stepResults: result.stepResults,
+    options: { timeout: body?.options?.timeout },
+    requestSource,
+    traceId,
+    startedAt: result.startedAt,
+    completedAt: result.completedAt,
+  });
+
+  // Use JsonStreamStringify to handle large payloads that exceed V8 string limits
+  const responsePayload = {
+    ...response,
+    success: result.success, // Deprecated: for backward compatibility with old CLI
+  };
+  const jsonStream = new JsonStreamStringify(responsePayload);
+  addTraceHeader(reply, traceId).code(200).header("Content-Type", "application/json");
+  return reply.send(jsonStream);
 };
 
 // Request body type for POST /tools (create)
 interface CreateToolRequestBody {
   id?: string;
   name?: string;
-  steps: Tool["steps"];
+  steps?: Tool["steps"];
   instruction?: string;
   inputSchema?: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
@@ -516,10 +566,6 @@ const createTool: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
   const body = request.body as CreateToolRequestBody;
   const metadata = authReq.toMetadata();
-
-  if (!body?.steps || !Array.isArray(body?.steps) || body?.steps.length === 0) {
-    return sendError(reply, 400, "Tool must have at least one step");
-  }
 
   const toolId = body?.id || crypto.randomUUID();
 
@@ -546,11 +592,27 @@ const createTool: RouteHandler = async (request, reply) => {
     archived: false,
   };
 
+  const toolValidation = validateToolStructure(tool);
+  if (toolValidation.valid === false) {
+    return sendError(reply, 400, toolValidation.error);
+  }
+
   const savedTool = await authReq.datastore.upsertWorkflow({
     id: toolId,
     workflow: tool,
     orgId: authReq.authInfo.orgId,
   });
+
+  if (isEEDataStore(authReq.datastore)) {
+    const baseRoleId = getBaseRoleId(authReq.authInfo.roles);
+    if (baseRoleId) {
+      await authReq.datastore.appendToolToRole({
+        roleId: baseRoleId,
+        toolId,
+        orgId: authReq.authInfo.orgId,
+      });
+    }
+  }
 
   logMessage("info", `Tool ${toolId} created`, metadata);
 
@@ -608,6 +670,11 @@ const updateTool: RouteHandler = async (request, reply) => {
       body?.responseFilters !== undefined ? body?.responseFilters : existingTool.responseFilters,
   };
 
+  const toolValidation = validateToolStructure(updatedTool);
+  if (toolValidation.valid === false) {
+    return sendError(reply, 400, toolValidation.error);
+  }
+
   const savedTool = await authReq.datastore.upsertWorkflow({
     id: params.toolId,
     workflow: updatedTool,
@@ -641,6 +708,13 @@ const deleteTool: RouteHandler = async (request, reply) => {
 
   if (!success) {
     return sendError(reply, 500, "Failed to delete tool");
+  }
+
+  if (isEEDataStore(authReq.datastore)) {
+    await authReq.datastore.removeToolFromRoles({
+      toolId: params.toolId,
+      orgId: authReq.authInfo.orgId,
+    });
   }
 
   logMessage("info", `Tool ${params.toolId} deleted`, metadata);
@@ -705,34 +779,17 @@ const renameTool: RouteHandler = async (request, reply) => {
     orgId: authReq.authInfo.orgId,
   });
 
+  if (isEEDataStore(authReq.datastore)) {
+    await authReq.datastore.renameToolInRoles({
+      oldToolId: params.toolId,
+      newToolId: body?.newId,
+      orgId: authReq.authInfo.orgId,
+    });
+  }
+
   logMessage("info", `Tool ${params.toolId} renamed to ${body?.newId}`, metadata);
 
   return addTraceHeader(reply, authReq.traceId).code(200).send(renamedTool);
-};
-
-// GET /tools/search - Search for relevant tools
-const searchTools: RouteHandler = async (request, reply) => {
-  const authReq = request as AuthenticatedFastifyRequest;
-  const query = request.query as { q?: string };
-  const metadata = authReq.toMetadata();
-
-  try {
-    const allTools = await authReq.datastore.listWorkflows({
-      limit: 1000,
-      offset: 0,
-      orgId: authReq.authInfo.orgId,
-    });
-
-    const tools = (allTools.items || []).filter((tool) => !tool.archived);
-
-    const finder = new ToolFinder(metadata);
-    const results: SuggestedTool[] = await finder.findTools(query.q, tools);
-
-    return addTraceHeader(reply, authReq.traceId).code(200).send({ data: results });
-  } catch (error) {
-    logMessage("error", `Error searching tools: ${String(error)}`, metadata);
-    return addTraceHeader(reply, authReq.traceId).code(200).send({ data: [] });
-  }
 };
 
 registerApiModule({
@@ -742,19 +799,17 @@ registerApiModule({
       method: "GET",
       path: "/tools",
       handler: listTools,
-      permissions: { type: "read", resource: "tool", allowRestricted: true },
+      permissions: {
+        type: "read",
+        resource: "tool",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "POST",
       path: "/tools",
       handler: createTool,
-      permissions: { type: "write", resource: "tool", allowRestricted: false },
-    },
-    {
-      method: "GET",
-      path: "/tools/search",
-      handler: searchTools,
-      permissions: { type: "read", resource: "tool", allowRestricted: false },
+      permissions: { type: "write", resource: "tool", allowedBaseRoles: ["admin", "member"] },
     },
     {
       method: "GET",
@@ -763,7 +818,7 @@ registerApiModule({
       permissions: {
         type: "read",
         resource: "tool",
-        allowRestricted: true,
+        allowedBaseRoles: ["admin", "member", "enduser"],
         checkResourceId: "toolId",
       },
     },
@@ -774,7 +829,7 @@ registerApiModule({
       permissions: {
         type: "write",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
         checkResourceId: "toolId",
       },
     },
@@ -785,7 +840,7 @@ registerApiModule({
       permissions: {
         type: "delete",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
         checkResourceId: "toolId",
       },
     },
@@ -796,7 +851,7 @@ registerApiModule({
       permissions: {
         type: "write",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
         checkResourceId: "toolId",
       },
     },
@@ -807,7 +862,7 @@ registerApiModule({
       permissions: {
         type: "execute",
         resource: "tool",
-        allowRestricted: false,
+        allowedBaseRoles: ["admin", "member"],
       },
     },
     {
@@ -817,7 +872,7 @@ registerApiModule({
       permissions: {
         type: "execute",
         resource: "tool",
-        allowRestricted: true,
+        allowedBaseRoles: ["admin", "member", "enduser"],
         checkResourceId: "toolId",
       },
     },

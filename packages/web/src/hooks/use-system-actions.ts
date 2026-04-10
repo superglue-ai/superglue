@@ -1,15 +1,15 @@
-import { useConfig } from "@/src/app/config-context";
 import { useToast } from "@/src/hooks/use-toast";
 import { createOAuthErrorHandler, triggerOAuthFlow } from "@/src/lib/oauth-utils";
 import type { System } from "@superglue/shared";
-import { SuperglueClient } from "@superglue/shared";
+import { useUpdateSystem } from "@/src/queries/systems";
 import { tokenRegistry } from "../lib/token-registry";
+import { useConfig } from "@/src/app/config-context";
 
 export function useSystemActions() {
   const config = useConfig();
   const { toast } = useToast();
+  const updateSystemMutation = useUpdateSystem();
 
-  // Helper function to clean system data for update
   const cleanSystemForInput = (system: System) => {
     return {
       id: system.id,
@@ -22,17 +22,12 @@ export function useSystemActions() {
   const saveSystem = async (system: System): Promise<System | null> => {
     try {
       if (system.id) {
-        // Simple save - always update mode for editing existing systems
         const cleanedSystem = cleanSystemForInput(system);
-
-        const client = new SuperglueClient({
-          endpoint: config.apiEndpoint,
-          apiKey: tokenRegistry.getToken(),
-          apiEndpoint: config.apiEndpoint,
+        const savedSystem = await updateSystemMutation.mutateAsync({
+          id: system.id,
+          input: cleanedSystem,
         });
-        const savedSystem = await client.updateSystem(system.id, cleanedSystem);
-
-        return savedSystem; // Return the saved system with correct ID
+        return savedSystem;
       }
       return null;
     } catch (error) {
@@ -42,7 +37,7 @@ export function useSystemActions() {
         description: "Failed to save system",
         variant: "destructive",
       });
-      throw error; // Re-throw so the form can handle the error
+      throw error;
     }
   };
 

@@ -1,5 +1,4 @@
-import { useConfig } from "@/src/app/config-context";
-import { useTools } from "@/src/app/tools-context";
+import { useTools, useUpsertTool } from "@/src/queries/tools";
 import { Button } from "@/src/components/ui/button";
 import {
   Dialog,
@@ -12,8 +11,7 @@ import {
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { isValidToolName, validateToolName } from "@/src/lib/client-utils";
-import { tokenRegistry } from "@/src/lib/token-registry";
-import { SuperglueClient, Tool } from "@superglue/shared";
+import { Tool } from "@superglue/shared";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -30,11 +28,10 @@ export function DuplicateToolDialog({
   onClose,
   onDuplicated,
 }: DuplicateToolDialogProps) {
-  const config = useConfig();
-  const { tools, refreshTools } = useTools();
+  const { tools } = useTools();
+  const upsertTool = useUpsertTool();
   const [duplicateToolName, setDuplicateToolName] = useState("");
   const [duplicateError, setDuplicateError] = useState("");
-  const [isDuplicating, setIsDuplicating] = useState(false);
 
   useEffect(() => {
     if (isOpen && tool) {
@@ -66,33 +63,20 @@ export function DuplicateToolDialog({
       return;
     }
 
-    try {
-      setIsDuplicating(true);
-      const superglueClient = new SuperglueClient({
-        endpoint: config.apiEndpoint,
-        apiKey: tokenRegistry.getToken(),
-        apiEndpoint: config.apiEndpoint,
-      });
-
-      const duplicatedTool: Tool = {
-        ...tool,
-        id: trimmedName,
-      };
-
-      await superglueClient.upsertWorkflow(trimmedName, duplicatedTool as any);
-
-      await refreshTools();
-      handleClose();
-
-      if (onDuplicated) {
-        onDuplicated(trimmedName);
-      }
-    } catch (error: any) {
-      console.error("Error duplicating tool:", error);
-      setDuplicateError(error.message || "Failed to duplicate tool");
-    } finally {
-      setIsDuplicating(false);
-    }
+    const duplicatedTool: Tool = { ...tool, id: trimmedName };
+    upsertTool.mutate(
+      { id: trimmedName, input: duplicatedTool },
+      {
+        onSuccess: () => {
+          handleClose();
+          onDuplicated?.(trimmedName);
+        },
+        onError: (error: any) => {
+          console.error("Error duplicating tool:", error);
+          setDuplicateError(error.message || "Failed to duplicate tool");
+        },
+      },
+    );
   };
 
   return (
@@ -101,7 +85,7 @@ export function DuplicateToolDialog({
         onKeyDown={(e) => {
           if (
             e.key === "Enter" &&
-            !isDuplicating &&
+            !upsertTool.isPending &&
             (e.target as HTMLElement).tagName !== "BUTTON"
           ) {
             e.preventDefault();
@@ -127,17 +111,17 @@ export function DuplicateToolDialog({
                 }
               }}
               placeholder="Enter tool name"
-              disabled={isDuplicating}
+              disabled={upsertTool.isPending}
             />
             {duplicateError && <p className="text-sm text-red-500">{duplicateError}</p>}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isDuplicating}>
+          <Button variant="outline" onClick={handleClose} disabled={upsertTool.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleDuplicateConfirm} disabled={isDuplicating}>
-            {isDuplicating ? (
+          <Button onClick={handleDuplicateConfirm} disabled={upsertTool.isPending}>
+            {upsertTool.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Duplicating...

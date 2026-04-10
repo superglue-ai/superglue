@@ -1,20 +1,19 @@
-import { WorkerPool } from "./worker-pool.js";
-import { Tool, RequestOptions, ToolStepResult, System } from "@superglue/shared";
+import {
+  Tool,
+  RequestOptions,
+  ToolStepResult,
+  System,
+  Role,
+  RequestSource,
+} from "@superglue/shared";
+import type { TunnelPortMappings } from "../tunnel/index.js";
+import type { DenoProcessPool } from "../deno/index.js";
 
 export interface WorkerPools {
-  toolExecution: WorkerPool<ToolExecutionPayload, ToolExecutionResult>;
+  /** Deno subprocess pool for tool execution */
+  toolExecution: DenoProcessPool;
 }
 
-export interface WorkerTask<Payload, Result> {
-  run(payload: Payload): Promise<Result>;
-}
-
-export type WorkerMessageHandler<T = any> = (message: T) => void | Promise<void>;
-export interface WorkerPoolOptions {
-  concurrency: number;
-  memoryMb?: number;
-  messageHandlers?: Record<string, WorkerMessageHandler>;
-}
 export interface ToolExecutionPayload {
   runId: string;
   workflow: Tool;
@@ -24,7 +23,14 @@ export interface ToolExecutionPayload {
   systems: System[];
   orgId: string;
   traceId?: string;
+  userEmail?: string;
+  tunnelMappings?: TunnelPortMappings;
+  /** Pre-resolved user roles for request-level access rule evaluation in worker */
+  userRoles: Role[];
+  /** Where this execution originated from, used for source-scoped access rules */
+  requestSource?: RequestSource;
 }
+
 export interface ToolExecutionResult {
   runId: string;
   success: boolean;
@@ -35,6 +41,7 @@ export interface ToolExecutionResult {
   startedAt: Date;
   completedAt: Date;
 }
+
 export interface CredentialUpdateMessage {
   systemId: string;
   orgId: string;

@@ -1,8 +1,9 @@
 "use client";
 
 import { ErrorMessage } from "@/src/components/ui/error-message";
+import { JsonEditor } from "@/src/components/editors/JsonEditor";
 import { ToolCall, Tool } from "@superglue/shared";
-import { Play } from "lucide-react";
+import { FilePlay, Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ToolCallToolDisplay } from "./ToolComponentDisplay";
 import { ToolCallPendingState } from "./ToolCallPendingState";
@@ -14,13 +15,19 @@ interface RunToolComponentProps {
   isPlayground?: boolean;
 }
 
+function toolFromSummary(summary: any): Partial<Tool> {
+  return {
+    id: summary.id,
+    outputTransform: summary.hasOutputTransform ? "true" : undefined,
+    steps: (summary.steps || []).map((s: any) => ({
+      id: s.id,
+      config: { type: s.type, ...(s.systemId ? { systemId: s.systemId } : {}) },
+    })),
+  };
+}
+
 export function RunToolComponent({ tool }: RunToolComponentProps) {
   const [currentConfig, setCurrentConfig] = useState<Tool | null>(null);
-  const [runResult, setRunResult] = useState<{
-    success: boolean;
-    data?: any;
-    error?: string;
-  } | null>(null);
 
   const displayInstruction = tool.input?.instruction;
 
@@ -41,14 +48,17 @@ export function RunToolComponent({ tool }: RunToolComponentProps) {
     if (parsedOutput?.config && (tool.status === "completed" || tool.status === "error")) {
       setCurrentConfig(parsedOutput.config);
     }
-    if (tool.status === "completed" && parsedOutput) {
-      setRunResult({
-        success: parsedOutput.success,
-        data: parsedOutput.data,
-        error: parsedOutput.error,
-      });
-    }
   }, [parsedOutput, tool.status]);
+
+  const displayTool =
+    currentConfig ?? (parsedOutput?.toolSummary ? toolFromSummary(parsedOutput.toolSummary) : null);
+
+  const resultData = parsedOutput?.data;
+  const resultDisplayHeight = useMemo(() => {
+    if (!resultData) return "150px";
+    const json = JSON.stringify(resultData, null, 2);
+    return `${Math.min(Math.max(json.split("\n").length * 18 + 24, 60), 200)}px`;
+  }, [resultData]);
 
   return (
     <ToolCallWrapper tool={tool} openByDefault={true} hideStatusIcon={isToolPending}>
@@ -74,29 +84,58 @@ export function RunToolComponent({ tool }: RunToolComponentProps) {
           </ToolCallPendingState>
         )}
 
-        {tool.status === "completed" && isSuccess && currentConfig && (
-          <ToolCallToolDisplay
-            toolId={currentConfig.id}
-            tool={currentConfig}
-            payload={tool.input?.payload}
-            output={runResult?.success ? runResult.data : undefined}
-            showOutput={!!runResult?.success}
-            showToolSteps={true}
-            showPayload={true}
-          />
+        {tool.status === "completed" && isSuccess && (
+          <>
+            {displayTool && (
+              <ToolCallToolDisplay
+                toolId={displayTool.id}
+                tool={displayTool as Tool}
+                payload={tool.input?.payload}
+                showOutput={false}
+                showToolSteps={true}
+                showPayload={true}
+              />
+            )}
+
+            {resultData && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <FilePlay className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">Tool Output</span>
+                </div>
+                <JsonEditor
+                  value={JSON.stringify(resultData, null, 2)}
+                  readOnly
+                  maxHeight={resultDisplayHeight}
+                  tableEnabled
+                  defaultView="table"
+                />
+              </div>
+            )}
+          </>
         )}
 
         {(tool.status === "error" || (tool.status === "completed" && !isSuccess)) && (
           <div className="space-y-3">
-            {(parsedOutput?.config || currentConfig) && (
+            {displayTool && (
               <ToolCallToolDisplay
-                toolId={(parsedOutput?.config || currentConfig)?.id}
-                tool={parsedOutput?.config || currentConfig}
+                toolId={displayTool.id}
+                tool={displayTool as Tool}
                 payload={tool.input?.payload}
                 error={parsedOutput?.error || tool.error}
                 showOutput={false}
                 showToolSteps={true}
                 showPayload={true}
+              />
+            )}
+            {!displayTool && (parsedOutput?.error || tool.error) && (
+              <ErrorMessage
+                title="Execution failed"
+                message={
+                  typeof (parsedOutput?.error || tool.error) === "string"
+                    ? parsedOutput?.error || tool.error
+                    : JSON.stringify(parsedOutput?.error || tool.error, null, 2)
+                }
               />
             )}
             {parsedOutput?.inputSchema?.required && (

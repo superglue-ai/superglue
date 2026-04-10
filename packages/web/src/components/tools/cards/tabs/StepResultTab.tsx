@@ -1,13 +1,9 @@
-import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { DownloadButton } from "../../shared/download-button";
 import { isEmptyData } from "@/src/lib/general-utils";
 import { formatBytes } from "@/src/lib/file-utils";
 import { Loader2, OctagonX, X } from "lucide-react";
-import { useState } from "react";
-import { JsonCodeEditor } from "../../../editors/JsonCodeEditor";
+import { JsonEditor } from "../../../editors/JsonEditor";
 import { useDataProcessor } from "../../hooks/use-data-processor";
 import { useExecution } from "../../context";
-import { CopyButton } from "../../shared/CopyButton";
 import { isAbortError } from "@/src/lib/general-utils";
 
 interface StepResultTabProps {
@@ -29,16 +25,8 @@ export function StepResultTab({
   const stepResult = getStepResult(step.id);
   const stepFailed = isStepFailed(step.id);
   const stepAborted = isStepAborted(step.id);
-  const [outputViewMode, setOutputViewMode] = useState<"preview" | "schema">("preview");
 
   const outputProcessor = useDataProcessor(stepResult, isActive);
-
-  const handleOutputViewModeChange = (mode: "preview" | "schema") => {
-    setOutputViewMode(mode);
-    if (mode === "schema") {
-      outputProcessor.computeSchema();
-    }
-  };
 
   const errorResult =
     (stepFailed || stepAborted) && (!stepResult || typeof stepResult === "string");
@@ -62,24 +50,13 @@ export function StepResultTab({
         outputString = '{\n  "error": "Step execution failed"\n}';
       }
     } else {
-      outputString =
-        outputViewMode === "schema"
-          ? outputProcessor.schema?.displayString || ""
-          : outputProcessor.preview?.displayString || "";
-      isTruncated =
-        outputViewMode === "schema"
-          ? outputProcessor.schema?.truncated || false
-          : outputProcessor.preview?.truncated || false;
+      outputString = outputProcessor.preview?.displayString || "";
+      isTruncated = outputProcessor.preview?.truncated || false;
     }
   }
 
   const showEmptyWarning =
-    !stepFailed &&
-    !stepAborted &&
-    !isPending &&
-    !errorResult &&
-    outputViewMode === "preview" &&
-    isEmptyData(outputString || "");
+    !stepFailed && !stepAborted && !isPending && !errorResult && isEmptyData(outputString || "");
 
   const aborted = stepAborted || (errorResult && isAbortError(stepResult));
 
@@ -130,42 +107,20 @@ export function StepResultTab({
         </div>
       ) : (
         <>
-          <JsonCodeEditor
+          <JsonEditor
             value={outputString}
             readOnly={true}
-            minHeight="300px"
+            minHeight="350px"
             maxHeight="600px"
             resizable={true}
             overlay={
               <div className="flex items-center gap-2">
-                {(outputProcessor.isComputingPreview || outputProcessor.isComputingSchema) && (
+                {outputProcessor.isComputingPreview && (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
-                <Tabs
-                  value={outputViewMode}
-                  onValueChange={(v) => handleOutputViewModeChange(v as "preview" | "schema")}
-                  className="w-auto"
-                >
-                  <TabsList className="h-6 p-0.5 rounded-md">
-                    <TabsTrigger
-                      value="preview"
-                      className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm"
-                    >
-                      Preview
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="schema"
-                      className="h-full px-2 text-[11px] rounded-sm data-[state=active]:rounded-sm"
-                    >
-                      Schema
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
                 <span className="text-[10px] text-muted-foreground">
                   {formatBytes(outputProcessor.bytes)}
                 </span>
-                <CopyButton getData={() => stepResult} />
-                <DownloadButton data={stepResult} filename={`step_${step.id}_result.json`} />
               </div>
             }
           />
@@ -174,7 +129,7 @@ export function StepResultTab({
               ⚠ No data returned. Is this expected?
             </div>
           )}
-          {isTruncated && outputViewMode === "preview" && (
+          {isTruncated && (
             <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-300 px-2">
               Preview truncated for display performance
             </div>

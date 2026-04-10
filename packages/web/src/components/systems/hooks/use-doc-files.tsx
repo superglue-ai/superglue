@@ -4,139 +4,45 @@ import {
   MAX_TOTAL_FILE_SIZE_DOCUMENTATION,
   sanitizeFileName,
 } from "@/src/lib/file-utils";
-import type { SuperglueClient } from "@superglue/shared";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useDocFilesQuery,
+  useUploadDocFiles,
+  useAddDocUrl,
+  useDeleteDocFile,
+  type DocFile,
+} from "@/src/queries/doc-files";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/src/queries/query-keys";
+import { useOrg } from "@/src/app/org-context";
+import { useCallback, useRef, useState } from "react";
 
-export interface DocFile {
-  id: string;
-  source: "upload" | "scrape" | "openapi";
-  status: string;
-  fileName: string;
-  sourceUrl?: string;
-  error?: string;
-  content?: string;
-  createdAt?: string;
-  contentLength?: number;
-}
+export type { DocFile } from "@/src/queries/doc-files";
 
 const BLOCKED_DOC_EXTENSIONS = [".zip", ".gz"];
-const POLL_TIMEOUT_MS = 5 * 60 * 1000;
-const POLL_INTERVAL_MS = 3000;
 const MAX_FILES = 10;
 const OPENAPI_PATTERNS = /\.(json|yaml|yml)$|openapi|swagger|\/v[23]\//i;
 
-function reconcileFiles(prev: DocFile[], next: DocFile[]): DocFile[] {
-  const nextMap = new Map(next.map((f) => [f.id, f]));
-  const result: DocFile[] = [];
-  let changed = false;
-
-  for (const existing of prev) {
-    const updated = nextMap.get(existing.id);
-    if (!updated) {
-      changed = true;
-      continue;
-    }
-    if (
-      existing.status === updated.status &&
-      existing.fileName === updated.fileName &&
-      existing.error === updated.error &&
-      existing.contentLength === updated.contentLength
-    ) {
-      result.push(existing);
-    } else {
-      result.push(updated);
-      changed = true;
-    }
-    nextMap.delete(existing.id);
-  }
-
-  for (const file of nextMap.values()) {
-    result.push(file);
-    changed = true;
-  }
-
-  if (!changed && result.length === prev.length) return prev;
-  return result;
-}
-
-export function useDocFiles(systemId: string | undefined, client: SuperglueClient) {
+export function useDocFiles(systemId: string | undefined) {
   const { toast } = useToast();
+  const { orgId } = useOrg();
+  const queryClient = useQueryClient();
 
-  const [docFiles, setDocFiles] = useState<DocFile[]>([]);
-  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
-  const [pendingOps, setPendingOps] = useState<Set<string>>(new Set());
+  const query = useDocFilesQuery(systemId);
+  const uploadMutation = useUploadDocFiles(systemId);
+  const addUrlMutation = useAddDocUrl(systemId);
+  const deleteMutation = useDeleteDocFile(systemId);
+
+  const docFiles = query.data ?? [];
+
   const [deleteTarget, setDeleteTarget] = useState<DocFile | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isAddingUrl, setIsAddingUrl] = useState(false);
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
-  const hasFetchedRef = useRef(false);
-  const pollStartRef = useRef<number>(0);
   const inlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const docFilesRef = useRef<DocFile[]>([]);
-  docFilesRef.current = docFiles;
 
   const showInlineMessage = useCallback((msg: string) => {
     if (inlineTimerRef.current) clearTimeout(inlineTimerRef.current);
     setInlineMessage(msg);
     inlineTimerRef.current = setTimeout(() => setInlineMessage(null), 4000);
   }, []);
-
-  const fetchDocFiles = useCallback(
-    async (silent = false) => {
-      if (!systemId) return;
-      try {
-        if (!silent) setIsLoadingDocs(true);
-        const result = await client.listSystemFileReferences(systemId);
-        setDocFiles((prev) => reconcileFiles(prev, result.files));
-        hasFetchedRef.current = true;
-      } catch (error: any) {
-        console.error("Failed to fetch documentation:", error);
-      } finally {
-        if (!silent) setIsLoadingDocs(false);
-      }
-    },
-    [systemId, client],
-  );
-
-  useEffect(() => {
-    fetchDocFiles();
-  }, [fetchDocFiles]);
-
-  const hasProcessingFiles =
-    pendingOps.size > 0 ||
-    docFiles.some((f) => f.status === "PROCESSING" || f.status === "PENDING");
-
-  useEffect(() => {
-    if (!hasProcessingFiles) {
-      pollStartRef.current = 0;
-      return;
-    }
-    if (!pollStartRef.current) pollStartRef.current = Date.now();
-
-    const interval = setInterval(() => {
-      if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
-        clearInterval(interval);
-        setPendingOps(new Set());
-        return;
-      }
-      fetchDocFiles(true).then(() => {
-        setPendingOps((prev) => {
-          const current = docFilesRef.current;
-          const still = new Set<string>();
-          for (const id of prev) {
-            const file = current.find((f) => f.id === id);
-            if (!file || file.status === "PROCESSING" || file.status === "PENDING") {
-              still.add(id);
-            }
-          }
-          if (still.size === prev.size) return prev;
-          return still;
-        });
-      });
-    }, POLL_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [hasProcessingFiles, fetchDocFiles]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -184,56 +90,20 @@ export function useDocFiles(systemId: string | undefined, client: SuperglueClien
 
     if (validFiles.length === 0 || !systemId) return;
 
-    try {
-      const fileInfos = await client.createSystemFileUploadUrls(
-        systemId,
-        validFiles.map((f) => ({
-          fileName: f.uploadName,
-          contentType: f.file.type || "application/octet-stream",
-          contentLength: f.file.size,
-        })),
-      );
-
-      setDocFiles((prev) => [
-        ...prev,
-        ...fileInfos.map((info) => ({
-          id: info.id,
-          source: "upload" as const,
-          status: "PENDING",
-          fileName: info.originalFileName,
-        })),
-      ]);
-      setPendingOps((prev) => new Set([...prev, ...fileInfos.map((f) => f.id)]));
-
-      const uploadResults = await Promise.allSettled(
-        fileInfos.map((info, i) =>
-          fetch(info.uploadUrl, {
-            method: "PUT",
-            body: validFiles[i].file,
-            headers: { "Content-Type": validFiles[i].file.type || "application/octet-stream" },
-          }).then((res) => {
-            if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
-          }),
-        ),
-      );
-
-      for (let i = 0; i < uploadResults.length; i++) {
-        if (uploadResults[i].status === "rejected") {
-          const reason = (uploadResults[i] as PromiseRejectedResult).reason;
-          toast({
-            title: "Upload failed",
-            description: `${validFiles[i].uploadName}: ${reason?.message || "Unknown error"}`,
-            variant: "destructive",
-          });
+    uploadMutation.mutate(validFiles, {
+      onSuccess: ({ errors }) => {
+        for (const err of errors) {
+          toast({ title: "Upload failed", description: err, variant: "destructive" });
         }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message || "Failed to create upload URLs",
-        variant: "destructive",
-      });
-    }
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Upload failed",
+          description: error.message || "Failed to create upload URLs",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const looksLikeOpenApi = useCallback((url: string) => OPENAPI_PATTERNS.test(url), []);
@@ -251,108 +121,43 @@ export function useDocFiles(systemId: string | undefined, client: SuperglueClien
       return;
     }
 
-    setIsAddingUrl(true);
-    const tempId = `temp-url-${Date.now()}`;
     const source = looksLikeOpenApi(url) ? "openapi" : "scrape";
-    const optimisticCard: DocFile = {
-      id: tempId,
-      source,
-      status: "PENDING",
-      fileName: url,
-      sourceUrl: url,
-    };
-    setDocFiles((prev) => [...prev, optimisticCard]);
-
-    const replaceTemp = (real: DocFile) => {
-      setDocFiles((prev) => prev.map((f) => (f.id === tempId ? real : f)));
-    };
-    const removeTemp = () => {
-      setDocFiles((prev) => prev.filter((f) => f.id !== tempId));
-    };
-
-    const clearAdding = () => setIsAddingUrl(false);
-
-    if (source === "openapi") {
-      client
-        .fetchOpenApiSpec(systemId, url)
-        .then((result) => {
-          replaceTemp({
-            id: result.fileReferenceId,
-            source: "openapi",
-            status: "COMPLETED",
-            fileName: result.title || url,
-            sourceUrl: url,
-            createdAt: new Date().toISOString(),
-          });
-          clearAdding();
-        })
-        .catch(() =>
-          client.triggerSystemDocumentationScrapeJob(systemId, { url }).then(
-            (result) => {
-              replaceTemp({
-                id: result.fileReferenceId,
-                source: "scrape",
-                status: "PENDING",
-                fileName: url,
-                sourceUrl: url,
-              });
-              setPendingOps((prev) => new Set([...prev, result.fileReferenceId]));
-              clearAdding();
-            },
-            (error: any) => {
-              removeTemp();
-              showInlineMessage(error.message || "Failed to add URL");
-              clearAdding();
-            },
-          ),
-        );
-    } else {
-      client
-        .triggerSystemDocumentationScrapeJob(systemId, { url })
-        .then((result) => {
-          replaceTemp({
-            id: result.fileReferenceId,
-            source: "scrape",
-            status: "PENDING",
-            fileName: url,
-            sourceUrl: url,
-          });
-          setPendingOps((prev) => new Set([...prev, result.fileReferenceId]));
-          clearAdding();
-        })
-        .catch((error: any) => {
-          removeTemp();
-          showInlineMessage(error.message || "Failed to scrape URL");
-          clearAdding();
-        });
-    }
+    addUrlMutation.mutate(
+      { url, source },
+      {
+        onError: (error: any) => {
+          showInlineMessage(error.message || "Failed to add URL");
+        },
+      },
+    );
   };
 
   const handleConfirmDelete = () => {
     if (!deleteTarget || !systemId) return;
     const file = deleteTarget;
     setDeleteTarget(null);
-    setDocFiles((prev) => prev.filter((f) => f.id !== file.id));
-    setPendingOps((prev) => {
-      const next = new Set(prev);
-      next.delete(file.id);
-      return next;
-    });
-    client.deleteSystemFileReference(systemId, file.id).catch((error: any) => {
-      setDocFiles((prev) => [...prev, file]);
-      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    deleteMutation.mutate(file.id, {
+      onError: (error: any) => {
+        toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+      },
     });
   };
 
+  const refreshDocFiles = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.docFiles.list(orgId, systemId ?? ""),
+    });
+  }, [queryClient, orgId, systemId]);
+
   return {
     docFiles,
-    isLoadingDocs,
-    refreshDocFiles: fetchDocFiles,
-    hasFetched: hasFetchedRef.current,
+    isLoadingDocs: query.isLoading,
+    refreshDocFiles,
+    hasFetched: query.isFetchedAfterMount,
     deleteTarget,
     setDeleteTarget,
-    isDeleting,
-    isAddingUrl,
+    isDeleting: deleteMutation.isPending,
+    isAddingUrl: addUrlMutation.isPending,
     inlineMessage,
     looksLikeOpenApi,
     handleFileUpload,

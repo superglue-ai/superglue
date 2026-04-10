@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Paperclip,
   ListOrdered,
+  Link,
+  User,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { type CategorizedVariables, type CategorizedSources } from "../context/types";
@@ -47,11 +49,13 @@ function getTypeSymbol(type: ValueType, value?: unknown): string {
 
 type CategorizedVariablesKey =
   | "credentials"
+  | "systemUrls"
   | "toolInputs"
   | "fileInputs"
   | "currentStepData"
   | "previousStepData"
-  | "paginationVariables";
+  | "paginationVariables"
+  | "contextVariables";
 
 interface CategoryConfig {
   key: CategorizedVariablesKey;
@@ -61,11 +65,13 @@ interface CategoryConfig {
 
 const CATEGORY_CONFIGS: CategoryConfig[] = [
   { key: "credentials", label: "Credentials", icon: <Key className="h-4 w-4" /> },
+  { key: "systemUrls", label: "System URLs", icon: <Link className="h-4 w-4" /> },
   { key: "toolInputs", label: "Tool Inputs", icon: <FileJson className="h-4 w-4" /> },
   { key: "fileInputs", label: "File Inputs", icon: <Paperclip className="h-4 w-4" /> },
   { key: "currentStepData", label: "Current Step Data", icon: <FileInput className="h-4 w-4" /> },
   { key: "previousStepData", label: "Previous Step Data", icon: <Route className="h-4 w-4" /> },
   { key: "paginationVariables", label: "Pagination", icon: <ListOrdered className="h-4 w-4" /> },
+  { key: "contextVariables", label: "Context", icon: <User className="h-4 w-4" /> },
 ];
 
 interface VariableCommandMenuProps {
@@ -92,6 +98,8 @@ function getValueFromSources(
   switch (categoryKey) {
     case "credentials":
       return undefined;
+    case "systemUrls":
+      return undefined; // URLs are strings, no drill-down needed
     case "toolInputs":
       return sources.manualPayload?.[varName];
     case "fileInputs":
@@ -102,6 +110,8 @@ function getValueFromSources(
       return sources.previousStepResults?.[varName];
     case "paginationVariables":
       return sources.paginationData?.[varName];
+    case "contextVariables":
+      return sources.contextData?.[varName];
     default:
       return undefined;
   }

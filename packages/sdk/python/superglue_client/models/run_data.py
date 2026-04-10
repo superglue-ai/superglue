@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -11,7 +9,7 @@ T = TypeVar("T", bound="RunData")
 
 @_attrs_define
 class RunData:
-    """Tool execution results (only present when status is success, maps to 'toolResult' in GraphQL)"""
+    """Tool execution results (only present when status is success)"""
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

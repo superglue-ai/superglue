@@ -1,4 +1,4 @@
-import { cn } from "@/src/lib/general-utils";
+import { cn, truncateValue } from "@/src/lib/general-utils";
 import { truncateTemplateValue } from "@/src/lib/templating-utils";
 import { maskCredentials } from "@superglue/shared";
 import { Code2, FileJson, X } from "lucide-react";
@@ -85,7 +85,10 @@ export function TemplateChip({
       fullDisplayText = displayValue === "" ? '""' : displayValue;
     } else if (typeof displayValue === "object") {
       try {
-        fullDisplayText = JSON.stringify(displayValue);
+        // Truncate the object structure BEFORE stringifying
+        // This prevents JSON.stringify from processing massive objects
+        const sampled = truncateValue(displayValue, 0);
+        fullDisplayText = JSON.stringify(sampled);
       } catch {
         fullDisplayText = "[Complex Object]";
       }
@@ -94,10 +97,14 @@ export function TemplateChip({
     }
 
     originalSize = fullDisplayText.length;
-    const masked = maskCredentials(fullDisplayText, credentials);
+
+    // Truncate string BEFORE masking to avoid regex on huge strings
+    const preTruncated = truncateTemplateValue(fullDisplayText, previewMaxLength * 3);
+    const masked = maskCredentials(preTruncated.display, credentials);
     const truncated = truncateTemplateValue(masked, previewMaxLength);
+
     displayText = truncated.display;
-    isTruncated = truncated.truncated;
+    isTruncated = truncated.truncated || preTruncated.truncated;
     originalSize = truncated.originalSize;
   }
 

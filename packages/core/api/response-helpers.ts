@@ -29,6 +29,9 @@ export function validateCreateSystemBody(body: any): CreateSystemBody {
   const normalized = normalizeSystem(body);
 
   const missing: string[] = [];
+  if (!normalized.id || typeof normalized.id !== "string" || normalized.id.trim() === "") {
+    missing.push("id");
+  }
   if (!normalized.name || typeof normalized.name !== "string" || normalized.name.trim() === "") {
     missing.push("name");
   }
@@ -82,6 +85,15 @@ export function parsePaginationParams(query: { page?: string; limit?: string }):
   return { page, limit, offset };
 }
 
+export function parseMultiValueQueryParam(value?: string): string[] | undefined {
+  const parsed = value
+    ?.split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return parsed && parsed.length > 0 ? parsed : undefined;
+}
+
 export function mapRunStatusToOpenAPI(
   status: RunStatus,
 ): "running" | "success" | "failed" | "aborted" {
@@ -110,10 +122,24 @@ export function mapOpenAPIRequestSourceToInternal(source: string): RequestSource
     frontend: RequestSource.FRONTEND,
     scheduler: RequestSource.SCHEDULER,
     mcp: RequestSource.MCP,
+    cli: RequestSource.CLI,
     "tool-chain": RequestSource.TOOL_CHAIN,
     webhook: RequestSource.WEBHOOK,
   };
   return sourceMap[source.toLowerCase()];
+}
+
+const CLIENT_DECLARED_SOURCES: Set<string> = new Set([
+  RequestSource.FRONTEND,
+  RequestSource.MCP,
+  RequestSource.CLI,
+]);
+
+export function resolveClientRequestSource(declared?: string): RequestSource {
+  if (declared && CLIENT_DECLARED_SOURCES.has(declared)) {
+    return declared as RequestSource;
+  }
+  return RequestSource.API;
 }
 
 export function sendError(reply: any, statusCode: number, message: string) {

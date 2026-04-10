@@ -1,6 +1,7 @@
 "use client";
 
 import { formatBytes } from "@/src/lib/file-utils";
+import { copyToClipboard } from "@/src/components/tools/shared/CopyButton";
 import { ArrowLeft, Check, Copy, Download } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -145,9 +146,11 @@ export function FileContentViewer({
   }, [content, file.fileName]);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const success = await copyToClipboard(content);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   }, [content]);
 
   const displayName = file.source === "scrape" && file.sourceUrl ? file.sourceUrl : file.fileName;

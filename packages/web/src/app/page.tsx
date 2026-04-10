@@ -12,7 +12,7 @@ export default function Main() {
     if (!promptParam) return null;
     return {
       userPrompt: promptParam,
-      systemPrompt: "",
+      hiddenStarterMessage: "",
     };
   }, [promptParam]);
 

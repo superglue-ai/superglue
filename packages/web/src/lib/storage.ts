@@ -1,6 +1,7 @@
 import { openDB, IDBPDatabase, DBSchema } from "idb";
 import { ToolStep } from "@superglue/shared";
 import { deepEqual } from "./general-utils";
+import { getCacheScopeIdentifier } from "./cache-scope-identifier";
 
 const DB_NAME = "superglue";
 const DB_VERSION = 1;
@@ -141,32 +142,35 @@ function ensureMigration(): Promise<void> {
   return migrateFromLocalStorage();
 }
 
-// Run cleanup once per session after migration
-async function ensureCleanup(): Promise<void> {
-  if (typeof window === "undefined") return;
-  if (cleanupInitiated) return;
-  cleanupInitiated = true;
-
-  await ensureMigration();
-}
-
 // ===== PAYLOAD STORAGE =====
+
+// Get org-scoped key for payload/draft storage to prevent cross-org data leakage
+function getOrgScopedKey(toolId: string): string {
+  const orgScope = getCacheScopeIdentifier();
+  // If no org scope (e.g., not logged in), use toolId directly
+  if (!orgScope) {
+    return toolId;
+  }
+  return `${orgScope}:${toolId}`;
+}
 
 export async function getPayload(toolId: string): Promise<string | null> {
   if (typeof window === "undefined") return null;
   await ensureMigration();
   const db = await getDB();
-  return db.get("payloads", toolId) ?? null;
+  const scopedKey = getOrgScopedKey(toolId);
+  return db.get("payloads", scopedKey) ?? null;
 }
 
 export async function setPayload(toolId: string, payload: string): Promise<void> {
   if (typeof window === "undefined") return;
   await ensureMigration();
   const db = await getDB();
+  const scopedKey = getOrgScopedKey(toolId);
   if (payload.trim() === "") {
-    await db.delete("payloads", toolId);
+    await db.delete("payloads", scopedKey);
   } else {
-    await db.put("payloads", payload, toolId);
+    await db.put("payloads", payload, scopedKey);
   }
 }
 
@@ -188,7 +192,8 @@ export async function getLatestDraft(toolId: string): Promise<ToolDraft | null> 
   if (typeof window === "undefined") return null;
   await ensureMigration();
   const db = await getDB();
-  return db.get("drafts", toolId) ?? null;
+  const scopedKey = getOrgScopedKey(toolId);
+  return db.get("drafts", scopedKey) ?? null;
 }
 
 // Normalize draft content for comparison (exclude id, createdAt, toolId)
@@ -210,9 +215,10 @@ export async function addDraft(
 
   await ensureMigration();
   const db = await getDB();
+  const scopedKey = getOrgScopedKey(toolId);
 
   // Check if content differs from existing draft
-  const existingDraft = await db.get("drafts", toolId);
+  const existingDraft = await db.get("drafts", scopedKey);
   if (existingDraft) {
     const existingContent = getDraftContent(existingDraft);
     const newContent = getDraftContent(draft);
@@ -228,7 +234,7 @@ export async function addDraft(
   };
 
   // Simply replace the draft for this tool
-  await db.put("drafts", fullDraft, toolId);
+  await db.put("drafts", fullDraft, scopedKey);
 
   // Notify listeners
   notifyDraftChange(toolId);
@@ -238,8 +244,9 @@ export async function deleteAllDrafts(toolId: string): Promise<void> {
   if (typeof window === "undefined") return;
   await ensureMigration();
   const db = await getDB();
+  const scopedKey = getOrgScopedKey(toolId);
 
-  await db.delete("drafts", toolId);
+  await db.delete("drafts", scopedKey);
 
   // Notify listeners
   notifyDraftChange(toolId);

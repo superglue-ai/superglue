@@ -1,6 +1,14 @@
-import { ToolStep, System, ResponseFilter, SuperglueClient, Tool } from "@superglue/shared";
+import {
+  ToolStep,
+  System,
+  ResponseFilter,
+  SuperglueClient,
+  Tool,
+  isTransformConfig,
+} from "@superglue/shared";
 import { isAbortError } from "./general-utils";
 import { tokenRegistry } from "./token-registry";
+import { connectionMonitor } from "./connection-monitor";
 
 const BASE62_REGEX = /^[a-zA-Z0-9_-]*$/;
 
@@ -80,12 +88,16 @@ export async function executeSingleStep({
   payload,
   previousResults,
   onRunIdGenerated,
+  mode,
+  systemIds,
 }: {
   client: SuperglueClient;
   step: ToolStep;
   payload: any;
   previousResults: Record<string, any>;
   onRunIdGenerated?: (runId: string) => void;
+  mode?: "dev" | "prod";
+  systemIds?: string[];
 }): Promise<StepExecutionResult> {
   const stepRunId = generateUUID();
 
@@ -100,6 +112,8 @@ export async function executeSingleStep({
       payload,
       previousResults,
       runId: stepRunId,
+      mode,
+      systemIds,
     });
 
     return {
@@ -127,6 +141,8 @@ export async function executeToolStepByStep({
   onStepComplete,
   onBeforeStep,
   onStepRunIdChange,
+  mode,
+  systemIds,
 }: {
   client: SuperglueClient;
   tool: Tool;
@@ -134,6 +150,8 @@ export async function executeToolStepByStep({
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void;
   onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>;
   onStepRunIdChange?: (stepRunId: string) => void;
+  mode?: "dev" | "prod";
+  systemIds?: string[];
 }): Promise<ToolExecutionState> {
   const state: ToolExecutionState = {
     originalTool: tool,
@@ -162,12 +180,16 @@ export async function executeToolStepByStep({
       }
     }
 
+    // Pass systemIds for transform steps so they can access system credentials
+    const stepSystemIds = isTransformConfig(step.config) ? systemIds : undefined;
     const result = await executeSingleStep({
       client,
       step,
       payload,
       previousResults,
       onRunIdGenerated: onStepRunIdChange,
+      mode,
+      systemIds: stepSystemIds,
     });
 
     state.stepResults[step.id] = result;
@@ -290,42 +312,6 @@ export async function executeOutputTransform({
   }
 }
 
-export const isJsonEmpty = (inputJson: string): boolean => {
-  try {
-    if (!inputJson) return true;
-    const parsedJson = JSON.parse(inputJson);
-    return Object.keys(parsedJson).length === 0;
-  } catch (error) {
-    return true;
-  }
-};
-
-export const findArraysOfObjects = (obj: any): Record<string, any[]> => {
-  const arrays: Record<string, any[]> = {};
-
-  const traverse = (value: any, path: string = "") => {
-    if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object") {
-      arrays[path] = value;
-    }
-
-    if (typeof value === "object" && value !== null) {
-      Object.entries(value).forEach(([key, val]) => {
-        traverse(val, `${path ? `${path}.` : ""}${key}`);
-      });
-    }
-  };
-  traverse(obj);
-
-  if (Object.keys(arrays).length === 0) {
-    if (Object.keys(obj).length === 1) {
-      const [key, value] = Object.entries(obj)[0];
-      return { [key]: [value] };
-    }
-    return { response: [obj] };
-  }
-  return arrays;
-};
-
 export const parseCredentialsHelper = (simpleCreds: string): Record<string, string> => {
   try {
     const creds = simpleCreds?.trim() || "";
@@ -349,17 +335,6 @@ export const parseCredentialsHelper = (simpleCreds: string): Record<string, stri
   } catch (error) {
     return {};
   }
-};
-
-export const deepMergePreferRight = (left: any, right: any): any => {
-  if (Array.isArray(left) && Array.isArray(right)) return right;
-  if (typeof left !== "object" || left === null) return right ?? left;
-  if (typeof right !== "object" || right === null) return right ?? left;
-  const result: Record<string, any> = { ...left };
-  for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
-    result[key] = deepMergePreferRight(left[key], right[key]);
-  }
-  return result;
 };
 
 /**
@@ -399,12 +374,5 @@ export function generateUUID(): string {
     const r = (Math.random() * 16) | 0;
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
-  });
-}
-
-export function createSuperglueClient(apiEndpoint: string): SuperglueClient {
-  return new SuperglueClient({
-    apiKey: tokenRegistry.getToken(),
-    apiEndpoint,
   });
 }

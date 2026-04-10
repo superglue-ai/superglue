@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
-import { useConfig } from "@/src/app/config-context";
 import { useToast } from "@/src/hooks/use-toast";
-import { createSuperglueClient } from "@/src/lib/client-utils";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import {
   formatBytes,
   generateUniqueKey,
@@ -42,7 +41,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
     externalPayloads,
   } = options;
 
-  const config = useConfig();
+  const createClient = useSuperglueClient();
   const { toast } = useToast();
 
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
@@ -91,7 +90,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
           existingKeys.push(key);
 
           try {
-            const client = createSuperglueClient(config.apiEndpoint);
+            const client = createClient();
             const parsedData = await processAndExtractFile(file, client);
 
             newPayloads[key] = parsedData;
@@ -130,7 +129,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
       filePayloads,
       totalFileSize,
       maxTotalSize,
-      config.apiEndpoint,
+      createClient,
       toast,
       onFilesChange,
       onPayloadTextUpdate,

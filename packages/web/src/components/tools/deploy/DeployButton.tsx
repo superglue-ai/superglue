@@ -1,6 +1,5 @@
 "use client";
 
-import { useSchedules } from "@/src/app/schedules-context";
 import { Button } from "@/src/components/ui/button";
 import { Tool } from "@superglue/shared";
 import { CloudUpload } from "lucide-react";
@@ -13,6 +12,7 @@ interface DeployButtonProps {
   onBeforeOpen?: () => Promise<unknown> | void;
   disabled?: boolean;
   size?: "default" | "sm" | "lg" | "icon";
+  variant?: "glass" | "outline" | "default" | "ghost";
   className?: string;
 }
 
@@ -22,12 +22,11 @@ export function DeployButton({
   onBeforeOpen,
   disabled,
   size = "sm",
+  variant = "glass",
   className,
 }: DeployButtonProps) {
-  const { getSchedulesForTool } = useSchedules();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const activeCount = getSchedulesForTool(tool.id).filter((s) => s.enabled).length;
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,20 +45,13 @@ export function DeployButton({
   return (
     <>
       <Button
-        variant="glass"
+        variant={variant}
         size={size}
         onClick={handleClick}
         disabled={disabled || isLoading}
         className={className}
       >
-        <span className="relative">
-          <CloudUpload className="h-4 w-4" />
-          {activeCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 text-[10px] font-medium bg-primary text-primary-foreground rounded-full h-3.5 min-w-[0.875rem] px-1 flex items-center justify-center border-2 border-background">
-              {activeCount}
-            </span>
-          )}
-        </span>
+        <CloudUpload className="h-4 w-4" />
         Deploy
       </Button>
       <ToolDeployModal

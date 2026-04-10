@@ -1,4 +1,5 @@
-import { SuperglueClient, systems } from "@superglue/shared";
+import crypto from "crypto";
+import { SuperglueClient, systems, decryptCliApiKey } from "@superglue/shared";
 import { OAuthState } from "@/src/lib/oauth-utils";
 import { resolveOAuthCertAndKey } from "@superglue/shared";
 import axios from "axios";
@@ -337,9 +338,12 @@ export async function GET(request: NextRequest) {
     const stateData = JSON.parse(atob(state)) as OAuthState & {
       token_url?: string;
       portalToken?: string;
+      cliApiKey?: string;
+      orgId?: string;
     };
     const {
       systemId,
+      orgId: cliOrgId,
       timestamp,
       clientId,
       client_credentials_uid,
@@ -350,6 +354,7 @@ export async function GET(request: NextRequest) {
       oauth_key,
       scopes,
       portalToken,
+      cliApiKey,
     } = stateData;
 
     if (Date.now() - timestamp >= OAUTH_STATE_EXPIRY_MS) {
@@ -358,7 +363,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Determine backend endpoint from cookie or env
     const cookieApiUrl = request.cookies.get("superglue_api_url")?.value;
     const endpoint = cookieApiUrl
       ? decodeURIComponent(cookieApiUrl)
@@ -387,6 +391,19 @@ export async function GET(request: NextRequest) {
       apiKey = legacyApiKey;
     }
 
+    // Fallback to CLI encrypted API key in state (no cookies in CLI-initiated flows)
+    if (!apiKey && cliApiKey && cliOrgId) {
+      const masterKey = process.env.MASTER_ENCRYPTION_KEY;
+      if (masterKey) {
+        // Derive the same org-specific secret used by CLI for encryption
+        const derivedSecret = crypto
+          .createHash("sha256")
+          .update(`${masterKey}:cli-oauth-derived:${cliOrgId}`)
+          .digest("hex");
+        apiKey = decryptCliApiKey(cliApiKey, systemId, derivedSecret) || undefined;
+      }
+    }
+
     if (!apiKey && !portalToken) {
       throw new Error(
         "[OAUTH_STAGE:AUTHENTICATION] No API key found. OAuth session may have expired or was not properly initialized.",
@@ -401,8 +418,6 @@ export async function GET(request: NextRequest) {
         client_secret: "",
       };
     } else if (portalToken) {
-      // Portal flow - fetch credentials from backend using portal token
-      // Use same endpoint as determined above
       const oauthConfigResponse = await fetch(
         `${endpoint}/v1/portal/systems/${systemId}/oauth-config`,
         {
@@ -431,7 +446,6 @@ export async function GET(request: NextRequest) {
       };
     } else {
       const client = new SuperglueClient({
-        endpoint,
         apiKey: apiKey,
         apiEndpoint: endpoint,
       });
@@ -497,12 +511,6 @@ export async function GET(request: NextRequest) {
     const { access_token, refresh_token, ...additionalFields } = tokenData;
 
     if (!access_token) {
-      console.error(
-        "[OAUTH_DEBUG] Token data received from provider:",
-        JSON.stringify(tokenData, null, 2),
-      );
-      console.error("[OAUTH_DEBUG] Token URL:", token_url);
-      console.error("[OAUTH_DEBUG] System ID:", systemId);
       throw new Error(
         `[OAUTH_STAGE:TOKEN_VALIDATION] No access_token field in OAuth provider response. The provider may require different OAuth configuration or the token_url may be incorrect: ${JSON.stringify(tokenData, null, 2)}`,
       );
@@ -522,6 +530,29 @@ export async function GET(request: NextRequest) {
       ...(tokenConfig.tokenContentType && { tokenContentType: tokenConfig.tokenContentType }),
       ...(tokenConfig.extraHeaders && { extraHeaders: JSON.stringify(tokenConfig.extraHeaders) }),
     };
+
+    // CLI flow: save tokens directly to the system server-side
+    if (cliApiKey && apiKey) {
+      try {
+        const saveClient = new SuperglueClient({ apiKey, apiEndpoint: endpoint });
+        const existingSystem = await saveClient.getSystem(systemId);
+        await saveClient.updateSystem(systemId, {
+          credentials: { ...existingSystem?.credentials, ...tokens },
+        });
+      } catch (e) {
+        console.error("[OAUTH_CLI] Failed to save tokens to system:", e);
+        const errMsg = e instanceof Error ? e.message : "Unknown error saving tokens";
+        const html = createOAuthCallbackHTML(
+          "error",
+          `[OAUTH_STAGE:CLI_TOKEN_SAVE] OAuth tokens were obtained but could not be saved to the system: ${errMsg}`,
+          systemId,
+          origin,
+          undefined,
+          suppressErrorUI,
+        );
+        return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
+      }
+    }
 
     if (grantTypeParam === "client_credentials") {
       const response = NextResponse.json({

@@ -1,6 +1,7 @@
 "use client";
 
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems } from "@/src/queries/systems";
+import { useToolsIncludingArchived, useInvalidateTools } from "@/src/queries/tools";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import {
@@ -15,9 +16,16 @@ import {
 import { DeployButton } from "@/src/components/tools/deploy/DeployButton";
 import { FolderSelector, useFolderFilter } from "@/src/components/tools/folders/FolderSelector";
 import { InlineFolderPicker } from "@/src/components/tools/folders/InlineFolderPicker";
+import { useImportTools, ImportToolsDialog } from "@/src/components/tools/ImportToolsButton";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
 import { ToolActionsMenu } from "@/src/components/tools/ToolActionsMenu";
 import { SystemIcon } from "@/src/components/ui/system-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -26,20 +34,21 @@ import {
 } from "@/src/components/ui/tooltip";
 import { useAgentModal } from "@/src/components/agent/AgentModalContext";
 import { getToolBuilderPrompts } from "@/src/lib/agent/agent-context";
-import { getToolSystemIds } from "@superglue/shared";
+import { getToolSystemIds, Tool } from "@superglue/shared";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
   Hammer,
   Loader2,
   Plus,
-  RotateCw,
+  RefreshCw,
   Search,
+  Upload,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTools } from "../tools-context";
 
 type SortColumn = "id" | "folder" | "instruction" | "updatedAt";
 type SortDirection = "asc" | "desc";
@@ -47,9 +56,12 @@ type SortDirection = "asc" | "desc";
 const ToolsTable = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { tools, isInitiallyLoading, isRefreshing, refreshTools } = useTools();
+  const { tools, isInitiallyLoading, isRefreshing } = useToolsIncludingArchived();
   const { systems, loading: systemsLoading } = useSystems();
   const { openAgentModal, registerOnClose } = useAgentModal();
+
+  const invalidateTools = useInvalidateTools();
+  const importTools = useImportTools({ onImportComplete: () => invalidateTools() });
 
   const systemParam = searchParams.get("system");
   const systemsParam = searchParams.get("systems");
@@ -124,8 +136,8 @@ const ToolsTable = () => {
   }, [filteredByFolder, debouncedSearchTerm, sortColumn, sortDirection]);
 
   const refreshConfigs = useCallback(() => {
-    refreshTools();
-  }, [refreshTools]);
+    invalidateTools();
+  }, [invalidateTools]);
 
   const openToolBuilderModal = useCallback(
     (systemIds?: string[]) => {
@@ -183,13 +195,52 @@ const ToolsTable = () => {
     <div className="p-8 max-w-none w-full h-full flex flex-col overflow-hidden">
       <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-2 flex-shrink-0">
         <h1 className="text-2xl font-bold">Tools</h1>
-        <div className="flex gap-4">
-          <Button className="rounded-xl" onClick={handleTool}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create
-          </Button>
+        <div className="flex gap-2">
+          <input
+            ref={importTools.fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={importTools.handleFileSelect}
+            className="hidden"
+          />
+          <DropdownMenu>
+            <div className="flex">
+              <Button className="rounded-xl rounded-r-none" onClick={handleTool}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create
+              </Button>
+              <DropdownMenuTrigger asChild>
+                <Button className="rounded-xl rounded-l-none border-l-0 px-2">
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </div>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={importTools.triggerImport}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import from JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
+
+      <ImportToolsDialog
+        isOpen={importTools.isDialogOpen}
+        onClose={importTools.handleClose}
+        isImporting={importTools.isImporting}
+        validationResult={importTools.validationResult}
+        importTools={importTools.importTools}
+        importSystems={importTools.importSystems}
+        onToolSelectionChange={importTools.handleToolSelectionChange}
+        onToolResolutionChange={importTools.handleToolResolutionChange}
+        onSystemSelectionChange={importTools.handleSystemSelectionChange}
+        onSystemResolutionChange={importTools.handleSystemResolutionChange}
+        onImport={importTools.handleImport}
+        selectedToolCount={importTools.selectedToolCount}
+        selectedSystemCount={importTools.selectedSystemCount}
+        hasSelection={importTools.hasSelection}
+      />
 
       <div className="flex flex-wrap gap-3 mb-4 flex-shrink-0">
         <FolderSelector
@@ -250,23 +301,16 @@ const ToolsTable = () => {
                 </div>
               </TableHead>
               <TableHead className="text-right">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={refreshConfigs}
-                        className="transition-transform"
-                      >
-                        <RotateCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Refresh Tools</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <button
+                  onClick={refreshConfigs}
+                  disabled={isRefreshing}
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/50 transition-colors disabled:opacity-50 ml-auto"
+                  title="Refresh Tools"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
               </TableHead>
             </TableRow>
           </TableHeader>

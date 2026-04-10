@@ -3,36 +3,41 @@
 import { ToolCall } from "@superglue/shared";
 import { useCallback } from "react";
 import type { UseAgentToolsReturn } from "./types";
+import {
+  mutateToolCallInMessages,
+  ToolMutation,
+} from "@/src/lib/agent/agent-tools/tool-call-state";
 
 interface UseAgentToolsOptions {
   setMessages: React.Dispatch<React.SetStateAction<any[]>>;
+  messagesRef: React.MutableRefObject<any[]>;
 }
 
-export function useAgentTools({ setMessages }: UseAgentToolsOptions): UseAgentToolsReturn {
+export function useAgentTools({
+  setMessages,
+  messagesRef,
+}: UseAgentToolsOptions): UseAgentToolsReturn {
   const handleToolInputChange = useCallback((_newInput: any) => {}, []);
+
+  const handleToolMutation = useCallback(
+    (toolCallId: string, mutation: ToolMutation) => {
+      const nextMessages = mutateToolCallInMessages(messagesRef.current, toolCallId, mutation);
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
+    },
+    [messagesRef, setMessages],
+  );
 
   const handleToolUpdate = useCallback(
     (toolCallId: string, updates: Partial<ToolCall>) => {
-      setMessages((prev) =>
-        prev.map((msg) => {
-          const updateTool = (tool: ToolCall): ToolCall =>
-            tool.id === toolCallId ? { ...tool, ...updates } : tool;
-
-          return {
-            ...msg,
-            tools: msg.tools?.map(updateTool),
-            parts: msg.parts?.map((part: any) =>
-              part.type === "tool" && part.tool ? { ...part, tool: updateTool(part.tool) } : part,
-            ),
-          };
-        }),
-      );
+      handleToolMutation(toolCallId, updates);
     },
-    [setMessages],
+    [handleToolMutation],
   );
 
   return {
     handleToolInputChange,
     handleToolUpdate,
+    handleToolMutation,
   };
 }

@@ -294,7 +294,7 @@ export const SpotlightStepCard = React.memo(
         stepError || (typeof stepResult === "string" ? stepResult : "Step execution failed");
       const truncatedError = errorMsg.length > 500 ? `${errorMsg.slice(0, 500)}...` : errorMsg;
       sendMessageToAgent(
-        `Step "${step.id}" failed with the following error:\n\n${truncatedError}\n\nPlease search documentation and/or web search to diagnose the issue and fix the step.`,
+        `Step "${step.id}" failed with the following error:\n\n${truncatedError}\n\nDiagnose the issue and fix the step.`,
       );
     }, [step.id, stepResult, getStepError, sendMessageToAgent]);
 
@@ -778,7 +778,7 @@ export const SpotlightStepCard = React.memo(
                                         maxHeight="300px"
                                         resizable={true}
                                         isTransformEditor={false}
-                                        autoFormatOnMount={true}
+                                        autoFormatOnMount={false}
                                       />
                                     </div>
                                   </div>

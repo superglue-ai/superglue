@@ -2,7 +2,9 @@ export type ServiceMetadata = {
   traceId?: string;
   orgId?: string;
   userId?: string;
+  userEmail?: string;
   isRestricted?: boolean; // true if userId is from a restricted API key
+  roleIds?: string[];
 };
 
 export interface Log {
@@ -20,6 +22,13 @@ export interface MessagePart {
   errorDetails?: string;
   tool?: ToolCall;
   id: string;
+}
+
+export interface ToolInteractionEntry {
+  id: string;
+  event: string;
+  createdAt: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface Message {
@@ -45,6 +54,9 @@ export interface ToolCall {
   name: string;
   input?: any;
   output?: any;
+  interactionLog?: ToolInteractionEntry[];
+  confirmationState?: string;
+  confirmationData?: any;
   status:
     | "pending"
     | "awaiting_confirmation"
@@ -67,15 +79,33 @@ export interface ToolCall {
   buildResult?: any;
 }
 
-export enum UserRole {
-  ADMIN = "admin",
-  MEMBER = "member",
-}
-
 // User info for lookup by user ID
 export interface UserInfo {
   id: string;
   email: string | null;
+  name: string | null;
+}
+
+export interface OrgMember {
+  id: string;
+  email: string | null;
+  name: string | null;
+  userType: "member" | "end_user";
+  roleIds: string[];
+  createdAt?: string;
+  externalId?: string;
+  metadata?: Record<string, any>;
+  credentials?: EndUserCredentialStatus[];
+}
+
+export interface OrgInvitation {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  inviterId: string;
+  expiresAt: string;
+  createdAt: string;
 }
 
 export enum SupportedFileType {
@@ -183,7 +213,10 @@ export enum RequestSource {
   MCP = "mcp",
   TOOL_CHAIN = "tool-chain",
   WEBHOOK = "webhook",
+  CLI = "cli",
 }
+
+export type ClientRequestSource = RequestSource.FRONTEND | RequestSource.MCP | RequestSource.CLI;
 
 export enum FilterTarget {
   KEYS = "KEYS",
@@ -269,19 +302,19 @@ export interface TransformStepConfig {
 // Union type for step config
 export type StepConfig = RequestStepConfig | TransformStepConfig;
 
-// Type guard for request step config
-export function isRequestConfig(config: StepConfig): config is RequestStepConfig {
-  // "request" type covers HTTP, SFTP, Postgres - all URL-based steps
-  // Fallback to true if no type (safety for edge cases)
-  return config?.type === "request" || !config?.type;
+export function isRequestConfig(
+  config: StepConfig | null | undefined,
+): config is RequestStepConfig {
+  if (!config || typeof config !== "object") return false;
+  return config.type === "request" || !("type" in config) || config.type === undefined;
 }
 
-// Type guard for transform step config
-export function isTransformConfig(config: StepConfig): config is TransformStepConfig {
+export function isTransformConfig(
+  config: StepConfig | null | undefined,
+): config is TransformStepConfig {
   return config?.type === "transform";
 }
 
-// Failure behavior values (lowercase for OpenAPI compatibility)
 export type FailureBehavior = "fail" | "continue";
 
 export interface ToolStep {
@@ -303,18 +336,6 @@ export interface Tool extends BaseConfig {
   folder?: string;
   archived?: boolean;
   responseFilters?: ResponseFilter[];
-}
-
-// Helper function to compute systemIds from steps
-export function getToolSystemIds(tool: Tool): string[] {
-  if (!tool.steps) return [];
-  const ids = new Set<string>();
-  for (const step of tool.steps) {
-    if (step.config && isRequestConfig(step.config) && step.config.systemId) {
-      ids.add(step.config.systemId);
-    }
-  }
-  return Array.from(ids);
 }
 
 export interface ToolStepResult {
@@ -375,6 +396,7 @@ export interface System extends BaseConfig {
   documentationFiles?: DocumentationFiles;
   multiTenancyMode?: MultiTenancyMode; // EE: When 'enabled', end users must authenticate themselves
   tunnel?: TunnelConfig; // EE: On-prem agent tunnel configuration
+  environment?: "dev" | "prod"; // "dev" = development, "prod" = production (default)
 }
 
 export interface SystemInput {
@@ -390,6 +412,7 @@ export interface SystemInput {
   credentials?: Record<string, string>;
   metadata?: Record<string, any>;
   templateName?: string;
+  environment?: "dev" | "prod"; // "dev" = development, "prod" = production (default)
 }
 
 export interface SuggestedTool {
@@ -400,6 +423,13 @@ export interface SuggestedTool {
   steps: Array<{
     systemId?: string;
     instruction?: string;
+    config?: {
+      url?: string;
+      method?: string;
+      queryParams?: Record<string, any>;
+      headers?: Record<string, any>;
+      body?: string;
+    };
   }>;
   reason: string;
 }
@@ -444,6 +474,7 @@ export interface Run {
   metadata: RunMetadata;
   resultStorageUri?: string; // FileService URI where full results are stored (EE feature)
   userId?: string; // User or end user who triggered this run
+  executionMode?: SystemEnvironment; // Which environment was used for system resolution
 }
 
 // Stored run results in FileService (EE feature)
@@ -510,6 +541,7 @@ export type ToolSchedule = {
   enabled: boolean;
   payload?: Record<string, any>;
   options?: RequestOptions;
+  createdByUserId?: string;
   lastRunAt?: Date;
   nextRunAt: Date;
   createdAt: Date;
@@ -616,7 +648,6 @@ export enum ConfirmationAction {
 export interface AgentRequest {
   agentId: string;
   messages: Message[];
-  hiddenContext?: string;
   agentParams?: Record<string, any>;
   filePayloads?: Record<string, any>;
 }
@@ -715,13 +746,17 @@ export interface OrgSettings {
 
 export type MultiTenancyMode = "disabled" | "enabled";
 
+// ENVIRONMENT MODE TYPES
+// ============================================
+
+export type SystemEnvironment = "dev" | "prod";
+
 export interface EndUser {
   id: string;
   orgId: string;
   externalId: string;
   email?: string;
   name?: string;
-  allowedSystems?: string[] | null; // ['*'] = all access, specific IDs = restricted, null/[] = no access
   metadata?: Record<string, any>;
   credentials?: EndUserCredentialStatus[];
   createdAt?: Date;
@@ -732,7 +767,6 @@ export interface EndUserInput {
   externalId?: string; // Optional - same as id if not provided
   email?: string;
   name?: string;
-  allowedSystems?: string[] | null; // ['*'] = all access, specific IDs = restricted, null/[] = no access
   metadata?: Record<string, any>;
 }
 
@@ -749,6 +783,46 @@ export interface PortalToken {
   expiresAt: Date;
 }
 
+export enum SystemAccessLevel {
+  NONE = "none",
+  READ_ONLY = "read-only",
+  READ_WRITE = "read-write",
+}
+
+export interface CustomRule {
+  id: string;
+  name: string;
+  expression?: string;
+  isActive: boolean;
+}
+
+export interface CustomRulePermission {
+  rules: CustomRule[];
+}
+
+export type SystemPermission = SystemAccessLevel | CustomRulePermission;
+
+export interface Role extends BaseConfig {
+  name: string;
+  description?: string;
+  tools: "ALL" | string[];
+  systems: "ALL" | Record<string, SystemPermission>;
+  isBaseRole?: boolean;
+  userCount?: number;
+}
+
+export interface RoleInput {
+  name: string;
+  description?: string;
+  tools?: "ALL" | string[];
+  systems?: "ALL" | Record<string, SystemPermission>;
+}
+
+export interface UserRoleAssignment {
+  userId: string;
+  roleIds: string[];
+}
+
 export interface PatchSystemBody {
   name?: string;
   url?: string;
@@ -760,4 +834,5 @@ export interface PatchSystemBody {
   multiTenancyMode?: MultiTenancyMode;
   documentationFiles?: DocumentationFiles;
   tunnel?: TunnelConfig;
+  environment?: "dev" | "prod";
 }

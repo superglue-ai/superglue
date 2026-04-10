@@ -55,6 +55,7 @@ import {
   OpenApiLinkExtractorStrategy,
   DirectOpenApiStrategy,
   SwaggerUIStrategy,
+  SwaggerHubStrategy,
   HtmlLinkExtractorStrategy,
 } from "./strategies/index.js";
 import {
@@ -155,6 +156,7 @@ export class DocumentationFetcher {
       const data = response.data;
 
       const strategies: OpenApiFetchingStrategy[] = [
+        new SwaggerHubStrategy(),
         new DirectOpenApiStrategy(),
         new SwaggerUIStrategy(),
         new HtmlLinkExtractorStrategy(this.lastFetchAndProcessRawResult),

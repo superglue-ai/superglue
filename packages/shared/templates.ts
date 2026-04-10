@@ -35,6 +35,34 @@ export const systems: Record<string, SystemConfig> = {
     preferredAuthType: "apikey",
     keywords: ["database", "sql", "postgres", "postgresql", "api key", "tables"],
   },
+  redis_direct: {
+    name: "redis_direct",
+    apiUrl: "redis://<<username>>:<<password>>@<<host>>:<<port>>/<<database>>",
+    regex: "^.*(rediss?://).*$",
+    icon: "redis",
+    docsUrl: "https://redis.io/docs/latest/commands/",
+    preferredAuthType: "apikey",
+    keywords: ["database", "cache", "redis", "key-value", "nosql", "api key"],
+  },
+  azure_sql: {
+    name: "azure_sql",
+    apiUrl: "sqlserver://<<host>>:1433;database=<<database>>",
+    regex: "^.*(azure.*sql|sql.*azure|database\\.windows\\.net).*$",
+    icon: "default",
+    docsUrl: "https://learn.microsoft.com/en-us/azure/azure-sql/",
+    preferredAuthType: "apikey",
+    keywords: [
+      "database",
+      "sql",
+      "azure",
+      "query",
+      "table",
+      "schema",
+      "connection",
+      "mssql",
+      "sqlserver",
+    ],
+  },
   stripe: {
     name: "stripe",
     apiUrl: "https://api.stripe.com",
@@ -120,6 +148,30 @@ export const systems: Record<string, SystemConfig> = {
       "products",
       "associations",
       "memberships",
+    ],
+  },
+  hrworks: {
+    name: "hrworks",
+    apiUrl: "https://api.hrworks.de/v2",
+    regex: "(^|.*\\b)(hr\\s?works|hrworks)(\\b.*|$)",
+    icon: "default",
+    docsUrl: "https://developers.hrworks.de/",
+    preferredAuthType: "apikey",
+    keywords: [
+      "hr",
+      "employee",
+      "absence",
+      "vacation",
+      "payroll",
+      "personnel",
+      "time_tracking",
+      "human_resources",
+      "working_time",
+      "attendance",
+      "onboarding",
+      "applicant_management",
+      "travel_expenses",
+      "sick_leave",
     ],
   },
   attio: {
@@ -312,7 +364,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://slack.com/api/oauth.v2.access",
       scopes:
         "channels:read channels:history chat:write chat:write.public users:read users:read.email files:read files:write groups:read im:read im:write mpim:read",
-      client_id: "7626585708593.9087382641312",
     },
     keywords: [
       "channel",
@@ -344,7 +395,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://airtable.com/oauth2/v1/token",
       scopes:
         "data.recordComments:read data.recordComments:write data.records:read data.records:write schema.bases:read schema.bases:write user.email:read enterprise.groups:read workspacesAndBases.shares:manage workspacesAndBases:read workspacesAndBases:write data.records:manage enterprise.account:read enterprise.account:write enterprise.auditLogs:read enterprise.changeEvents:read enterprise.exports:manage enterprise.groups:manage enterprise.scim.usersAndGroups:manage enterprise.user:read enterprise.user:write workspacesAndBases:manage webhook:manage",
-      client_id: "02601365-de97-4191-b12d-e03c8540b03d",
       usePKCE: true,
       tokenAuthMethod: "basic_auth",
       tokenContentType: "form",
@@ -393,6 +443,15 @@ export const systems: Record<string, SystemConfig> = {
       "profile",
       "oauth",
     ],
+  },
+  granola: {
+    name: "granola",
+    apiUrl: "https://public-api.granola.ai",
+    regex: "^.*granola.*$",
+    icon: "default",
+    docsUrl: "https://docs.granola.ai",
+    preferredAuthType: "apikey",
+    keywords: ["meeting", "notes", "transcript", "summary", "ai", "recording"],
   },
   googleDrive: {
     name: "googleDrive",
@@ -586,7 +645,6 @@ export const systems: Record<string, SystemConfig> = {
     keywords: [
       "compute",
       "storage",
-      "bigquery",
       "pubsub",
       "cloud run",
       "kubernetes",
@@ -597,6 +655,68 @@ export const systems: Record<string, SystemConfig> = {
       "dataflow",
       "logging",
       "monitoring",
+      "oauth",
+    ],
+  },
+  bigquery: {
+    name: "bigquery",
+    apiUrl: "https://bigquery.googleapis.com/bigquery/v2",
+    regex: "^.*(bigquery|bq\\.googleapis).*$",
+    icon: "googleCloud",
+    docsUrl: "https://cloud.google.com/bigquery/docs/reference/rest",
+    openApiUrl: "https://bigquery.googleapis.com/$discovery/rest?version=v2",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+      tokenUrl: "https://oauth2.googleapis.com/token",
+      scopes: "https://www.googleapis.com/auth/bigquery",
+    },
+    systemSpecificInstructions: `BigQuery REST API - Authentication Options:
+
+OPTION 1: OAuth App (Recommended)
+If the user has or creates an OAuth app in their Google Cloud project:
+1. Create OAuth credentials in Google Cloud Console → APIs & Services → Credentials → Create Credentials → OAuth client ID
+2. Set application type to "Web application" and add the superglue callback URL as authorized redirect URI
+3. Use create_system with credentials: { client_id: "..." } and sensitiveCredentials: { client_secret: true }
+4. After system creation, use authenticate_oauth - user completes Google sign-in in popup
+5. Superglue auto-refreshes tokens - no manual token management needed
+
+OPTION 2: Service Account JWT (Advanced)
+If the user has a service account JSON file, you can generate JWTs dynamically using a transform step:
+- Extract private_key and client_email from the service account JSON
+- Build the JWT header and claims, then sign with crypto.sign('sha256', data, privateKey, 'base64url')
+- Exchange the JWT for an access token via POST to https://oauth2.googleapis.com/token
+
+OPTION 3: Service Account Token via CLI (Manual refresh required)
+If the user prefers to generate tokens externally:
+- User generates an access token on their machine using gcloud CLI:
+  1. Activate the service account: gcloud auth activate-service-account --key-file=/path/to/service-account.json
+  2. Print the token: gcloud auth print-access-token
+- The token is valid for 1 hour only
+- For tools built this way: the token should be a required INPUT in the tool payload, not stored as a system credential (since it expires quickly)
+
+REQUIRED GCP PERMISSIONS:
+- BigQuery Data Viewer (roles/bigquery.dataViewer) - read access
+- BigQuery Data Editor (roles/bigquery.dataEditor) - write access  
+- BigQuery Job User (roles/bigquery.jobUser) - run queries
+
+HEADERS: { "Authorization": "Bearer <<token>>", "Content-Type": "application/json" }`,
+    keywords: [
+      "datasets",
+      "tables",
+      "queries",
+      "jobs",
+      "projects",
+      "schemas",
+      "rows",
+      "streaming",
+      "partitions",
+      "clustering",
+      "views",
+      "routines",
+      "models",
+      "data warehouse",
+      "sql",
       "oauth",
     ],
   },
@@ -644,8 +764,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://login.salesforce.com/services/oauth2/token",
       scopes: "full",
       grant_type: "authorization_code",
-      client_id:
-        "3MVG9rZjd7MXFdLh_gnrsdT0JYyCLRCfTpDu93a61QQbINe1OKu1ROuXUBzNLAX2WT.XbO3L444Hyuu2Xd8wO",
     },
     keywords: [
       "accounts",
@@ -1143,7 +1261,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://auth.atlassian.com/oauth/token",
       scopes:
         "read:jira-work write:jira-work read:jira-user write:jira-user read:jira-work-management write:jira-work-management read:servicedesk-request write:servicedesk-request manage:jira-project manage:jira-configuration manage:jira-data-provider offline_access",
-      client_id: "Az7iTb4uWYSv5N4p295PulP8oO2B3PjK",
     },
     systemSpecificInstructions:
       "You need a cloud id in the url to connect to the Jira instance. Fetch it from available-resources and store it in the system. The /rest/api/3/search endpoint has been deprecated - Use GET /rest/api/3/search/jql with query parameter 'jql' for searching issues. MUST specify a project in the JQL query. Example: GET /rest/api/3/search/jql?jql=project=KAN&maxResults=100. The jql parameter accepts JQL queries like 'project=KEY', 'assignee=currentUser()', 'order by created DESC'. Always URL-encode the jql parameter value.",
@@ -1181,7 +1298,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://auth.atlassian.com/oauth/token",
       scopes:
         "read:confluence-content.all write:confluence-content read:confluence-space.summary write:confluence-space read:confluence-props write:confluence-props read:confluence-user write:confluence-user read:confluence-groups write:confluence-groups delete:confluence-content delete:confluence-space offline_access",
-      client_id: "Az7iTb4uWYSv5N4p295PulP8oO2B3PjK",
     },
     keywords: [
       "spaces",
@@ -1349,7 +1465,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://app.asana.com/-/oauth_token",
       scopes: "default openid email profile",
       grant_type: "authorization_code",
-      client_id: "1211466490919249",
     },
     keywords: [
       "tasks",
@@ -1412,7 +1527,6 @@ export const systems: Record<string, SystemConfig> = {
       tokenUrl: "https://api.notion.com/v1/oauth/token",
       scopes:
         "read_content update_content insert_content read_comments update_comments insert_comments read_user update_user",
-      client_id: "2f4d872b-594c-805e-abdd-00375c12bae0",
       tokenAuthMethod: "basic_auth",
       tokenContentType: "json",
       extraHeaders: { "Notion-Version": "2022-06-28" },
@@ -1866,6 +1980,59 @@ export const systems: Record<string, SystemConfig> = {
       "publishing",
       "preview",
       "api key",
+    ],
+  },
+  creatio: {
+    name: "creatio",
+    apiUrl: "https://<<instance>>.creatio.com/0/odata",
+    regex: "^(.*\\.)?creatio\\.com(/.*)?$",
+    icon: "default",
+    docsUrl:
+      "https://academy.creatio.com/docs/developer/integrations_and_api/data_services/odata/overview",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://<<instance>>.creatio.com/0/connect/authorize",
+      tokenUrl: "https://<<instance>>.creatio.com/0/connect/token",
+      scopes: "offline_access",
+      grant_type: "authorization_code",
+    },
+    systemSpecificInstructions: `Creatio uses OIDC-compliant OAuth endpoints. The standard /ServiceModel/AuthService.svc/Authorize and /rest/oauth/token endpoints are behind IIS session auth and will NOT work for OAuth flows — you MUST use the /0/connect/* OIDC endpoints instead.
+
+To discover the correct endpoints for any Creatio instance, fetch: https://<instance>.creatio.com/0/.well-known/openid-configuration
+
+This returns authorization_endpoint, token_endpoint, and other OIDC URLs.
+
+IMPORTANT — Scopes:
+- "offline_access" gets you a refresh token but may not grant API access alone.
+- To get actual API access, the user needs the ApplicationAccess scope: "offline_access ApplicationAccess_<GUID>"
+- The GUID is found in Creatio: System Designer → Lookups → "OAuth resources" → Name column (strip dashes).
+- The OAuth app in Creatio must also have this resource added under its permitted resources.
+
+OAuth App Setup in Creatio:
+1. System Designer → "OAuth 2.0 integrated applications" → create app with grant type "On behalf of a user (authorization code)"
+2. Set redirect URI to the superglue callback URL
+3. Under the app's permitted resources, add the ApplicationAccess resource
+4. Note the Client ID and Client Secret
+
+API Base URLs:
+- OData 4: https://<instance>.creatio.com/0/odata/ (e.g., /0/odata/Contact)
+- OData 3: https://<instance>.creatio.com/0/ServiceModel/EntityDataService.svc/ (e.g., /EntityDataService.svc/ContactCollection)
+- Use Bearer token auth: Authorization: Bearer <access_token>`,
+    keywords: [
+      "contacts",
+      "accounts",
+      "leads",
+      "opportunities",
+      "activities",
+      "cases",
+      "orders",
+      "products",
+      "invoices",
+      "campaigns",
+      "crm",
+      "bpm",
+      "odata",
+      "oauth",
     ],
   },
   sanity: {
@@ -2398,8 +2565,148 @@ export const systems: Record<string, SystemConfig> = {
     Tenant-Specific Endpoints: Multi-tenant apps need tenant ID in OAuth URLs (/04a63d67.../oauth2/v2.0/authorize) instead of /common endpoint
     Credentials Needed: Application (client) ID + Client Secret (generated under Certificates & secrets - copy the Value immediately, not the Secret ID)
     API Permissions: Add Microsoft Graph permissions (e.g., Sites.ReadWrite.All) under API permissions, then grant admin consent if you have admin rights
-    Scopes Must Include: Always add offline_access scope to get refresh tokens for long-term access without re-authentication 
+    Scopes Must Include: Always add offline_access scope to get refresh tokens for long-term access without re-authentication
     `,
+  },
+  dynamics365_sales: {
+    name: "dynamics365_sales",
+    apiUrl: "https://<<org>>.crm<<region_number>>.dynamics.com/api/data/v9.2",
+    regex: "^.*(crm\\d*\\.dynamics\\.com|dynamicscrm).*$",
+    icon: "lucide:square-percent",
+    docsUrl:
+      "https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/query-data-web-api",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      scopes: "https://<<org>>.crm<<region_number>>.dynamics.com/user_impersonation offline_access",
+      grant_type: "authorization_code",
+    },
+    keywords: [
+      "accounts",
+      "contacts",
+      "leads",
+      "opportunities",
+      "quotes",
+      "salesorders",
+      "salesorderdetails",
+      "products",
+      "incidents",
+      "campaigns",
+      "invoices",
+      "competitors",
+      "teams",
+      "systemusers",
+      "businessunits",
+      "odata",
+      "dynamics",
+      "crm",
+      "dynamics 365 sales",
+      "dataverse",
+      "oauth",
+    ],
+    systemSpecificInstructions: `Dynamics 365 Sales — Dataverse Web API v9.2
+
+REQUIRED HEADERS (in addition to Authorization):
+- OData-MaxVersion: 4.0
+- OData-Version: 4.0
+- If-None-Match: null (recommended — prevents stale cached data, especially on $expand queries)
+
+QUERY BEHAVIOR:
+- $skip is NOT supported. Use @odata.nextLink for pagination (default page size 5000, control with Prefer: odata.maxpagesize=<n>).
+- PAGINATION IN SUPERGLUE: Use cursorBased pagination with cursorPath "@odata.nextLink":
+  pagination: { type: "cursorBased", pageSize: "5000", cursorPath: "@odata.nextLink" }
+  The cursor is a full URL — use <<cursor>> as the step URL (set the initial URL via a "cursor" input variable).
+- $apply is supported for aggregations.
+- Lookup fields (foreign keys) are named _<field>_value — e.g. _parentaccountid_value, _customerid_value.
+- To get formatted/display values (e.g. option set labels, currency formatting), add header: Prefer: odata.include-annotations="OData.Community.Display.V1.FormattedValue"
+- FetchXML: GET /api/data/v9.2/<entity>?fetchXml=<url_encoded_xml> for complex aggregations and outer joins that OData $expand cannot express.
+- Max URL length is 32KB. For long queries, wrap in a $batch POST request (raises limit to 64KB).
+- Max individual OData URL segment is 260 chars — use parameter aliases (@p1=value) to shorten segments.
+
+WRITE SPECIFICS:
+- PATCH doubles as an upsert when the target record doesn't exist (by ID or alternate key). Use If-Match: * to prevent accidental creates. Use If-None-Match: * to prevent accidental updates.
+- Setting lookups on write: use @odata.bind — e.g. "parentaccountid@odata.bind": "/accounts(<guid>)"
+- Disassociating a lookup: set the navigation property to null (without @odata.bind), e.g. "parentcustomerid_account": null
+
+RATE LIMITS (Service Protection):
+- 429 Too Many Requests returned when limits exceeded. Always implement Retry-After handling.
+- Per-user limits per 5-min window: 6,000 requests, 20 min combined execution time, 52+ concurrent requests.
+- These are per web server — actual capacity varies by environment.
+
+DISCOVERING CUSTOM ENTITIES:
+GET /api/data/v9.2/EntityDefinitions?$filter=IsCustomEntity eq true&$select=LogicalName,DisplayName
+`,
+  },
+  dynamics365_business_central: {
+    name: "dynamics365_business_central",
+    apiUrl: "https://api.businesscentral.dynamics.com/v2.0/<<environment>>/api/v2.0",
+    regex: "^.*(businesscentral\\.dynamics\\.com|business[\\s\\-]?central).*$",
+    icon: "lucide:landmark",
+    docsUrl:
+      "https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/api-reference/v2.0/",
+    preferredAuthType: "oauth",
+    oauth: {
+      authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      scopes: "https://api.businesscentral.dynamics.com/.default offline_access",
+      grant_type: "authorization_code",
+    },
+    keywords: [
+      "customers",
+      "vendors",
+      "items",
+      "salesOrders",
+      "salesInvoices",
+      "salesQuotes",
+      "purchaseOrders",
+      "purchaseInvoices",
+      "generalLedgerEntries",
+      "journals",
+      "accounts",
+      "employees",
+      "dimensions",
+      "warehouses",
+      "inventory",
+      "odata",
+      "dynamics",
+      "erp",
+      "business central",
+      "finance",
+      "oauth",
+    ],
+    systemSpecificInstructions: `Dynamics 365 Business Central — API v2.0
+
+COMPANY SCOPING: All entities are scoped under a company. List companies first: GET /api/v2.0/companies, then access entities at /companies(<id>)/<entity>.
+
+WRITE SPECIFICS:
+- Updates REQUIRE an If-Match header with the entity's @odata.etag value — omitting it will fail.
+- Do NOT insert child records belonging to the same parent in parallel — causes locks. Use $batch to serialize them.
+- Transactional $batch: add Isolation: snapshot header for all-or-nothing batch operations. Max 100 operations per $batch.
+
+PAGINATION: Uses @odata.nextLink (a full URL for the next page). In superglue, use offsetBased pagination with $top and $skip since BC supports $skip:
+  pagination: { type: "offsetBased", pageSize: "1000" }
+  queryParams: { "$top": "<<limit>>", "$skip": "<<offset>>" }
+
+QUERY LIMITS:
+- Max page size: 20,000 entities per response (returns 413 if exceeded).
+- Max request body size: 350 MB.
+- Request timeout: 8 minutes — long-running requests get 408 or 504.
+- Use Data-Access-Intent: ReadOnly header on GET requests that don't need latest data (routes to read replica, reduces load).
+
+RATE LIMITS:
+- 429 Too Many Requests when limits exceeded. Always implement Retry-After handling.
+- Per-user: 6,000 requests per 5-min sliding window, 5 concurrent requests, 100 max connections.
+
+PERFORMANCE GOTCHAS:
+- Avoid temp-table-based API pages with >100 records — no caching, poor pagination.
+- Calculated/complex fields on API pages are expensive. Prefer stored values.
+- API pages/queries are up to 10x faster than SOAP endpoints — always prefer API v2.0.
+
+WEBHOOKS: Supports up to 200 webhook subscriptions for entity change notifications via /subscriptions.
+
+CUSTOM APIs: Publishers expose custom API pages at /api/{publisher}/{group}/{version}/companies(<id>)/<endpoint>, NOT under /api/v2.0/.
+`,
   },
   redis: {
     name: "redis",
@@ -2800,7 +3107,7 @@ export const systems: Record<string, SystemConfig> = {
   },
   googleAds: {
     name: "googleAds",
-    apiUrl: "https://googleads.googleapis.com/v20",
+    apiUrl: "https://googleads.googleapis.com/v23",
     regex: "^.*(googleads\\.googleapis|developers\\.google\\.com/google-ads|adwords\\.google).*$",
     icon: "googleads",
     docsUrl: "https://developers.google.com/google-ads/api/docs/concepts/overview",
@@ -2808,12 +3115,24 @@ export const systems: Record<string, SystemConfig> = {
     oauth: {
       authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
       tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes:
-        "https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
+      scopes: "https://www.googleapis.com/auth/adwords",
     },
+    systemSpecificInstructions: `Google Ads API requires BOTH OAuth AND a developer token on every request.
+
+REQUIRED HEADERS:
+- Authorization: Bearer <access_token>
+- developer-token: <22-char token from https://ads.google.com/aw/apicenter>
+- login-customer-id: <manager-account-id without hyphens> (only when calling through a manager account)
+
+SETUP: User needs a Google Ads Manager account, a Google Cloud project with OAuth credentials, and a developer token (applied for via the API Center). New tokens start as test-only; production access requires a follow-up application.
+
+QUERYING (GAQL): Use Google Ads Query Language via:
+- POST /v23/customers/{customerId}/googleAds:searchStream (streaming, recommended)
+- POST /v23/customers/{customerId}/googleAds:search (paginated)
+Example: SELECT campaign.name, metrics.impressions FROM campaign WHERE segments.date DURING LAST_30_DAYS`,
     keywords: [
       "campaigns",
-      "ad groups",
+      "ad_groups",
       "ads",
       "keywords",
       "GAQL",
@@ -2826,6 +3145,9 @@ export const systems: Record<string, SystemConfig> = {
       "accounts",
       "billing",
       "targeting",
+      "search_terms",
+      "metrics",
+      "segments",
       "oauth",
     ],
   },
@@ -2882,6 +3204,33 @@ export const systems: Record<string, SystemConfig> = {
       "segmentation",
       "track",
       "api key",
+    ],
+  },
+  circleback: {
+    name: "circleback",
+    apiUrl: "https://app.circleback.ai",
+    regex: "^.*circleback.*$",
+    icon: "default",
+    docsUrl: "https://support.circleback.ai/en/articles/13249081-circleback-mcp",
+    preferredAuthType: "oauth",
+    systemSpecificInstructions: `Circleback has NO traditional REST API. Data access is exclusively via their MCP server.
+
+MCP ENDPOINT: https://app.circleback.ai/api/mcp
+PROTOCOL: JSON-RPC 2.0 over Streamable HTTP transport
+AUTH: OAuth 2.0 with dynamic client registration (no app registration needed).
+
+AVAILABLE DATA: meetings, transcripts, action items, calendar events, emails, people, companies.`,
+    keywords: [
+      "meetings",
+      "transcripts",
+      "notes",
+      "action_items",
+      "calendar_events",
+      "attendees",
+      "summaries",
+      "people",
+      "companies",
+      "emails",
     ],
   },
   firecrawl: {
@@ -2954,6 +3303,75 @@ IMPORTANT: Sandbox and production use completely separate credentials and base U
     docsUrl: "https://ai.google.dev/api",
     // there is a openapi spec here: https://generativelanguage.googleapis.com/$discovery/OPENAPI3_0?version=v1beta&key=$GOOGLE_API_KEY - but you need your own google api key to access it
     preferredAuthType: "apikey",
+  },
+  tableau: {
+    name: "tableau",
+    apiUrl: "https://{your-server}.online.tableau.com",
+    regex: "^.*(tableau\\.com|online\\.tableau).*$",
+    icon: "lucide:plus",
+    docsUrl: "https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm",
+    preferredAuthType: "apikey",
+    keywords: [
+      "workbooks",
+      "views",
+      "datasources",
+      "projects",
+      "users",
+      "groups",
+      "permissions",
+      "sheets",
+      "published data sources",
+      "sites",
+      "jobs",
+      "favorites",
+      "flows",
+      "metrics",
+      "webhooks",
+      "connected apps",
+      "jwt",
+      "vizql",
+      "row-level security",
+    ],
+    systemSpecificInstructions: `Tableau supports two Connected App authentication methods:
+1. **Direct Trust**: Requires client_id, secret_id, and secret_value — you generate and sign JWTs yourself
+2. **OAuth 2.0**: Standard OAuth flow with client_id and client_secret
+
+DIRECT TRUST CREDENTIALS (from Settings > Connected Apps):
+- tableau_url: Server URL (e.g., https://prod-uk-a.online.tableau.com)
+- tableau_site_id: The content URL from browser (e.g., "mysite" from /site/mysite/)
+- tableau_client_id: Connected App ID
+- tableau_secret_id: The key ID you generated
+- tableau_client_secret: The secret value (only shown once when created)
+
+DIRECT TRUST AUTH FLOW:
+1. Generate a JWT signed with HMAC-SHA256 using the secret value. Include:
+   - Header: { alg: "HS256", typ: "JWT", kid: secret_id, iss: client_id }
+   - Payload: { iss: client_id, sub: "<username>", aud: "tableau", exp: <now+600>, jti: <uuid>, scp: ["tableau:content:read", "tableau:query:run"] }
+2. Exchange JWT for access token: POST /api/3.24/auth/signin with body: { credentials: { jwt: "<token>", site: { contentUrl: "<site_id>" } } }
+3. Use the returned token in X-Tableau-Auth header for all subsequent requests
+
+AVAILABLE APIs:
+- REST API (/api/3.24/...): Management & metadata — list datasources, workbooks, users, download view/dashboard data
+- Metadata API: GraphQL for relationships and lineage
+- VizQL Data Service (/api/v1/vizql-data-service/query-datasource): Query datasource rows directly
+
+ROW-LEVEL SECURITY: The JWT's "sub" claim determines which user's permissions apply. Data is automatically filtered based on that user's access.
+
+SUPERGLUE EXAMPLE - JWT generation in a transform step (Direct Trust):
+\`\`\`javascript
+(data) => {
+  const creds = data._credentials || {};
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT', kid: creds.tableau_secret_id, iss: creds.tableau_client_id }));
+  const payload = base64url(JSON.stringify({ iss: creds.tableau_client_id, sub: data.username, aud: 'tableau', exp: now + 600, jti: crypto.randomUUID(), scp: ['tableau:content:read', 'tableau:query:run'] }));
+  const signature = crypto.createHmac('sha256', creds.tableau_client_secret).update(header + '.' + payload).digest('base64url');
+  return { jwt: header + '.' + payload + '.' + signature };
+};
+\`\`\`
+
+EXAMPLE WORKFLOWS:
+- Generate JWT → Sign in → List datasources → Query via VizQL Data Service
+- Generate JWT → Sign in → Get workbook → Download view/dashboard data as CSV/PDF`,
   },
 };
 
@@ -3146,82 +3564,4 @@ export function getOAuthTokenUrl(system: System): string {
   } catch {
     return `${system.url}/oauth/token`;
   }
-}
-
-export interface SdkCodegenOptions {
-  apiKey: string;
-  endpoint: string;
-  workflowId: string;
-  payload: any;
-  credentials: any;
-  includeComments?: boolean;
-  wrapInMain?: boolean;
-}
-
-export interface SdkCode {
-  typescript: string;
-  python: string;
-  go: string;
-}
-
-export function getSDKCode(opts: SdkCodegenOptions): SdkCode {
-  const { endpoint, workflowId, payload } = opts;
-
-  return {
-    typescript: `// if not installed, run: npm install @superglue/client
-// ALWAYS USE THE SDK, do not use the graphql endpoint directly
-import { SuperglueClient } from '@superglue/client';
-
-const client = new SuperglueClient({
-  apiKey: "<YOUR_SUPERGLUE_API_KEY>",
-  endpoint: "${endpoint}" // or default to https://graphql.superglue.ai NOT https://api.superglue.ai
-});
-
-async function main() {
-  const result = await client.runTool({
-      toolId: "${workflowId}",
-      payload: ${JSON.stringify(payload, null, 2)}
-  });
-  console.log(result);
-}
-
-main();`,
-    python: `import requests
-
-response = requests.post("${endpoint}",  # or default to https://graphql.superglue.ai
-  headers={"Authorization": "Bearer <YOUR_SUPERGLUE_API_KEY>"},
-  json={
-      "query": "mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) { \\n      executeWorkflow(input: $input, payload: $payload) { \\n        data error success\\n      }\\n    }",
-      "variables": {
-          "input": {"id": "${workflowId}"},
-          "payload": ${JSON.stringify(payload, null, 2)}
-      }
-  })
-`,
-    go: `package main
-import (
-  "bytes"
-  "encoding/json"
-  "net/http"
-)
-
-func main() {
-  payload := ${JSON.stringify(payload, null, 2)}
-  
-  reqBody, _ := json.Marshal(map[string]interface{}{
-      "query": \`mutation ExecuteWorkflow($input: WorkflowInputRequest!, $payload: JSON) {\\n      executeWorkflow(input: $input, payload: $payload) {\\n        data error success\\n      }\\n    }\`,
-      "variables": map[string]interface{}{
-          "input":       map[string]string{"id": "${workflowId}"},
-          "payload":     payload,
-      },
-  })
-  
-  req, _ := http.NewRequest("POST", "${endpoint}", bytes.NewBuffer(reqBody)) // or default to https://graphql.superglue.ai
-  req.Header.Set("Authorization", "Bearer <YOUR_SUPERGLUE_API_KEY>")
-  req.Header.Set("Content-Type", "application/json")
-  
-  resp, _ := http.DefaultClient.Do(req)
-  defer resp.Body.Close()
-}`,
-  };
 }

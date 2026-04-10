@@ -1,11 +1,13 @@
 "use client";
 
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems, useInvalidateSystems } from "@/src/queries/systems";
 import { Button } from "@/src/components/ui/button";
 import { ErrorMessage } from "@/src/components/ui/error-message";
 import { Input } from "@/src/components/ui/input";
-import { UserAction } from "@/src/lib/agent/agent-types";
-import { cn } from "@/src/lib/general-utils";
+import {
+  createToolInteractionEntry,
+  ToolMutation,
+} from "@/src/lib/agent/agent-tools/tool-call-state";
 import { ToolCall } from "@superglue/shared";
 import { AlertCircle, CheckCircle, Eye, EyeOff, KeyRound, Loader2, Settings } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,9 +17,14 @@ interface ModifySystemComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
+  onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
   sendAgentRequest?: (
     userMessage?: string,
-    options?: { userActions?: UserAction[] },
+    options?: {
+      hiddenStarterMessage?: string;
+      hideUserMessage?: boolean;
+      resumeToolCallId?: string;
+    },
   ) => Promise<void>;
   onAbortStream?: () => void;
 }
@@ -30,7 +37,6 @@ interface ModifySystemInput {
 
 interface ModifySystemOutput {
   success?: boolean;
-  confirmationState?: string;
   systemConfig?: any;
   requiredSensitiveFields?: string[];
   systemId?: string;
@@ -44,10 +50,12 @@ function ModifySystemComponentImpl({
   tool,
   onInputChange,
   onToolUpdate,
+  onToolMutation,
   sendAgentRequest,
   onAbortStream,
 }: ModifySystemComponentProps) {
-  const { systems, refreshSystems } = useSystems();
+  const { systems } = useSystems();
+  const invalidateSystems = useInvalidateSystems();
   const hasRefreshedRef = useRef(false);
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
@@ -77,6 +85,7 @@ function ModifySystemComponentImpl({
 
   const systemConfig = output?.systemConfig || input;
   const systemId = output?.systemId || output?.system?.id || systemConfig?.id || input?.id;
+  const environment = output?.environment || input?.environment || "prod";
   const systemFromContext = useMemo(() => {
     return systemId ? systems.find((i) => i.id === systemId) : null;
   }, [systems, systemId]);
@@ -87,7 +96,11 @@ function ModifySystemComponentImpl({
     if (output?.requiredSensitiveFields && output.requiredSensitiveFields.length > 0) {
       return output.requiredSensitiveFields;
     }
-    if (input?.sensitiveCredentials) {
+    if (
+      input?.sensitiveCredentials &&
+      typeof input.sensitiveCredentials === "object" &&
+      !Array.isArray(input.sensitiveCredentials)
+    ) {
       return Object.keys(input.sensitiveCredentials);
     }
     return [];
@@ -101,14 +114,14 @@ function ModifySystemComponentImpl({
     tool.status === "pending" ||
     (tool.status === "awaiting_confirmation" && !hasSensitiveCredentials);
   const hasError =
-    tool.status === "error" || (output && !output.success && !output.confirmationState);
+    tool.status === "error" || (tool.status === "completed" && output && !output.success);
 
   useEffect(() => {
     if (isCompleted && !hasRefreshedRef.current) {
       hasRefreshedRef.current = true;
-      refreshSystems();
+      invalidateSystems();
     }
-  }, [isCompleted, refreshSystems]);
+  }, [isCompleted, invalidateSystems]);
 
   useEffect(() => {
     if (isCompleted || hasError || tool.status === "declined") {
@@ -121,39 +134,40 @@ function ModifySystemComponentImpl({
 
     setIsExecuting(true);
     onToolUpdate?.(tool.id, { status: "running" });
+    onToolMutation?.(tool.id, {
+      interactionEntry: createToolInteractionEntry(
+        "user_submitted_credentials_and_confirmed_system_edit",
+        {
+          providedCredentialFields: Object.keys(credentialValues).filter((field) =>
+            credentialValues[field]?.trim(),
+          ),
+        },
+      ),
+      confirmationState: "confirmed",
+      confirmationData: {
+        systemConfig,
+        userProvidedCredentials: credentialValues,
+      },
+    });
 
     sendAgentRequest(undefined, {
-      userActions: [
-        {
-          type: "tool_event",
-          toolCallId: tool.id,
-          toolName: "edit_system",
-          event: "confirmed",
-          payload: {
-            systemConfig,
-            userProvidedCredentials: credentialValues,
-          },
-        },
-      ],
+      resumeToolCallId: tool.id,
     });
-  }, [sendAgentRequest, onToolUpdate, tool.id, systemConfig, credentialValues]);
+  }, [credentialValues, onToolMutation, onToolUpdate, sendAgentRequest, systemConfig, tool.id]);
 
   const handleCancel = useCallback(() => {
     if (!sendAgentRequest) return;
 
     onToolUpdate?.(tool.id, { status: "declined" });
+    onToolMutation?.(tool.id, {
+      interactionEntry: createToolInteractionEntry("user_declined_system_edit"),
+      confirmationState: "declined",
+    });
 
     sendAgentRequest(undefined, {
-      userActions: [
-        {
-          type: "tool_event",
-          toolCallId: tool.id,
-          toolName: "edit_system",
-          event: "declined",
-        },
-      ],
+      resumeToolCallId: tool.id,
     });
-  }, [sendAgentRequest, onToolUpdate, tool.id]);
+  }, [onToolMutation, onToolUpdate, sendAgentRequest, tool.id]);
 
   const allCredentialsProvided = useMemo(() => {
     return requiredSensitiveFields.every(
@@ -208,6 +222,11 @@ function ModifySystemComponentImpl({
           <code className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {displayName}
           </code>
+          {environment === "dev" && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+              DEV
+            </span>
+          )}
         </div>
 
         {isAwaitingConfirmation && requiredSensitiveFields.length > 0 && (

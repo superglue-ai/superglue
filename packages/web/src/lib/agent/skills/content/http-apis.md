@@ -1,4 +1,4 @@
-# HTTP API Steps
+# HTTP APIs
 
 Covers REST APIs, GraphQL, webhooks, and any HTTP-based service.
 
@@ -8,14 +8,31 @@ Covers REST APIs, GraphQL, webhooks, and any HTTP-based service.
 {
   type: "request",
   systemId: "my_api",
-  url: "https://api.example.com/v1/users",   // supports <<variables>> and JS expressions
+  url: "<<my_api_url>>/v1/users",              // RECOMMENDED: use system URL variable for base URL
   method: "GET",                               // GET, POST, PUT, DELETE, PATCH
-  headers: { "Authorization": "Bearer <<my_api_access_token>>" }, // // supports <<variables>> and JS expressions
-  queryParams: { "limit": "<<limit>>", "status": "active" }, // // supports <<variables>> and JS expressions
+  headers: { "Authorization": "Bearer <<my_api_access_token>>" }, // supports <<variables>> and JS expressions
+  queryParams: { "limit": "<<limit>>", "status": "active" }, // supports <<variables>> and JS expressions
   body: '{"name": "<<(sourceData) => sourceData.currentItem.name>>"}', // supports <<variables>> and JS expressions
   pagination: { ... }  // optional
 }
 ```
+
+### URL Best Practices
+
+**Prefer system URL variables over hardcoded URLs:**
+
+```typescript
+// RECOMMENDED: Environment-agnostic (works with dev/prod switching)
+{ "url": "<<salesforce_url>>/services/data/v58.0/sobjects/Account" }
+
+// ACCEPTABLE: When URL differs significantly from system base URL
+{ "url": "https://api.stripe.com/v1/customers" }
+
+// AVOID: Hardcoding URLs that match the system's base URL
+{ "url": "https://mycompany.salesforce.com/services/data/v58.0/sobjects/Account" }
+```
+
+Using `<<systemId_url>>` enables the same tool to work across different environments (dev/prod) without modification. The URL resolves dynamically based on execution mode.
 
 ## Authentication Patterns
 
@@ -77,7 +94,7 @@ Bypass: `failureBehavior: "continue"` skips all error checking. Can be set in th
 
 ## Pagination
 
-Makes multiple requests in a loop, merging results. Only configure if you've verified the exact pagination mechanism from docs.
+Makes multiple requests in a loop, merging results. Only configure if you've verified the exact API pagination mechanism from docs.
 
 ### Configuration
 
@@ -136,6 +153,10 @@ Examples:
 
 `cursorPath` is a JSONPath expression (auto-prefixed with `$.` if needed). Extracted via `jsonpath-plus`. Null cursor → stop.
 
+**Special characters in cursorPath:** For property names containing `@` (e.g. OData's `@odata.nextLink`), use the property name directly as the cursorPath: `cursorPath: "@odata.nextLink"`. The engine handles `@`-prefixed paths automatically.
+
 ## Output
+
+Paginated steps merge all pages into a **single** result object. The step result is always accessed via `sourceData.stepId.data` — it is NOT an array of per-page results. Do NOT call `.map()` on a paginated step result.
 
 Returns single object if one result, array if multiple (unwrapped from single-element array).

@@ -12,9 +12,86 @@ import prettier from "prettier/standalone";
 import type { SimpleIcon } from "simple-icons";
 import * as simpleIcons from "simple-icons";
 import { twMerge } from "tailwind-merge";
-import { StepExecutionResult } from "./client-utils";
+import type { StepExecutionResult } from "./client-utils";
 
 export const inputErrorStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";
+
+/**
+ * Generate a unique key for a system based on id and environment.
+ * With composite key model, systems are uniquely identified by (id, environment).
+ */
+export function getSystemKey(system: { id: string; environment?: "dev" | "prod" }): string {
+  return system.environment ? `${system.id}:${system.environment}` : system.id;
+}
+
+/**
+ * Find a system by id and optional environment.
+ * If environment is not specified, returns the first match.
+ */
+export function findSystemByIdAndEnv(
+  systems: System[] | undefined,
+  id: string,
+  environment?: "dev" | "prod",
+): System | undefined {
+  if (!systems) return undefined;
+  if (environment) {
+    return systems.find((s) => s.id === id && s.environment === environment);
+  }
+  return systems.find((s) => s.id === id);
+}
+
+/**
+ * Check if a system has a linked environment counterpart (same id, different environment).
+ * DB constraint ensures environment is always 'dev' or 'prod'.
+ */
+export function hasLinkedEnvironment(systems: System[] | undefined, system: System): boolean {
+  if (!systems) return false;
+  const otherEnv = system.environment === "dev" ? "prod" : "dev";
+  return systems.some((s) => s.id === system.id && s.environment === otherEnv);
+}
+
+/**
+ * Get the linked environment system (same id, different environment).
+ * DB constraint ensures environment is always 'dev' or 'prod'.
+ */
+export function getLinkedSystem(systems: System[] | undefined, system: System): System | undefined {
+  if (!systems) return undefined;
+  const otherEnv = system.environment === "dev" ? "prod" : "dev";
+  return systems.find((s) => s.id === system.id && s.environment === otherEnv);
+}
+
+export const copyToClipboard = async (text: string): Promise<boolean> => {
+  if (typeof navigator === "undefined" || typeof document === "undefined") {
+    return false;
+  }
+
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn("Clipboard API failed, trying fallback:", err);
+    }
+  }
+
+  const textArea = document.createElement("textarea");
+  try {
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    return successful;
+  } catch (err) {
+    console.error("Fallback copy failed:", err);
+    return false;
+  } finally {
+    textArea.remove();
+  }
+};
 
 /** Deep equality check for JSON-serializable objects */
 export function deepEqual(a: unknown, b: unknown): boolean {
@@ -94,8 +171,8 @@ export const computeStepOutput = (
 };
 
 // Truncation constants for display
-export const MAX_DISPLAY_SIZE = 1024 * 1024; // 1MB limit for JSON display
-export const MAX_DISPLAY_LINES = 3000; // Max lines to show in any JSON view
+export const MAX_DISPLAY_SIZE = 2 * 1024 * 1024; // 2MB limit for JSON display
+export const MAX_DISPLAY_LINES = 10000; // Max lines to show in any JSON view
 export const MAX_STRING_PREVIEW_LENGTH = 3000; // Max chars for individual string values
 export const MAX_ARRAY_PREVIEW_ITEMS = 10; // Max array items to show before truncating
 export const MAX_TRUNCATION_DEPTH = 10; // Max depth for nested object traversal
@@ -198,16 +275,6 @@ export const truncateForDisplay = (data: any): { value: string; truncated: boole
     }
     return { value: JSON.stringify(stringValue), truncated: false };
   }
-};
-
-export const truncateLines = (text: string, maxLines: number): string => {
-  if (!text) return text;
-  const lines = text.split("\n");
-  if (lines.length <= maxLines) return text;
-  return (
-    lines.slice(0, maxLines).join("\n") +
-    `\n... truncated ${lines.length - maxLines} more lines ...`
-  );
 };
 
 let _simpleIconsBySlug: Map<string, SimpleIcon> | null = null;
@@ -485,9 +552,14 @@ export function wrapDataSelectorWithLimit(
 }`;
 }
 
-export function isAbortError(errorMessage: string | undefined): boolean {
-  if (!errorMessage) return false;
-  return errorMessage.startsWith("AbortError:");
+export function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "string") return error.startsWith("AbortError:");
+  if (error instanceof DOMException) return error.name === "AbortError";
+  if (error instanceof Error) {
+    return error.name === "AbortError" || error.message.startsWith("AbortError:");
+  }
+  return false;
 }
 
 export function formatDurationShort(ms: number): string {
@@ -510,8 +582,7 @@ export const handleCopyCode = async (code: string): Promise<boolean> => {
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&amp;/g, "&");
-    await navigator.clipboard.writeText(decodedCode);
-    return true;
+    return await copyToClipboard(decodedCode);
   } catch {
     return false;
   }
@@ -581,5 +652,26 @@ export function truncateToolResult(result: any, maxLength: number = 100000): str
     return basicString.length > maxLength
       ? basicString.slice(0, maxLength) + "\n\n... [Output truncated - result too large]"
       : basicString;
+  }
+}
+
+/**
+ * Convert camelCase, snake_case, or kebab-case to human-readable format.
+ * e.g., "browserLink" -> "Browser Link", "user_name" -> "User Name"
+ */
+export function formatLabel(label: string): string {
+  if (!label) return "";
+  try {
+    return (
+      label
+        // Insert space before uppercase letters (camelCase)
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        // Replace underscores and hyphens with spaces
+        .replace(/[_-]/g, " ")
+        // Capitalize first letter of each word
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+  } catch {
+    return label;
   }
 }

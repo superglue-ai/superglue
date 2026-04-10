@@ -1,6 +1,12 @@
 "use client";
 
+import { useSystems } from "@/src/queries/systems";
 import { Button } from "@/src/components/ui/button";
+import {
+  EnvironmentBadge,
+  EnvironmentSwitch,
+  getEnvironmentType,
+} from "@/src/components/ui/environment-label";
 import { MiniCard } from "@/src/components/ui/mini-card";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { useAgentModal } from "@/src/components/agent/AgentModalContext";
@@ -9,7 +15,16 @@ import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/src/lib/general-utils";
-import { Blocks, Check, FileText, FlaskConical, Hammer, KeyRound, Loader2 } from "lucide-react";
+import {
+  Blocks,
+  Check,
+  FileText,
+  FlaskConical,
+  Hammer,
+  KeyRound,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import { useSystemConfig } from "./context";
 import { SectionStatus, SystemContextForAgent, SystemSection } from "./context/types";
 import { ConfigurationSection } from "./sections/ConfigurationSection";
@@ -22,7 +37,7 @@ const SECTIONS: SystemSection[] = ["configuration", "authentication", "context"]
 const SECTION_CONFIG: Record<SystemSection, { icon: React.ElementType; label: string }> = {
   configuration: { icon: Blocks, label: "Configuration" },
   authentication: { icon: KeyRound, label: "Authentication" },
-  context: { icon: FileText, label: "Documentation" },
+  context: { icon: FileText, label: "Knowledge Base" },
 };
 
 function getStatusColor(status: SectionStatus) {
@@ -37,6 +52,7 @@ function getStatusColor(status: SectionStatus) {
 
 export function SystemPlayground() {
   const router = useRouter();
+  const { systems } = useSystems();
   const {
     sendMessageToAgent,
     setShowAgent,
@@ -59,6 +75,40 @@ export function SystemPlayground() {
   } = useSystemConfig();
 
   const [justSaved, setJustSaved] = useState(false);
+
+  // Compute linked systems for environment switcher
+  // With composite key model, linked systems have the same ID but different environment
+  const linkedDevSystem = useMemo(() => {
+    if (!system.id) return null;
+    // Only find a dev system if we're NOT currently viewing a dev system
+    if (system.environment === "dev") return null;
+    return systems.find((s) => s.id === system.id && s.environment === "dev") || null;
+  }, [systems, system.id, system.environment]);
+
+  const linkedProdSystem = useMemo(() => {
+    if (!system.id) return null;
+    // Only find a prod system if we're NOT currently viewing a prod system
+    if (system.environment === "prod") return null;
+    return systems.find((s) => s.id === system.id && s.environment === "prod") || null;
+  }, [systems, system.id, system.environment]);
+
+  const envType = useMemo(() => {
+    return getEnvironmentType(system.environment, !!linkedDevSystem, !!linkedProdSystem);
+  }, [system.environment, linkedDevSystem, linkedProdSystem]);
+
+  // Determine if we have a linked system
+  const hasLinkedSystem = !!linkedDevSystem || !!linkedProdSystem;
+  const isViewingDev = system.environment === "dev";
+
+  const handleEnvSwitch = useCallback(() => {
+    // With composite key model, dev and prod have the same ID
+    // Use query parameter to switch between environments
+    if (isViewingDev && linkedProdSystem) {
+      router.push(`/systems/${encodeURIComponent(system.id)}?env=prod`);
+    } else if (!isViewingDev && linkedDevSystem) {
+      router.push(`/systems/${encodeURIComponent(system.id)}?env=dev`);
+    }
+  }, [router, linkedDevSystem, linkedProdSystem, isViewingDev, system.id]);
 
   const systemConfigForAgent = useMemo(
     () => getSystemContextForAgent(),
@@ -165,9 +215,45 @@ export function SystemPlayground() {
   return (
     <div className="flex flex-col h-full w-full px-6 py-3">
       <div className="flex items-center justify-between mb-2 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <SystemIcon system={system} size={20} fallbackClassName="text-muted-foreground" />
-          <h1 className="text-xl font-semibold">{system.name || system.id || "New System"}</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <SystemIcon system={system} size={20} fallbackClassName="text-muted-foreground" />
+            <h1 className="text-xl font-semibold">{system.name || system.id || "New System"}</h1>
+          </div>
+
+          {/* Environment badge and switcher */}
+          {!isNewSystem && envType !== "none" && (
+            <>
+              {hasLinkedSystem ? (
+                <EnvironmentSwitch
+                  value={isViewingDev ? "dev" : "prod"}
+                  onChange={(val) => {
+                    if (val !== (isViewingDev ? "dev" : "prod")) {
+                      handleEnvSwitch();
+                    }
+                  }}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <EnvironmentBadge type={envType} size="sm" />
+                  <button
+                    onClick={() => {
+                      const systemName = system.name || system.id;
+                      const targetEnv = envType === "prod" ? "dev" : "prod";
+                      const prompt = encodeURIComponent(
+                        `Create a ${targetEnv === "dev" ? "development" : "production"} version of the "${systemName}" system with the same ID (${system.id}) but environment='${targetEnv}'. The ${targetEnv} system should have the same structure but with ${targetEnv === "dev" ? "development/sandbox" : "production"} credentials.`,
+                      );
+                      router.push(`/?prompt=${prompt}`);
+                    }}
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-md border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-muted-foreground/60 hover:text-foreground transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {envType === "prod" ? "Dev" : "Prod"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

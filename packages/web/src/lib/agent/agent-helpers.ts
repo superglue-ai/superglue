@@ -1,12 +1,15 @@
-import { ALLOWED_PATCH_SYSTEM_FIELDS, Message, System, Tool } from "@superglue/shared";
+import {
+  ALLOWED_PATCH_SYSTEM_FIELDS,
+  Message,
+  System,
+  SystemConfig,
+  systems,
+  Tool,
+} from "@superglue/shared";
 import * as jsonpatch from "fast-json-patch";
-import { ToolExecutionContext } from "./agent-types";
+import { EditToolSaveResult, ToolExecutionContext } from "./agent-types";
 import { SKILL_INDEX } from "./skills/index";
-
-// Re-export from shared for backwards compatibility
-export { getConnectionProtocol, type ConnectionProtocol } from "@superglue/shared";
-// Alias for backwards compatibility
-export { getConnectionProtocol as getProtocol } from "@superglue/shared";
+import { findDraftInMessages } from "./agent-context";
 
 export const needsSystemMessage = (messages: Message[]): boolean => {
   return !messages.some((m) => m.role === "system");
@@ -22,6 +25,79 @@ export const stripLegacyToolFields = (tool: Tool): Tool => {
   };
 };
 
+function getEditToolSavedToolSuffix(saveResult: EditToolSaveResult): string {
+  return saveResult?.success === true ? ` as "${saveResult.toolId}"` : "";
+}
+
+export function buildEditToolApprovalMessage({
+  saveResult,
+  approvedCount,
+  rejectedCount,
+}: {
+  saveResult: EditToolSaveResult;
+  approvedCount?: number;
+  rejectedCount?: number;
+}): string {
+  if (approvedCount === undefined || rejectedCount === undefined) {
+    if (saveResult?.success === true) {
+      return `All changes approved, applied, and saved${getEditToolSavedToolSuffix(saveResult)}.`;
+    }
+
+    if (saveResult?.success === false) {
+      return `All changes approved and applied to the draft only, but saving failed: ${saveResult.error}`;
+    }
+
+    return "All changes approved and applied to the draft only. Tool is not saved yet.";
+  }
+
+  if (saveResult?.success === true) {
+    return `User partially approved the changes: ${approvedCount} applied and saved${getEditToolSavedToolSuffix(saveResult)}, ${rejectedCount} rejected.`;
+  }
+
+  if (saveResult?.success === false) {
+    return `User partially approved the changes: ${approvedCount} applied to the draft only, ${rejectedCount} rejected, but saving failed: ${saveResult.error}`;
+  }
+
+  return `User partially approved the changes: ${approvedCount} applied to the draft only, ${rejectedCount} rejected. Tool is not saved yet.`;
+}
+
+function getEditToolPersistenceFields(saveResult: EditToolSaveResult): Record<string, any> {
+  if (saveResult?.success === true) {
+    return {
+      persistence: "saved",
+    };
+  }
+
+  if (saveResult?.success === false) {
+    return {
+      persistence: "draft_only",
+      saveError: saveResult.error,
+    };
+  }
+
+  return {
+    persistence: "draft_only",
+  };
+}
+
+export function buildEditToolConfirmationOutput(
+  baseOutput: Record<string, any>,
+  saveResult: EditToolSaveResult,
+  options?: { keepDraftIdOnSave?: boolean },
+): Record<string, any> {
+  const nextOutput: Record<string, any> = {
+    ...baseOutput,
+    ...getEditToolPersistenceFields(saveResult),
+  };
+  delete nextOutput.originalConfig;
+  delete nextOutput.confirmationState;
+  delete nextOutput.confirmationData;
+  if (saveResult?.success === true && !options?.keepDraftIdOnSave) {
+    delete nextOutput.draftId;
+  }
+  return nextOutput;
+}
+
 export const filterSystemFields = (system: System) => {
   const credentialKeys = Object.keys(system.credentials || {});
   const credentialPlaceholders = credentialKeys.map((key) => `<<${system.id}_${key}>>`);
@@ -29,8 +105,10 @@ export const filterSystemFields = (system: System) => {
     id: system.id,
     name: system.name,
     url: system.url,
+    urlPlaceholder: system.url ? `<<${system.id}_url>>` : undefined,
     specificInstructions: system.specificInstructions,
     credentialPlaceholders: credentialPlaceholders,
+    environment: system.environment,
   };
 };
 
@@ -121,7 +199,7 @@ export const validateRequiredFields = (
   if (!schema) return { valid: true };
 
   let parsedSchema = typeof schema === "string" ? JSON.parse(schema) : schema;
-  parsedSchema = parsedSchema.properties?.payload;
+  parsedSchema = parsedSchema.properties?.payload || parsedSchema;
   if (!parsedSchema?.required || !Array.isArray(parsedSchema.required)) {
     return { valid: true };
   }
@@ -163,7 +241,6 @@ export type FileResolutionError = {
   success: false;
   error: string;
   availableFiles: string[];
-  next_step: string;
 };
 
 export function resolvePayloadWithFiles(
@@ -177,10 +254,6 @@ export function resolvePayloadWithFiles(
       success: false,
       error: `File references not found: ${validation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
       availableFiles: validation.availableKeys.map((k) => `file::${k}`),
-      next_step:
-        validation.availableKeys.length > 0
-          ? `Available file keys: ${validation.availableKeys.map((k) => `file::${k}`).join(", ")}`
-          : "No files are currently available. Ask the user to upload the required files.",
     };
   }
 
@@ -195,8 +268,6 @@ export function resolvePayloadWithFiles(
       success: false,
       error: error.message,
       availableFiles: Object.keys(filePayloads || {}).map((k) => `file::${k}`),
-      next_step:
-        "Use the exact sanitized file key from the file reference list (e.g., file::my_data_csv)",
     };
   }
 }
@@ -204,12 +275,11 @@ export function resolvePayloadWithFiles(
 export function validateDraftOrToolId(
   draftId?: string,
   toolId?: string,
-): { valid: true } | { valid: false; error: string; next_step?: string } {
+): { valid: true } | { valid: false; error: string } {
   if (!draftId && !toolId) {
     return {
       valid: false,
       error: "Either draftId or toolId is required",
-      next_step: "Provide draftId (from build_tool) or toolId (for saved tools)",
     };
   }
   if (draftId && toolId) {
@@ -426,51 +496,94 @@ export const validatePatches = (
   return { valid: true };
 };
 
-export const validateToolStructure = (
-  tool: any,
-  options?: { systemIds?: string[] },
-): { valid: boolean; error?: string } => {
-  if (!tool.id || typeof tool.id !== "string") {
-    return { valid: false, error: "Tool must have a valid 'id' string" };
+export const resolveOriginalConfig = async (
+  draftId: string,
+  toolId: string | undefined,
+  ctx: ToolExecutionContext,
+): Promise<any | null> => {
+  if (draftId === "playground-draft" && ctx.playgroundDraft) {
+    return ctx.playgroundDraft.config;
   }
-  if (!Array.isArray(tool.steps)) {
-    return { valid: false, error: "Tool must have a 'steps' array" };
+
+  const draft = findDraftInMessages(ctx.messages || [], draftId);
+  if (draft?.config) return draft.config;
+
+  if (toolId) {
+    try {
+      return await ctx.superglueClient.getWorkflow(toolId);
+    } catch {}
   }
-  if (tool.steps.length === 0 && !tool.outputTransform) {
-    return { valid: false, error: "Tool must have at least one step or an outputTransform" };
+
+  return null;
+};
+
+export const formatSystemKnowledgeForOutput = (template: SystemConfig) => {
+  const { apiUrl, oauth: rawOauth, ...rest } = template;
+  type TemplateOauth =
+    | {
+        authUrl?: string;
+        tokenUrl?: string;
+        scopes?: string | string[];
+        client_id?: string;
+        grant_type?: string;
+      }
+    | Record<string, unknown>;
+  const oauthObj =
+    rawOauth && typeof rawOauth === "object" ? (rawOauth as TemplateOauth) : undefined;
+
+  let snakeCaseOauth: Record<string, any> = {};
+  if (oauthObj?.authUrl) snakeCaseOauth["auth_url"] = oauthObj.authUrl;
+  if (oauthObj?.tokenUrl) snakeCaseOauth["token_url"] = oauthObj.tokenUrl;
+  if (oauthObj?.scopes) snakeCaseOauth["scopes"] = oauthObj.scopes;
+  if (oauthObj?.client_id) snakeCaseOauth["client_id"] = oauthObj.client_id;
+  if (oauthObj?.grant_type) snakeCaseOauth["grant_type"] = oauthObj.grant_type;
+
+  return {
+    ...rest,
+    url: apiUrl || "",
+    oauth: Object.keys(snakeCaseOauth).length > 0 ? snakeCaseOauth : undefined,
+  };
+};
+
+export const resolveSensitiveCredentials = (raw: unknown): Record<string, boolean> | null => {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch {}
+    return null;
   }
-  for (let i = 0; i < tool.steps.length; i++) {
-    const step = tool.steps[i];
-    if (!step.id) {
-      return { valid: false, error: `Step ${i + 1}: missing 'id'` };
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, boolean>;
+  return null;
+};
+
+export const buildSystemPendingOutput = (input: any) => {
+  let systemConfig = { ...input };
+  const { templateId, sensitiveCredentials: rawCreds, ...rest } = systemConfig;
+  const sensitiveCredentials = resolveSensitiveCredentials(rawCreds);
+
+  if (templateId) {
+    const template = systems[templateId];
+    if (template) {
+      const oauthCreds: Record<string, any> = {};
+      if (template.oauth) {
+        oauthCreds.auth_url = template.oauth.authUrl;
+        oauthCreds.token_url = template.oauth.tokenUrl;
+        oauthCreds.scopes = template.oauth.scopes;
+      }
+      systemConfig = {
+        name: template.name,
+        url: template.apiUrl,
+        templateName: templateId,
+        ...rest,
+        credentials: { ...oauthCreds, ...rest.credentials },
+      };
     }
-    if (!step.config) {
-      return { valid: false, error: `Step ${i + 1} (${step.id}): missing 'config'` };
-    }
-    if (step.config.type === "transform") {
-      if (!step.config.transformCode) {
-        return {
-          valid: false,
-          error: `Step ${i + 1} (${step.id}): transform step missing 'transformCode'`,
-        };
-      }
-    } else {
-      if (!step.config.systemId) {
-        return {
-          valid: false,
-          error: `Step ${i + 1} (${step.id}): request step missing 'systemId'`,
-        };
-      }
-      if (!step.config.url) {
-        return { valid: false, error: `Step ${i + 1} (${step.id}): request step missing 'url'` };
-      }
-      if (options?.systemIds && !options.systemIds.includes(step.config.systemId)) {
-        return {
-          valid: false,
-          error: `Step ${i + 1} (${step.id}): systemId '${step.config.systemId}' not in provided systemIds [${options.systemIds.join(", ")}]`,
-        };
-      }
-    }
   }
-  return { valid: true };
+
+  return {
+    systemConfig,
+    requiredSensitiveFields: sensitiveCredentials ? Object.keys(sensitiveCredentials) : [],
+  };
 };

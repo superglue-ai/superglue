@@ -1,36 +1,11 @@
+"use client";
+
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { safeStringify } from "@superglue/shared";
-import { cn } from "@/src/lib/general-utils";
+import { cn, copyToClipboard } from "@/src/lib/general-utils";
 
-export const copyToClipboard = async (text: string): Promise<boolean> => {
-  if (navigator.clipboard && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (err) {
-      console.warn("Clipboard API failed, trying fallback:", err);
-    }
-  }
-
-  const textArea = document.createElement("textarea");
-  try {
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    textArea.style.top = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    const successful = document.execCommand("copy");
-    return successful;
-  } catch (err) {
-    console.error("Fallback copy failed:", err);
-    return false;
-  } finally {
-    textArea.remove();
-  }
-};
+export { copyToClipboard };
 
 export const CopyButton = ({
   text,

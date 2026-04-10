@@ -1,6 +1,5 @@
 "use client";
 
-import { useConfig } from "@/src/app/config-context";
 import {
   formatBytes,
   generateUniqueKey,
@@ -8,8 +7,7 @@ import {
   processAndExtractFile,
   sanitizeFileName,
 } from "@/src/lib/file-utils";
-import { tokenRegistry } from "@/src/lib/token-registry";
-import { SuperglueClient } from "@superglue/shared";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import { useCallback, useRef, useState } from "react";
 import type { UploadedFile, UseAgentFileUploadReturn } from "./types";
 
@@ -18,7 +16,7 @@ interface UseAgentFileUploadOptions {
 }
 
 export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAgentFileUploadReturn {
-  const config = useConfig();
+  const createClient = useSuperglueClient();
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
   const [sessionFiles, setSessionFiles] = useState<UploadedFile[]>([]);
   const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
@@ -42,11 +40,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         const newFiles: UploadedFile[] = [];
         const newPayloads: Record<string, any> = {};
 
-        const client = new SuperglueClient({
-          endpoint: config.apiEndpoint,
-          apiKey: tokenRegistry.getToken(),
-          apiEndpoint: config.apiEndpoint,
-        });
+        const client = createClient();
 
         for (const file of files) {
           try {
@@ -123,7 +117,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         setIsProcessingFiles(false);
       }
     },
-    [allFiles, filePayloads, config.apiEndpoint, toast],
+    [allFiles, filePayloads, createClient, toast],
   );
 
   const handlePendingFileRemove = useCallback((key: string) => {

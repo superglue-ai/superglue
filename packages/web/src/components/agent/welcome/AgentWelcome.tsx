@@ -1,9 +1,8 @@
 "use client";
 
 import { cn } from "@/src/lib/general-utils";
-import { Lightbulb, Users } from "lucide-react";
-import React, { useImperativeHandle, useState, useCallback } from "react";
-import { AgentWelcomeToolLibrary } from "./AgentWelcomeToolLibrary";
+import { Lightbulb, Play } from "lucide-react";
+import React, { useImperativeHandle, useCallback } from "react";
 import { SystemCarousel } from "@/src/components/ui/rotating-icon-gallery";
 import { SystemConfig } from "@superglue/shared";
 
@@ -14,8 +13,11 @@ const EXAMPLES = {
     user: "What can I do with superglue?",
   },
   TEMPLATES: {
-    title: "What are other people building?",
-    description: "Explore a library of production ready tools",
+    title: "Give me a demo",
+    description: "Show me what superglue can do",
+    user: "Give me a demo.",
+    hiddenStarterMessage:
+      "After a brief welcome message, call load_skill with skills ['demos'] and follow it exactly. Narrate each step briefly and map it to real customer systems.",
   },
 };
 
@@ -86,17 +88,15 @@ export interface AgentWelcomeRef {
 interface AgentWelcomeProps {
   onStartPrompt: (
     userPrompt: string,
-    hiddenContext?: string,
+    hiddenStarterMessage?: string,
     options?: { hideUserMessage?: boolean; chatTitle?: string; chatIcon?: string },
   ) => void;
   ref?: React.Ref<AgentWelcomeRef>;
 }
 
 export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
-  const [showToolLibrary, setShowToolLibrary] = useState(false);
-
   const cleanup = () => {
-    setShowToolLibrary(false);
+    return;
   };
 
   useImperativeHandle(ref, () => ({
@@ -105,18 +105,21 @@ export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
 
   const handleSystemSelect = useCallback(
     (key: string, label: string, config: SystemConfig) => {
-      const hiddenContext = JSON.stringify({
-        templateInfo: {
-          apiUrl: config.apiUrl,
-          docsUrl: config.docsUrl,
-          openApiUrl: config.openApiUrl,
-          preferredAuthType: config.preferredAuthType,
-          hasOAuth: !!config.oauth,
-          systemSpecificInstructions: config.systemSpecificInstructions,
-        },
-      });
+      const hiddenStarterMessage = [
+        "The user selected a system template.",
+        config.apiUrl ? `Suggested API URL: ${config.apiUrl}` : null,
+        config.docsUrl ? `Documentation URL: ${config.docsUrl}` : null,
+        config.openApiUrl ? `OpenAPI URL: ${config.openApiUrl}` : null,
+        config.preferredAuthType ? `Suggested auth type: ${config.preferredAuthType}` : null,
+        `OAuth available: ${config.oauth ? "yes" : "no"}`,
+        config.systemSpecificInstructions
+          ? `Template-specific instructions: ${config.systemSpecificInstructions}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
       const prompt = `I want to set up ${label}`;
-      onStartPrompt(prompt, hiddenContext, {
+      onStartPrompt(prompt, hiddenStarterMessage, {
         hideUserMessage: true,
         chatTitle: label,
         chatIcon: config.icon,
@@ -151,22 +154,17 @@ export function AgentWelcome({ onStartPrompt, ref }: AgentWelcomeProps) {
 
         <GlassButton
           onClick={() => {
-            setShowToolLibrary(!showToolLibrary);
+            onStartPrompt(EXAMPLES.TEMPLATES.user, EXAMPLES.TEMPLATES.hiddenStarterMessage, {
+              hideUserMessage: true,
+            });
           }}
-          icon={<Users className="w-5 h-5" />}
+          icon={<Play className="w-5 h-5" />}
           title={EXAMPLES.TEMPLATES.title}
           description={EXAMPLES.TEMPLATES.description}
           gradient="from-muted/20 via-transparent to-transparent"
           iconGradient="bg-muted text-muted-foreground"
         />
       </div>
-
-      {showToolLibrary && (
-        <AgentWelcomeToolLibrary
-          onDismiss={() => setShowToolLibrary(false)}
-          onStartPrompt={onStartPrompt}
-        />
-      )}
     </div>
   );
 }

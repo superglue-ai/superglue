@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
@@ -11,7 +9,7 @@ T = TypeVar("T", bound="RunToolPayload")
 
 @_attrs_define
 class RunToolPayload:
-    """The inputs and options provided when running the tool (maps to 'toolPayload' in GraphQL)"""
+    """The inputs and options provided when running the tool"""
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

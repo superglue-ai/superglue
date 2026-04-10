@@ -1,5 +1,4 @@
-import { useConfig } from "@/src/app/config-context";
-import { useTools } from "@/src/app/tools-context";
+import { useTools, useRenameTool } from "@/src/queries/tools";
 import { Button } from "@/src/components/ui/button";
 import {
   Dialog,
@@ -11,7 +10,7 @@ import {
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { createSuperglueClient, isValidToolName, validateToolName } from "@/src/lib/client-utils";
+import { isValidToolName, validateToolName } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -24,11 +23,10 @@ interface RenameToolDialogProps {
 }
 
 export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToolDialogProps) {
-  const config = useConfig();
-  const { tools, refreshTools } = useTools();
+  const { tools } = useTools();
+  const renameTool = useRenameTool();
   const [newToolName, setNewToolName] = useState("");
   const [error, setError] = useState("");
-  const [isRenaming, setIsRenaming] = useState(false);
 
   useEffect(() => {
     if (isOpen && tool) {
@@ -65,31 +63,30 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
       return;
     }
 
-    try {
-      setIsRenaming(true);
-      const client = createSuperglueClient(config.apiEndpoint);
-
-      const result = await client.renameWorkflow(tool.id, trimmedName);
-
-      await refreshTools();
-      handleClose();
-
-      if (onRenamed) {
-        onRenamed(trimmedName);
-      }
-    } catch (error: any) {
-      console.error("Error renaming tool:", error);
-      setError(error.message || "Failed to rename tool");
-    } finally {
-      setIsRenaming(false);
-    }
+    renameTool.mutate(
+      { oldId: tool.id, newId: trimmedName },
+      {
+        onSuccess: () => {
+          handleClose();
+          onRenamed?.(trimmedName);
+        },
+        onError: (error: any) => {
+          console.error("Error renaming tool:", error);
+          setError(error.message || "Failed to rename tool");
+        },
+      },
+    );
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !isRenaming && (e.target as HTMLElement).tagName !== "BUTTON") {
+          if (
+            e.key === "Enter" &&
+            !renameTool.isPending &&
+            (e.target as HTMLElement).tagName !== "BUTTON"
+          ) {
             e.preventDefault();
             handleRename();
           }
@@ -115,17 +112,17 @@ export function RenameToolDialog({ tool, isOpen, onClose, onRenamed }: RenameToo
                 }
               }}
               placeholder="Enter new tool name"
-              disabled={isRenaming}
+              disabled={renameTool.isPending}
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isRenaming}>
+          <Button variant="outline" onClick={handleClose} disabled={renameTool.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleRename} disabled={isRenaming}>
-            {isRenaming ? (
+          <Button onClick={handleRename} disabled={renameTool.isPending}>
+            {renameTool.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Renaming...

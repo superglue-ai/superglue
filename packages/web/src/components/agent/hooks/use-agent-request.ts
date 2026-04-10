@@ -1,16 +1,12 @@
 "use client";
 
 import { tokenRegistry } from "@/src/lib/token-registry";
-import {
-  AgentRequest,
-  UserAction,
-  ToolEventAction,
-  ToolExecutionPolicies,
-} from "@/src/lib/agent/agent-types";
+import { AgentRequest, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
 import { truncateFileContent } from "@/src/lib/file-utils";
 import { Message } from "@superglue/shared";
 import { useCallback, useRef } from "react";
 import type { AgentConfig, UploadedFile, UseAgentRequestReturn } from "./types";
+import type { StreamState } from "./use-agent-streaming";
 
 interface UseAgentRequestOptions {
   config: AgentConfig;
@@ -27,11 +23,13 @@ interface UseAgentRequestOptions {
     createMessageIfNeeded: () => Message,
   ) => Promise<void>;
   currentStreamControllerRef: React.MutableRefObject<AbortController | null>;
+  streamStateRef: React.MutableRefObject<StreamState>;
   uploadedFiles: UploadedFile[];
   pendingFiles: UploadedFile[];
   sessionFiles: UploadedFile[];
   filePayloads: Record<string, any>;
   toolExecutionPolicies: ToolExecutionPolicies;
+  loadedSkills: string[];
   conversationIdRef: React.MutableRefObject<string | null>;
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void;
 }
@@ -47,21 +45,31 @@ export function useAgentRequest({
   findAndResumeMessageWithTool,
   processStreamData,
   currentStreamControllerRef,
+  streamStateRef,
   uploadedFiles,
   pendingFiles,
   sessionFiles,
   filePayloads,
   toolExecutionPolicies,
+  loadedSkills,
   conversationIdRef,
   toast,
 }: UseAgentRequestOptions): UseAgentRequestReturn {
-  const actionBufferRef = useRef<UserAction[]>([]);
   const prevFileKeysRef = useRef<string>("");
   const chatEndpoint = config.chatEndpoint || "/api/agent/chat";
   const getAuthToken = config.getAuthToken || (() => tokenRegistry.getToken());
 
-  const bufferAction = useCallback((action: UserAction) => {
-    actionBufferRef.current.push(action);
+  const buildHiddenStarterMessage = useCallback((content: string): Message => {
+    return {
+      id:
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? `hidden-${crypto.randomUUID()}`
+          : `hidden-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      content,
+      role: "user",
+      timestamp: new Date(),
+      isHidden: true,
+    };
   }, []);
 
   const buildFilePayloads = useCallback(():
@@ -126,8 +134,7 @@ export function useAgentRequest({
           if (content === undefined || content === null) return null;
           let contentStr: string;
           try {
-            contentStr =
-              typeof content === "string" ? content : (JSON.stringify(content, null, 2) ?? "");
+            contentStr = typeof content === "string" ? content : JSON.stringify(content, null, 2);
           } catch {
             contentStr = "[Unable to serialize]";
           }
@@ -154,50 +161,64 @@ export function useAgentRequest({
   const sendAgentRequest = useCallback(
     async (
       userMessage?: string,
-      options?: { userActions?: UserAction[]; hiddenContext?: string; hideUserMessage?: boolean },
+      options?: {
+        hiddenStarterMessage?: string;
+        hideUserMessage?: boolean;
+        resumeToolCallId?: string;
+      },
     ) => {
-      let actionsToSend: UserAction[];
-      if (options?.userActions) {
-        actionsToSend = [...actionBufferRef.current.splice(0), ...options.userActions];
-      } else {
-        actionsToSend = actionBufferRef.current.splice(0);
-      }
       const hasMessage = userMessage && userMessage.trim().length > 0;
-      const hasActions = actionsToSend.length > 0;
 
       await Promise.resolve();
 
-      const hiddenContext = options?.hiddenContext || config.hiddenContextBuilder?.();
-      const hasHiddenContext = !!hiddenContext;
+      const hiddenStarterMessage = options?.hiddenStarterMessage?.trim();
+      const hasHiddenStarterMessage = !!hiddenStarterMessage;
+      const resumeToolCallId = options?.resumeToolCallId;
+      const shouldResume = !!resumeToolCallId && !hasMessage;
       const playgroundDraft = config.playgroundDraftBuilder?.() || undefined;
+      const systemPlaygroundContext = config.systemPlaygroundContextBuilder?.() || undefined;
+      const accessRulesContext = config.accessRulesContextBuilder?.() || undefined;
 
-      if (!hasMessage && !hasActions && !hasHiddenContext) {
-        console.warn("sendAgentRequest called with no userMessage, userActions, or hiddenContext");
+      if (!hasMessage && !hasHiddenStarterMessage && !shouldResume) {
+        console.warn(
+          "sendAgentRequest called with no userMessage, hidden starter message, or resumeToolCallId",
+        );
         return;
       }
 
-      const toolEventAction = actionsToSend.find(
-        (a): a is ToolEventAction => a.type === "tool_event",
-      );
-      const resumeToolId = toolEventAction?.toolCallId;
+      const currentState = streamStateRef.current;
 
-      const shouldResume = resumeToolId && !hasMessage;
-
-      if (currentStreamControllerRef.current && !shouldResume) {
-        currentStreamControllerRef.current.abort();
+      if (shouldResume) {
+        if (currentState !== "paused") {
+          console.warn(
+            `[StreamGuard] Dropping resume (toolCallId=${resumeToolCallId}): stream is "${currentState}", not "paused"`,
+          );
+          return;
+        }
+      } else if (currentState === "streaming") {
+        currentStreamControllerRef.current?.abort();
         cleanupInterruptedStream("\n\n*[Response interrupted by new action]*");
       }
+
+      streamStateRef.current = "streaming";
 
       if (!shouldResume) {
         setAwaitingToolsToDeclined();
       }
 
       const currentMessages = [...messagesRef.current];
+      let visibleUserMessageId: string | undefined;
 
       const fileStateMessage = buildFileStateMessage();
       if (fileStateMessage) {
         currentMessages.push(fileStateMessage);
         setMessages((prev) => [...prev, fileStateMessage]);
+      }
+
+      if (hiddenStarterMessage) {
+        const hiddenMessage = buildHiddenStarterMessage(hiddenStarterMessage);
+        currentMessages.push(hiddenMessage);
+        setMessages((prev) => [...prev, hiddenMessage]);
       }
 
       if (hasMessage) {
@@ -211,6 +232,7 @@ export function useAgentRequest({
           attachedFiles: readyPendingFiles.length > 0 ? readyPendingFiles : undefined,
           isHidden: options?.hideUserMessage,
         };
+        if (!options?.hideUserMessage) visibleUserMessageId = userMessageObj.id;
         currentMessages.push(userMessageObj);
         setMessages((prev) => [...prev, userMessageObj]);
       }
@@ -219,8 +241,8 @@ export function useAgentRequest({
 
       let assistantMessage: Message | null = null;
       if (shouldResume) {
-        assistantMessage = findAndResumeMessageWithTool(resumeToolId);
-      } else if (hasMessage || hasHiddenContext) {
+        assistantMessage = findAndResumeMessageWithTool(resumeToolCallId);
+      } else if (hasMessage || hasHiddenStarterMessage) {
         assistantMessage = createStreamingAssistantMessage(hasMessage ? 1 : 0);
         setMessages((prev) => [...prev, assistantMessage!]);
       }
@@ -232,13 +254,16 @@ export function useAgentRequest({
         agentId: config.agentId,
         messages: currentMessages,
         userMessage: hasMessage ? userMessage!.trim() : undefined,
-        userActions: actionsToSend.length > 0 ? actionsToSend : undefined,
+        visibleUserMessageId,
         filePayloads: buildFilePayloads(),
-        hiddenContext: hiddenContext || undefined,
+        resumeToolCallId: shouldResume ? resumeToolCallId : undefined,
         toolExecutionPolicies:
           Object.keys(toolExecutionPolicies).length > 0 ? toolExecutionPolicies : undefined,
         conversationId: conversationIdRef.current ?? undefined,
+        loadedSkills: loadedSkills.length > 0 ? loadedSkills : undefined,
         playgroundDraft,
+        systemPlaygroundContext,
+        accessRulesContext,
       };
 
       try {
@@ -307,8 +332,12 @@ export function useAgentRequest({
           ];
         });
       } finally {
-        setIsLoading(false);
-        if (currentStreamControllerRef.current === controller) {
+        const isOwner = currentStreamControllerRef.current === controller;
+        if (isOwner) {
+          if (streamStateRef.current === "streaming") {
+            streamStateRef.current = "idle";
+          }
+          setIsLoading(false);
           currentStreamControllerRef.current = null;
         }
       }
@@ -324,12 +353,15 @@ export function useAgentRequest({
       findAndResumeMessageWithTool,
       processStreamData,
       currentStreamControllerRef,
+      streamStateRef,
       uploadedFiles,
       pendingFiles,
       sessionFiles,
       buildFilePayloads,
+      buildHiddenStarterMessage,
       buildFileStateMessage,
       toolExecutionPolicies,
+      loadedSkills,
       chatEndpoint,
       getAuthToken,
       toast,
@@ -340,5 +372,5 @@ export function useAgentRequest({
     prevFileKeysRef.current = "";
   }, []);
 
-  return { sendAgentRequest, bufferAction, actionBufferRef, resetFileTracking };
+  return { sendAgentRequest, resetFileTracking };
 }

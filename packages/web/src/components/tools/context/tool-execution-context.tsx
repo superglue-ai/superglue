@@ -31,11 +31,15 @@ import {
 import {
   ToolStep,
   flattenAndNamespaceCredentials,
+  flattenAndNamespaceSystemUrls,
   assertValidArrowFunction,
   executeWithVMHelpers,
   RequestStepConfig,
   isRequestConfig,
+  System,
 } from "@superglue/shared";
+import { useEnvironment } from "@/src/app/environment-context";
+import { useOrgOptional } from "@/src/app/org-context";
 
 const ExecutionContext = createContext<ExecutionContextValue | null>(null);
 
@@ -59,11 +63,13 @@ const DATA_SELECTOR_DEBOUNCE_MS = 400;
 
 const emptyCategorizedVariables: CategorizedVariables = {
   credentials: [],
+  systemUrls: [],
   toolInputs: [],
   fileInputs: [],
   currentStepData: [],
   previousStepData: [],
   paginationVariables: [],
+  contextVariables: [],
 };
 
 const emptyCategorizedSources: CategorizedSources = {
@@ -72,6 +78,7 @@ const emptyCategorizedSources: CategorizedSources = {
   previousStepResults: {},
   currentItem: null,
   paginationData: {},
+  contextData: {},
 };
 
 const emptyStepTemplateData: StepTemplateData = {
@@ -119,7 +126,7 @@ const STATUS_INFO = {
 
 export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const { steps, payload, systems } = useToolConfig();
-
+  const org = useOrgOptional();
   const [stepExecutions, setStepExecutions] = useState<Record<string, StepExecutionState>>({});
   const [isExecutingAny, setIsExecutingAny] = useState(false);
   const [currentExecutingStepIndex, setCurrentExecutingStepIndexState] = useState<number | null>(
@@ -130,6 +137,7 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const [finalResult, setFinalResultState] = useState<any | null>(null);
   const [finalError, setFinalErrorState] = useState<string | null>(null);
   const [transformStatus, setTransformStatusState] = useState<TransformStatus>("idle");
+  const userEmail = org?.userEmail ?? null;
 
   const [dataSelectorResults, setDataSelectorResults] = useState<
     Record<string, DataSelectorResult>
@@ -433,8 +441,11 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
   const stepInputVersion = stepInputVersionRef.current.version;
   // Incremented when setDataSelectorResults is called with new data
   const dataSelectorVersionRef = useRef(0);
-  // Combined version for template cache - invalidates when EITHER step inputs OR data selector output changes
-  const sourceDataVersion = stepInputVersion * 10000 + dataSelectorVersionRef.current;
+  // Track environment mode changes to invalidate template cache
+  const [environmentVersion, setEnvironmentVersion] = useState(0);
+  // Combined version for template cache - invalidates when step inputs, data selector output, OR environment changes
+  const sourceDataVersion =
+    stepInputVersion * 100000 + dataSelectorVersionRef.current * 10 + environmentVersion;
 
   const getStepInput = useCallback(
     (stepId?: string): Record<string, any> => {
@@ -510,6 +521,33 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     };
   }, [steps, stepInputVersion]);
 
+  // Get environment mode for system resolution
+  const { mode: environmentMode } = useEnvironment();
+
+  // Increment environment version when mode changes to invalidate template cache
+  useEffect(() => {
+    setEnvironmentVersion((v) => v + 1);
+  }, [environmentMode]);
+
+  // Helper to resolve system based on environment mode
+  // In dev mode: prefer dev system, fall back to prod
+  // In prod mode: use prod system, fall back to dev (for standalone dev systems)
+  const resolveSystemForMode = useCallback(
+    (stepSystemId: string | undefined): System | undefined => {
+      if (!stepSystemId || !systems) return undefined;
+
+      const targetEnv = environmentMode === "dev" ? "dev" : "prod";
+      const fallbackEnv = environmentMode === "dev" ? "prod" : "dev";
+
+      // DB constraint ensures environment is always 'dev' or 'prod'
+      return (
+        systems.find((sys) => sys.id === stepSystemId && sys.environment === targetEnv) ||
+        systems.find((sys) => sys.id === stepSystemId && sys.environment === fallbackEnv)
+      );
+    },
+    [systems, environmentMode],
+  );
+
   const stepTemplateDataMap = useMemo(() => {
     const map: Record<string, StepTemplateData> = {};
 
@@ -529,27 +567,61 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
       // systemId is on step.config for request steps
       const stepSystemId =
         step.config && isRequestConfig(step.config) ? step.config.systemId : undefined;
-      const linkedSystem =
-        stepSystemId && systems ? systems.find((sys) => sys.id === stepSystemId) : undefined;
+      // Resolve system based on environment mode (dev mode uses linked dev system if available)
+      const linkedSystem = resolveSystemForMode(stepSystemId);
 
       const systemCredentials = flattenAndNamespaceCredentials(linkedSystem ? [linkedSystem] : []);
+      const systemUrls = flattenAndNamespaceSystemUrls(linkedSystem ? [linkedSystem] : []);
       // Only request steps have pagination data
       const paginationData =
         step.config && isRequestConfig(step.config)
           ? buildPaginationData((step.config as RequestStepConfig)?.pagination)
           : {};
 
+      // Context variables (sg_auth_email, etc.)
+      const contextVariables: Record<string, string> = {};
+      if (userEmail) {
+        contextVariables.sg_auth_email = userEmail;
+      }
+
       const sourceData: Record<string, any> = {
+        ...flattenAndNamespaceSystemUrls(systems),
         ...systemCredentials,
+        ...systemUrls,
         ...stepInput,
         ...(currentItemObj != null ? { currentItem: currentItemObj } : {}),
         ...paginationData,
+        ...contextVariables,
       };
 
       const allSystemCredentials = flattenAndNamespaceCredentials(systems);
+      const allSystemUrls = flattenAndNamespaceSystemUrls(systems);
+      // credentials object is used for masking - only include credentials from systems used by this tool
+      // to avoid masking unrelated strings that happen to match credential values from other systems
+      const toolSystemIds = new Set(
+        steps
+          .map((s) => (s.config && isRequestConfig(s.config) ? s.config.systemId : undefined))
+          .filter((id): id is string => !!id),
+      );
+      const toolSystems = systems.filter((sys) => toolSystemIds.has(sys.id));
+      const allCredentialValues: Record<string, string> = {};
+      for (const sys of toolSystems) {
+        if (sys.credentials) {
+          for (const [key, value] of Object.entries(sys.credentials)) {
+            if (value) {
+              // Use environment-aware key to avoid collisions between dev/prod
+              const envSuffix = sys.environment ? `_${sys.environment}` : "";
+              allCredentialValues[`${sys.id}_${key}${envSuffix}`] = value;
+              // Also add without environment suffix for backwards compatibility
+              // (last one wins, but at least all values are in the masking set)
+              allCredentialValues[`${sys.id}_${key}`] = value;
+            }
+          }
+        }
+      }
       const credentials = {
         ...extractCredentials(sourceData),
-        ...allSystemCredentials,
+        ...allCredentialValues,
       };
 
       const previousStepResults = buildPreviousStepResults(steps, stepResultsMap, stepIndex - 1);
@@ -560,15 +632,18 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
         previousStepResults,
         currentItem: currentItemObj,
         paginationData,
+        contextData: contextVariables,
       };
 
       const categorizedVariables: CategorizedVariables = {
         credentials: Object.keys(systemCredentials || {}),
+        systemUrls: Object.keys(allSystemUrls || {}),
         toolInputs: Object.keys(manualPayload || {}),
         fileInputs: Object.keys(payload.filePayloads || {}),
         currentStepData: ["currentItem"],
         previousStepData: Object.keys(previousStepResults || {}),
         paginationVariables: ["page", "offset", "cursor", "limit", "pageSize"],
+        contextVariables: ["sg_auth_email"],
       };
 
       map[stepId] = {
@@ -592,6 +667,9 @@ export function ExecutionProvider({ children }: ExecutionProviderProps) {
     manualPayload,
     payload.filePayloads,
     stepResultsMap,
+    resolveSystemForMode,
+    environmentMode,
+    userEmail,
   ]);
 
   const getStepTemplateData = useCallback(

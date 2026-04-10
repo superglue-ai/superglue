@@ -3,14 +3,13 @@
  *
  * Central service for executing tools. All tool execution flows through this service:
  * - REST API (/tools/:id/run)
- * - GraphQL (executeWorkflow mutation)
  * - Scheduler (cron-triggered executions)
  * - Internal step execution (/tools/step/run)
  *
  * This service handles:
  * - Run lifecycle management (create, complete, abort)
  * - Tunnel setup for private systems
- * - Worker pool dispatch
+ * - Deno subprocess pool dispatch
  * - Webhook notifications
  *
  * Design principles:
@@ -27,11 +26,13 @@ import {
   ToolStepResult,
 } from "@superglue/shared";
 import { DataStore } from "../datastore/types.js";
+import { resolveUserRoles } from "../auth/role-resolver.js";
 import { RunContext, RunLifecycleManager } from "../runs/run-lifecycle.js";
 import { SystemManager } from "../systems/system-manager.js";
+import { setupTunnelsForTool } from "../tunnel/index.js";
 import { logMessage } from "../utils/logs.js";
 import { notifyWebhook } from "../utils/webhook.js";
-import type { ToolExecutionPayload, WorkerPools } from "../worker/types.js";
+import type { ToolExecutionPayload, WorkerPools, ToolExecutionResult } from "../worker/types.js";
 
 // ============================================================================
 // Types
@@ -39,7 +40,7 @@ import type { ToolExecutionPayload, WorkerPools } from "../worker/types.js";
 
 /**
  * Context required for tool execution.
- * Passed by the caller (API handler, GraphQL resolver, scheduler).
+ * Passed by the caller (API handler, REST resolver, scheduler).
  */
 export interface ToolExecutionContext {
   /** Database access */
@@ -63,6 +64,7 @@ export type ToolChainCallback = (
   resultData: unknown,
   credentials?: Record<string, string>,
   options?: RequestOptions,
+  mode?: "dev" | "prod",
 ) => void;
 
 /**
@@ -85,6 +87,8 @@ export interface ExecuteToolOptions {
   userId?: string;
   /** Callback for tool: chain webhooks (only needed for REST API chaining) */
   onToolChain?: ToolChainCallback;
+  /** Execution mode for system resolution (default: prod) */
+  mode?: "dev" | "prod";
 }
 
 /**
@@ -128,6 +132,7 @@ function handleWebhookNotification({
   requestOptions,
   metadata,
   onToolChain,
+  mode,
 }: {
   webhookUrl: string;
   toolId: string;
@@ -139,6 +144,7 @@ function handleWebhookNotification({
   requestOptions?: RequestOptions;
   metadata: ServiceMetadata;
   onToolChain?: ToolChainCallback;
+  mode?: "dev" | "prod";
 }): void {
   if (webhookUrl.startsWith("http")) {
     // HTTP webhook - fire and forget
@@ -152,9 +158,15 @@ function handleWebhookNotification({
     }
     if (onToolChain) {
       // Use callback for chaining (REST API provides this)
-      onToolChain(chainToolId, data, credentials, { ...requestOptions, webhookUrl: undefined });
+      onToolChain(
+        chainToolId,
+        data,
+        credentials,
+        { ...requestOptions, webhookUrl: undefined },
+        mode,
+      );
     } else {
-      // No callback provided - log warning (scheduler/GraphQL don't support tool: chains)
+      // No callback provided - log warning (scheduler don't support tool: chains)
       logMessage(
         "warn",
         `Tool chain webhook (tool:${chainToolId}) not supported in this context`,
@@ -175,7 +187,7 @@ function handleWebhookNotification({
  * 1. Resolves systems needed by the tool
  * 2. Creates a run record (if createRun is true)
  * 3. Sets up tunnels for private systems
- * 4. Dispatches to worker pool
+ * 4. Dispatches to Deno subprocess pool
  * 5. Completes the run and sends notifications
  *
  * @param ctx - Execution context (datastore, worker pools, etc.)
@@ -195,13 +207,19 @@ export async function executeTool(
     runId: clientRunId,
     userId,
     onToolChain,
+    mode = "prod",
   } = options;
 
   const startedAt = new Date();
   const runId = clientRunId || crypto.randomUUID();
 
-  // Resolve systems for this tool
-  const systemManagers = await SystemManager.forToolExecution(tool, ctx.datastore, ctx.metadata);
+  // Resolve systems for this tool based on execution mode
+  const systemManagers = await SystemManager.forToolExecution(
+    tool,
+    ctx.datastore,
+    ctx.metadata,
+    mode,
+  );
   const systems = systemManagers.map((m) => m.toSystemSync());
 
   // Set up run lifecycle manager
@@ -210,8 +228,10 @@ export async function executeTool(
     : null;
 
   let runContext: RunContext | null = null;
+  let tunnelCleanups: Array<() => void> = [];
 
   try {
+    // Start run record if requested
     if (lifecycle) {
       runContext = await lifecycle.startRun({
         runId,
@@ -220,9 +240,26 @@ export async function executeTool(
         options: requestOptions,
         requestSource: ctx.requestSource,
         userId,
+        executionMode: mode,
       });
     }
 
+    // Set up tunnels for private systems (must happen in main thread)
+    const tunnelResult = await setupTunnelsForTool({
+      tool,
+      systems,
+      orgId: ctx.orgId,
+      metadata: ctx.metadata,
+    });
+    tunnelCleanups = tunnelResult.cleanups;
+
+    const userRoles = await resolveUserRoles({
+      userId: ctx.metadata.userId,
+      orgId: ctx.orgId,
+      datastore: ctx.datastore,
+    });
+
+    // Build worker payload
     const taskPayload: ToolExecutionPayload = {
       runId,
       workflow: tool,
@@ -232,10 +269,26 @@ export async function executeTool(
       systems,
       orgId: ctx.orgId,
       traceId: ctx.metadata.traceId,
+      userEmail: ctx.metadata.userEmail,
+      tunnelMappings: tunnelResult.tunnelMappings,
+      userRoles,
+      requestSource: ctx.requestSource,
     };
 
-    // Execute in worker pool
-    const executionResult = await ctx.workerPools.toolExecution.runTask(runId, taskPayload);
+    // Execute in Deno subprocess pool
+    const denoResult = await ctx.workerPools.toolExecution.runTask(runId, taskPayload);
+
+    // Convert Deno result to ToolExecutionResult
+    const executionResult: ToolExecutionResult = {
+      runId: denoResult.runId,
+      success: denoResult.success,
+      data: denoResult.data,
+      error: denoResult.error,
+      stepResults: denoResult.stepResults,
+      tool: denoResult.tool,
+      startedAt: new Date(denoResult.startedAt),
+      completedAt: new Date(denoResult.completedAt),
+    };
 
     // Complete run record
     if (lifecycle && runContext) {
@@ -262,6 +315,7 @@ export async function executeTool(
         requestOptions,
         metadata: ctx.metadata,
         onToolChain,
+        mode,
       });
     }
 
@@ -279,6 +333,7 @@ export async function executeTool(
     const isAborted = error.name === "AbortError";
     const completedAt = new Date();
 
+    // Handle run completion/abort
     if (lifecycle && runContext) {
       if (isAborted) {
         await lifecycle.abortRun(runContext, String(error));
@@ -292,6 +347,7 @@ export async function executeTool(
         });
       }
     } else if (lifecycle) {
+      // Run was never started, use fallback
       await lifecycle.failRunWithoutContext(
         runId,
         tool.id,
@@ -313,6 +369,15 @@ export async function executeTool(
       startedAt,
       completedAt,
     };
+  } finally {
+    // Always clean up tunnels
+    for (const cleanup of tunnelCleanups) {
+      try {
+        cleanup();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
   }
 }
 

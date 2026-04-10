@@ -1,6 +1,6 @@
 "use client";
 
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems } from "@/src/queries/systems";
 import { ErrorMessage } from "@/src/components/ui/error-message";
 import { ToolCall } from "@superglue/shared";
 import { AlertCircle, BookOpen, FileText, Loader2 } from "lucide-react";

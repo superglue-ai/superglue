@@ -1,7 +1,8 @@
 import { System } from "./types.js";
 import { toJsonSchema } from "./json-schema.js";
-import { UserRole } from "./types.js";
 import { PatchSystemBody } from "./types.js";
+import { Tool, isRequestConfig, RequestStepConfig } from "./types.js";
+import truncateJsonLib from "truncate-json";
 
 // Re-export cron utilities
 export * from "./utils/cron.js";
@@ -12,15 +13,27 @@ export * from "./utils/model-context-length.js";
 // Re-export token counting utilities
 export * from "./utils/token-count.js";
 
-export type ConnectionProtocol = "http" | "postgres" | "sftp" | "smb";
+export type ConnectionProtocol = "http" | "postgres" | "mssql" | "redis" | "sftp" | "smb";
 
 export const getConnectionProtocol = (url: string): ConnectionProtocol => {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
+  if (url.startsWith("mssql://") || url.startsWith("sqlserver://")) return "mssql";
+  if (url.startsWith("redis://") || url.startsWith("rediss://")) return "redis";
   if (url.startsWith("ftp://") || url.startsWith("ftps://") || url.startsWith("sftp://"))
     return "sftp";
   if (url.startsWith("smb://")) return "smb";
   return "http";
 };
+
+export function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "string") return error.startsWith("AbortError:");
+  if (error instanceof DOMException) return error.name === "AbortError";
+  if (error instanceof Error) {
+    return error.name === "AbortError" || error.message.startsWith("AbortError:");
+  }
+  return false;
+}
 
 export function validateExternalUrl(raw: string): URL {
   const parsed = new URL(raw);
@@ -201,6 +214,8 @@ function enhanceSchemaWithData(value: any, schema: any): any {
 export function flattenAndNamespaceCredentials(systems: System[]): Record<string, string> {
   return systems.reduce(
     (acc, sys) => {
+      // Use the system ID as the namespace
+      // With composite key model, dev and prod systems share the same ID
       Object.entries(sys.credentials || {}).forEach(([key, value]) => {
         acc[`${sys.id}_${key}`] = value;
       });
@@ -208,6 +223,30 @@ export function flattenAndNamespaceCredentials(systems: System[]): Record<string
     },
     {} as Record<string, string>,
   );
+}
+
+export function flattenAndNamespaceSystemUrls(systems: System[]): Record<string, string> {
+  return systems.reduce(
+    (acc, sys) => {
+      // Use the system ID as the namespace
+      // With composite key model, dev and prod systems share the same ID
+      if (sys.url) {
+        acc[`${sys.id}_url`] = sys.url;
+      }
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
+}
+
+export function slugify(value: string): string {
+  const slug = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return slug || "system";
 }
 
 export async function generateUniqueId({
@@ -309,17 +348,6 @@ export function inferJsonSchema(data: any): any {
   // For arrays, first check if items are objects and potentially heterogeneous
   // Arrays
   return buildArraySchemaFromData(data);
-}
-
-export function mapUserRole(role: string): UserRole {
-  switch (role) {
-    case "admin":
-      return UserRole.ADMIN;
-    case "member":
-      return UserRole.MEMBER;
-    default:
-      return UserRole.MEMBER;
-  }
 }
 
 export function resolveOAuthCertAndKey(oauthCert: string, oauthKey: string) {
@@ -520,6 +548,35 @@ export function safeStringify(value: any, indent: number = 2): string {
     // As a last resort, coerce to string
     return String(value ?? "");
   }
+}
+
+/**
+ * Truncates a value for use in LLM prompts.
+ * Uses sampleResultObject to intelligently sample large arrays/objects first,
+ * then applies a hard character limit as a safety net.
+ * Returns a string suitable for embedding in prompts.
+ */
+export function truncateForLLM(
+  value: unknown,
+  maxChars: number = 5000,
+  sampleSize: number = 10,
+): string {
+  if (value === undefined || value === null) return "null";
+  if (typeof value === "string") {
+    return value.length <= maxChars ? value : value.slice(0, maxChars) + "... [truncated]";
+  }
+
+  // Try full stringify first
+  const fullStr = safeStringify(value);
+  if (fullStr.length <= maxChars) return fullStr;
+
+  // Sample if over limit
+  const sampled = sampleResultObject(value, sampleSize);
+  const sampledStr = safeStringify(sampled);
+  if (sampledStr.length <= maxChars) return sampledStr;
+
+  // Hard truncate as safety net
+  return sampledStr.slice(0, maxChars) + "... [truncated]";
 }
 
 export function getDateMessage(): { role: "system"; content: string } {
@@ -745,4 +802,119 @@ export const ALLOWED_PATCH_SYSTEM_FIELDS: (keyof PatchSystemBody)[] = [
   "multiTenancyMode",
   "documentationFiles",
   "tunnel",
+  // Note: "environment" is NOT patchable because it's part of the composite primary key
 ];
+
+/**
+ * Truncate large data fields in a run result for display purposes.
+ * Only truncates specific "sampleable" fields to preserve metadata.
+ * Uses truncate-json library for safe JSON truncation that preserves structure.
+ */
+const SAMPLEABLE_KEYS = new Set([
+  "data",
+  "stepResults",
+  "toolPayload",
+  "rawData",
+  "transformedData",
+]);
+const DEFAULT_MAX_LENGTH = 80000;
+
+export function truncateRunResult(
+  result: unknown,
+  maxLength: number = DEFAULT_MAX_LENGTH,
+): unknown {
+  if (result === null || result === undefined) return result;
+
+  // Handle string input - try to parse as JSON
+  let data = result;
+  if (typeof result === "string") {
+    if (result.length <= maxLength) return result;
+
+    try {
+      data = JSON.parse(result);
+    } catch {
+      // Can't parse - return a safe summary
+      return {
+        _truncated: true,
+        _message: "String result too large to parse",
+        _size: result.length,
+      };
+    }
+  }
+
+  if (typeof data !== "object") return data;
+
+  // Track truncation stats
+  let truncatedCount = 0;
+  let originalSize = 0;
+
+  // Recursively find and truncate only sampleable keys
+  const truncateSampleableFields = (value: any, depth: number = 0): any => {
+    if (depth > 20) return value;
+    if (value === null || typeof value !== "object") return value;
+
+    if (Array.isArray(value)) {
+      return value.map((item) => truncateSampleableFields(item, depth + 1));
+    }
+
+    const obj: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (SAMPLEABLE_KEYS.has(key) && val !== null && typeof val === "object") {
+        // This is a sampleable key - truncate its value using the library
+        const valString = JSON.stringify(val);
+        if (valString.length > maxLength) {
+          originalSize += valString.length;
+          try {
+            const { jsonString: truncated, truncatedProps } = truncateJsonLib(valString, maxLength);
+            obj[key] = JSON.parse(truncated);
+            truncatedCount += truncatedProps.length;
+          } catch {
+            obj[key] = val;
+          }
+        } else {
+          obj[key] = val;
+        }
+      } else {
+        // Not a sampleable key - recurse to find nested sampleable keys
+        obj[key] = truncateSampleableFields(val, depth + 1);
+      }
+    }
+    return obj;
+  };
+
+  try {
+    const fullString = JSON.stringify(data);
+    if (fullString.length <= maxLength) return data;
+
+    const truncated = truncateSampleableFields(data);
+    if (truncatedCount > 0 && typeof truncated === "object" && truncated !== null) {
+      (truncated as any)._note =
+        `Result truncated: ${truncatedCount} items omitted (original ${originalSize} characters)`;
+    }
+    return truncated;
+  } catch {
+    return {
+      _truncated: true,
+      _message: "Result too large to display",
+    };
+  }
+}
+
+export function getToolSystemIds(tool: Tool): string[] {
+  if (!tool.steps) return [];
+  const ids = new Set<string>();
+  for (const step of tool.steps) {
+    if (
+      step.config &&
+      isRequestConfig(step.config) &&
+      (step.config as RequestStepConfig).systemId
+    ) {
+      ids.add((step.config as RequestStepConfig).systemId!);
+    }
+  }
+  return Array.from(ids);
+}
+
+export function isProductionSystem(system: System): boolean {
+  return system.environment !== "dev";
+}

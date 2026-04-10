@@ -7,16 +7,10 @@ export function getCacheScopeIdentifier(): string | null {
     return null;
   }
 
-  // Single-tenant mode - use constant scope for shared caching
-  if (process.env.NEXT_PUBLIC_SUPERGLUE_API_KEY) {
-    return "";
-  }
-
-  // Multi-tenant mode - use org ID from JWT
+  // Use org ID from JWT for cache scoping
   const payload = decodeJWTPayload(token);
   if (!payload) {
-    // Token is not a valid JWT (plain API key in single-tenant mode)
-    return "";
+    return null;
   }
-  return payload.app_metadata?.active_org_id || "";
+  return payload.orgId;
 }

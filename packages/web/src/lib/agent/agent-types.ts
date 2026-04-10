@@ -1,8 +1,9 @@
 import { ConfirmationAction, Message, ConnectionProtocol, Tool } from "@superglue/shared";
 import { SSESubscriptionClient } from "../sse-subscriptions";
-import { AgentType } from "./registry/agents";
+import { AgentType } from "./registries/agent-registry";
 import { EESuperglueClient } from "../ee-superglue-client";
 import { TextStreamPart, ToolSet } from "ai";
+import type { SkillName } from "./skills/index";
 
 export interface PlaygroundToolContext {
   toolId: string;
@@ -31,6 +32,43 @@ export interface DraftLookup {
   >;
 }
 
+export interface SystemPlaygroundContext {
+  systemId: string;
+  url: string;
+  templateName?: string;
+  authType: "none" | "oauth" | "apikey";
+  credentialKeys: string[];
+  specificInstructions: string;
+  isNewSystem: boolean;
+  sectionStatuses: {
+    configuration: { isComplete: boolean; label: string };
+    authentication: { isComplete: boolean; label: string };
+    context: { isComplete: boolean; label: string };
+  };
+}
+
+export interface AccessRulesContext {
+  role: {
+    id: string;
+    name: string;
+    description?: string;
+    tools: "ALL" | string[];
+    systems: "ALL" | Record<string, any>;
+    isBaseRole?: boolean;
+  };
+  allRoles: Array<{ id: string; name: string }>;
+  users: Array<{
+    id: string;
+    email: string | null;
+    name: string | null;
+    userType: "member" | "end_user";
+    roleIds: string[];
+  }>;
+  availableSystems: Array<{ id: string; name: string; urlHost: string }>;
+  availableTools: Array<{ id: string; name: string }>;
+  isEditing: boolean;
+}
+
 // Type helpers for AI SDK stream parts - Extract specific part types from the union
 export type StreamPart = TextStreamPart<ToolSet>;
 export type TextDeltaPart = Extract<StreamPart, { type: "text-delta" }>;
@@ -49,24 +87,16 @@ export interface ToolPolicy {
   buildPendingOutput?: (input: any) => any;
 }
 
-export type ToolEventStatus =
-  | "pending"
-  | "declined"
-  | "completed"
-  | "awaiting_confirmation"
-  | "running"
-  | "stopped"
-  | "failed"
-  | "error";
-
-export interface EventDefinition {
-  message: string;
-  statusUpdate?: ToolEventStatus;
-}
-
-export interface ToolEvents {
-  [toolName: string]: Record<string, EventDefinition>;
-}
+export type EditToolSaveResult =
+  | {
+      success: true;
+      toolId: string;
+    }
+  | {
+      success: false;
+      error: string;
+    }
+  | undefined;
 
 export type ToolExecutionPolicies = Record<string, Record<string, any>>;
 
@@ -83,6 +113,7 @@ export interface ToolDefinition {
 }
 
 export interface ToolExecutionContext {
+  agentId: AgentType;
   superglueClient: EESuperglueClient;
   filePayloads: Record<string, any>;
   messages: Message[];
@@ -91,6 +122,9 @@ export interface ToolExecutionContext {
   abortSignal?: AbortSignal;
   toolExecutionPolicies?: ToolExecutionPolicies;
   playgroundDraft?: DraftLookup;
+  systemPlaygroundContext?: SystemPlaygroundContext;
+  accessRulesContext?: AccessRulesContext;
+  loadedSkills: Set<SkillName>;
 }
 
 export interface ToolConfirmationConfig {
@@ -116,52 +150,49 @@ export interface SystemPromptResult {
 export interface AgentDefinition {
   id: string;
   toolSet: string[];
+  preloadedSkills?: SkillName[];
   systemPromptGenerator: (ctx: ToolExecutionContext) => Promise<SystemPromptResult>;
 }
-
-export interface ToolEventAction {
-  type: "tool_event";
-  toolCallId: string;
-  toolName: string;
-  event: string;
-  payload?: Record<string, unknown>;
-}
-
-export interface GlobalEventAction {
-  type: "global_event";
-  event: string;
-  payload?: Record<string, unknown>;
-}
-
-export type UserAction = ToolEventAction | GlobalEventAction;
 
 export interface AgentRequest {
   agentId: AgentType;
   messages: Message[];
   userMessage?: string;
-  userActions?: UserAction[];
+  visibleUserMessageId?: string;
+  resumeToolCallId?: string;
   filePayloads?: Record<string, { name: string; content: any }>;
-  hiddenContext?: string;
   toolExecutionPolicies?: ToolExecutionPolicies;
   conversationId?: string;
+  loadedSkills?: string[];
   playgroundDraft?: DraftLookup;
+  systemPlaygroundContext?: SystemPlaygroundContext;
+  accessRulesContext?: AccessRulesContext;
 }
 
 export interface ValidatedAgentRequest {
   agentId: AgentType;
   messages: Message[];
   userMessage?: string;
-  userActions?: UserAction[];
+  visibleUserMessageId?: string;
+  resumeToolCallId?: string;
   filePayloads?: Record<string, { name: string; content: any }>;
-  hiddenContext?: string;
   toolExecutionPolicies?: ToolExecutionPolicies;
   conversationId?: string;
+  loadedSkills?: string[];
   agent: AgentDefinition;
   playgroundDraft?: DraftLookup;
+  systemPlaygroundContext?: SystemPlaygroundContext;
+  accessRulesContext?: AccessRulesContext;
+}
+
+export interface PrepareMessagesResult {
+  messages: Message[];
+  systemMessage?: { id: string; content: string };
 }
 
 export interface CallSystemArgs {
   systemId?: string;
+  environment?: "dev" | "prod";
   url: string;
   method?: string;
   headers?: Record<string, string>;
@@ -176,5 +207,9 @@ export interface CallSystemResult {
   headers?: Record<string, string>;
   data?: any;
   error?: string;
-  next_step?: string;
+}
+
+export interface DeploymentEndpoints {
+  apiEndpoint: string;
+  appEndpoint: string;
 }

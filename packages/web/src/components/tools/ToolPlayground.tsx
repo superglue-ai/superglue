@@ -1,8 +1,7 @@
 "use client";
-import { useConfig } from "@/src/app/config-context";
-import { useSystems } from "@/src/app/systems-context";
-import { useTools } from "@/src/app/tools-context";
-import { createSuperglueClient } from "@/src/lib/client-utils";
+import { useSystems } from "@/src/queries/systems";
+import { useTools, useArchiveTool } from "@/src/queries/tools";
+import { useEnvironment } from "@/src/app/environment-context";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
 import {
   ToolStep,
@@ -19,6 +18,7 @@ import { useToolExecution } from "./hooks/use-tool-execution";
 import { useToolData } from "./hooks/use-tool-data";
 import { ToolConfigProvider, useToolConfig, ExecutionProvider, useExecution } from "./context";
 import { useToast } from "@/src/hooks/use-toast";
+import { useUnsavedChangesGuard } from "@/src/hooks/use-unsaved-changes-guard";
 import { ArchiveRestore, Check, Loader2, Play, Square, FileQuestion } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -42,6 +42,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { EnvironmentToggle } from "../ui/environment-toggle";
 import { DeployButton } from "./deploy/DeployButton";
 import { ModifyStepConfirmDialog } from "./dialogs/ModifyStepConfirmDialog";
 import { FolderPicker } from "./folders/FolderPicker";
@@ -102,8 +103,10 @@ function ToolPlaygroundInner({
 }: ToolPlaygroundProps & { innerRef: React.ForwardedRef<ToolPlaygroundHandle> }) {
   const router = useRouter();
   const { toast } = useToast();
-  const config = useConfig();
-  const { refreshTools, tools } = useTools();
+  const { tools } = useTools();
+  const archiveTool = useArchiveTool();
+  const { systems } = useSystems();
+  const { hasMultiEnvSystems } = useEnvironment();
   const toolConfig = useToolConfig();
   const execution = useExecution();
 
@@ -123,6 +126,7 @@ function ToolPlaygroundInner({
     setSteps,
     setFolder,
     setIsArchived,
+    hasUnsavedChanges,
   } = toolConfig;
 
   const {
@@ -142,6 +146,21 @@ function ToolPlaygroundInner({
     setPlaygroundTool,
     setOnRestoreDraft,
   } = useRightSidebar();
+
+  // Get the saved tool from context for diff comparison
+  const savedTool = useMemo(() => {
+    if (!toolId) return null;
+    return tools.find((t) => t.id === toolId) || null;
+  }, [toolId, tools]);
+
+  // Navigation guard for unsaved changes
+  const {
+    showDialog: showUnsavedDialog,
+    confirmNavigation,
+    cancelNavigation,
+  } = useUnsavedChangesGuard({
+    enabled: hasUnsavedChanges && !embedded,
+  });
 
   useEffect(() => {
     if (!isArchived && !renderAgentInline && AgentSidebarComponent) {
@@ -224,6 +243,24 @@ function ToolPlaygroundInner({
   const [navigateToFinalSignal, setNavigateToFinalSignal] = useState<number>(0);
   const [showStepOutputSignal, setShowStepOutputSignal] = useState<number>(0);
   const [focusStepId, setFocusStepId] = useState<string | null>(null);
+
+  // Check if this tool uses any systems with linked non-prod versions
+  const toolUsesMultiEnvSystems = useMemo(() => {
+    if (!hasMultiEnvSystems) return false;
+    // Get system IDs from steps
+    const toolSystemIds = new Set<string>();
+    for (const step of steps) {
+      if (step.config && isRequestConfig(step.config) && step.config.systemId) {
+        toolSystemIds.add(step.config.systemId);
+      }
+    }
+    return Array.from(toolSystemIds).some((systemId) => {
+      // Check if this system has both dev and prod environments (same ID, different environment)
+      const hasDevEnv = systems.some((s) => s.id === systemId && s.environment === "dev");
+      const hasProdEnv = systems.some((s) => s.id === systemId && s.environment === "prod");
+      return hasDevEnv && hasProdEnv;
+    });
+  }, [steps, systems, hasMultiEnvSystems]);
 
   type DialogState =
     | { type: "none" }
@@ -417,19 +454,20 @@ function ToolPlaygroundInner({
   };
 
   const handleUnarchive = async () => {
-    try {
-      const client = createSuperglueClient(config.apiEndpoint);
-      await client.archiveWorkflow(toolId, false);
-      setIsArchived(false);
-      refreshTools();
-    } catch (error: any) {
-      console.error("Error unarchiving tool:", error);
-      toast({
-        title: "Error unarchiving tool",
-        description: error.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
-    }
+    archiveTool.mutate(
+      { id: toolId, archived: false },
+      {
+        onSuccess: () => setIsArchived(false),
+        onError: (error: any) => {
+          console.error("Error unarchiving tool:", error);
+          toast({
+            title: "Error unarchiving tool",
+            description: error.message || "An unexpected error occurred",
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   const toolActionButtons = !embedded ? (
@@ -441,7 +479,6 @@ function ToolPlaygroundInner({
         showLabel
         onRenamed={(newId) => {
           setToolId(newId);
-          refreshTools();
           router.push(`/tools/${encodeURIComponent(newId)}`);
         }}
         onDuplicated={(newId) => {
@@ -456,6 +493,7 @@ function ToolPlaygroundInner({
 
   const defaultHeaderActions = (
     <div className="flex items-center gap-2">
+      {toolUsesMultiEnvSystems && <EnvironmentToggle />}
       {isArchived ? (
         <Button variant="glass" onClick={handleUnarchive} className="h-9 px-4 rounded-xl">
           <ArchiveRestore className="h-4 w-4" />
@@ -584,6 +622,7 @@ function ToolPlaygroundInner({
                       totalFileSize={totalFileSize}
                       isPayloadValid={isPayloadValid}
                       embedded={embedded}
+                      savedTool={savedTool}
                     />
                   )}
                 </div>
@@ -628,6 +667,23 @@ function ToolPlaygroundInner({
           />
         )}
 
+        {/* Unsaved changes navigation warning dialog */}
+        <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => !open && cancelNavigation()}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes to this tool. Are you sure you want to leave? Your changes
+                will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={cancelNavigation}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmNavigation}>Discard Changes</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Portal agent into sidebar (when not inline) - hideHeader since RightSidebar has tabs */}
         {!isArchived &&
           !renderAgentInline &&
@@ -663,6 +719,7 @@ const ToolPlayground = forwardRef<ToolPlaygroundHandle, ToolPlaygroundProps>((pr
       externalUploadedFiles={props.uploadedFiles}
       externalFilePayloads={props.filePayloads}
       onExternalFilesChange={props.onFilesChange}
+      skipLocalPayloadLoad={false}
     >
       <ExecutionProvider>
         <ToolPlaygroundInner {...props} innerRef={ref} />

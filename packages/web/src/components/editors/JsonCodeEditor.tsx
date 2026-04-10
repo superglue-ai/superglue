@@ -5,7 +5,7 @@ import Editor from "@monaco-editor/react";
 import React, { useMemo, useState } from "react";
 import { CopyButton } from "../tools/shared/CopyButton";
 
-const HIGHLIGHTING_THRESHOLD = 100 * 1024; // 100KB
+const HIGHLIGHTING_THRESHOLD = 500 * 1024; // 500KB
 
 type JsonCodeEditorProps = {
   value: string;
@@ -25,6 +25,7 @@ type JsonCodeEditorProps = {
   overlayPlacement?: "default" | "corner";
   resizable?: boolean;
   showValidation?: boolean;
+  noBorder?: boolean;
 };
 
 export const JsonCodeEditor = ({
@@ -32,7 +33,7 @@ export const JsonCodeEditor = ({
   onChange,
   readOnly = false,
   minHeight = "150px",
-  maxHeight = "300px",
+  maxHeight,
   height,
   resizeHandleProps,
   placeholder = "{}",
@@ -41,12 +42,23 @@ export const JsonCodeEditor = ({
   overlayPlacement = "default",
   resizable = false,
   showValidation = false,
+  noBorder = false,
 }: JsonCodeEditorProps) => {
   const { theme, onMount } = useMonacoTheme();
+
+  // Calculate content-based height when no explicit height/maxHeight is set
+  const contentHeight = useMemo(() => {
+    const content = value || placeholder;
+    const lineCount = (content.match(/\n/g) || []).length + 1;
+    const lineHeight = 18; // approximate line height in Monaco
+    const padding = 24; // top + bottom padding
+    return Math.max(parseInt(minHeight), lineCount * lineHeight + padding);
+  }, [value, placeholder, minHeight]);
+
   const { height: resizableHeight, resizeHandleProps: internalResizeHandleProps } = useResizable({
     minHeight: 100,
     maxHeight: 1000,
-    initialHeight: parseInt(maxHeight),
+    initialHeight: maxHeight ? parseInt(maxHeight) : 300,
   });
   const [jsonError, setJsonError] = useState<string | null>(null);
 
@@ -57,12 +69,22 @@ export const JsonCodeEditor = ({
     return base;
   }, [value, placeholder, readOnly]);
 
-  const effectiveHeight = height ?? (resizable ? resizableHeight : maxHeight);
+  // Use content-based height, capped by maxHeight if set
+  const effectiveHeight = useMemo(() => {
+    if (height) return height;
+    if (resizable) return resizableHeight;
+    if (!maxHeight) return contentHeight;
+
+    // Parse maxHeight - only works reliably with px values
+    const parsed = parseInt(maxHeight, 10);
+    if (isNaN(parsed)) return contentHeight;
+    return Math.min(contentHeight, parsed);
+  }, [height, resizable, resizableHeight, maxHeight, contentHeight]);
   const effectiveResizeHandleProps =
     resizeHandleProps ?? (resizable ? internalResizeHandleProps : null);
 
   return (
-    <div className={cn("relative rounded-lg border shadow-sm bg-muted/30")}>
+    <div className={cn("relative", !noBorder && "rounded-lg border shadow-sm bg-muted/30")}>
       {overlay && (
         <div
           className={cn(
@@ -152,6 +174,11 @@ export const JsonCodeEditor = ({
             occurrencesHighlight: "off",
             renderValidationDecorations: "off",
             stickyScroll: { enabled: false },
+            unicodeHighlight: {
+              ambiguousCharacters: false,
+              invisibleCharacters: false,
+              nonBasicASCII: false,
+            },
           }}
           theme={theme}
           className="bg-transparent"

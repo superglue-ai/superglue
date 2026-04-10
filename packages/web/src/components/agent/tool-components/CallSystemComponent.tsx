@@ -8,10 +8,11 @@ import {
   SelectValue,
 } from "@/src/components/ui/select";
 import { CopyButton } from "@/src/components/tools/shared/CopyButton";
-import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
-import { UserAction, CallSystemAutoExecute } from "@/src/lib/agent/agent-types";
+import { JsonEditor } from "@/src/components/editors/JsonEditor";
+import { CallSystemAutoExecute } from "@/src/lib/agent/agent-types";
+import { ToolMutation } from "@/src/lib/agent/agent-tools/tool-call-state";
 import { ToolCall, getConnectionProtocol } from "@superglue/shared";
-import { ChevronDown, FolderOpen, Globe, Loader2, Terminal } from "lucide-react";
+import { ChevronDown, Database, FolderOpen, Globe, Loader2, Terminal } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ToolCallPendingState } from "./ToolCallPendingState";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
@@ -20,6 +21,11 @@ import { Button } from "@/src/components/ui/button";
 import { ErrorMessage } from "@/src/components/ui/error-message";
 
 const maskConnectionString = (url: string): string => {
+  // If URL contains unresolved placeholders, show them cleanly with single angle brackets
+  if (url.includes("<<") && url.includes(">>")) {
+    return url.replace(/<<([^>]+)>>/g, "<$1>");
+  }
+
   try {
     const parsed = new URL(url);
     if (parsed.password) {
@@ -35,9 +41,14 @@ interface CallSystemComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
+  onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
   sendAgentRequest?: (
     userMessage?: string,
-    options?: { userActions?: UserAction[] },
+    options?: {
+      hiddenStarterMessage?: string;
+      hideUserMessage?: boolean;
+      resumeToolCallId?: string;
+    },
   ) => Promise<void>;
   onAbortStream?: () => void;
 }
@@ -46,6 +57,7 @@ export function CallSystemComponent({
   tool,
   onInputChange,
   onToolUpdate,
+  onToolMutation,
   sendAgentRequest,
   onAbortStream,
 }: CallSystemComponentProps) {
@@ -124,16 +136,12 @@ export function CallSystemComponent({
 
     setIsExecuting(true);
     onToolUpdate?.(tool.id, { status: "running" });
+    onToolMutation?.(tool.id, {
+      confirmationState: "confirmed",
+    });
 
     sendAgentRequest(undefined, {
-      userActions: [
-        {
-          type: "tool_event",
-          toolCallId: tool.id,
-          toolName: "call_system",
-          event: "confirmed",
-        },
-      ],
+      resumeToolCallId: tool.id,
     });
   };
 
@@ -141,16 +149,12 @@ export function CallSystemComponent({
     if (!sendAgentRequest) return;
 
     onToolUpdate?.(tool.id, { status: "declined" });
+    onToolMutation?.(tool.id, {
+      confirmationState: "declined",
+    });
 
     sendAgentRequest(undefined, {
-      userActions: [
-        {
-          type: "tool_event",
-          toolCallId: tool.id,
-          toolName: "call_system",
-          event: "declined",
-        },
-      ],
+      resumeToolCallId: tool.id,
     });
   };
 
@@ -183,6 +187,27 @@ export function CallSystemComponent({
         <div className="flex items-center gap-3">
           <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             PostgreSQL
+          </span>
+        </div>
+        <div className="relative rounded border border-border p-3">
+          <div className="absolute top-1 right-1">
+            <CopyButton text={query} />
+          </div>
+          <pre className="text-sm font-mono text-foreground whitespace-pre-wrap break-words pr-6">
+            {query}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMssqlHeader = () => {
+    const query = parsedBody?.query || body || "";
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+            Microsoft SQL Server
           </span>
         </div>
         <div className="relative rounded border border-border p-3">
@@ -341,6 +366,71 @@ export function CallSystemComponent({
     );
   };
 
+  const renderRedisHeader = () => {
+    const command = parsedBody?.command || (Array.isArray(parsedBody) ? "PIPELINE" : "");
+    const args = parsedBody?.args || [];
+    const commandCount = Array.isArray(parsedBody) ? parsedBody.length : 0;
+    return (
+      <div className="flex items-start gap-3">
+        <button
+          onClick={() => setDetailsExpanded(!detailsExpanded)}
+          className="flex-shrink-0 mt-1 hover:bg-muted rounded p-1 -m-1 transition-colors"
+          title={detailsExpanded ? "Hide details" : "Show details"}
+        >
+          {detailsExpanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <Database className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              Redis
+            </span>
+            <span className="text-xs font-medium text-muted-foreground uppercase">{command}</span>
+            {commandCount > 0 && (
+              <span className="text-xs text-muted-foreground">({commandCount} commands)</span>
+            )}
+          </div>
+          {!Array.isArray(parsedBody) && args.length > 0 && (
+            <pre className="text-sm font-mono text-foreground truncate">
+              {args.map((a: any) => String(a)).join(" ")}
+            </pre>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderRedisDetails = () => {
+    const commands = Array.isArray(parsedBody) ? parsedBody : [parsedBody];
+    return (
+      <div className="bg-muted/50 p-3 rounded-md space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">
+            {commands.length > 1 ? `Redis Pipeline (${commands.length} commands)` : "Redis Command"}
+          </div>
+          <CopyButton getData={() => JSON.stringify(parsedBody, null, 2)} />
+        </div>
+        <div className="text-xs space-y-1.5">
+          {commands.map((cmd: any, i: number) => (
+            <div key={i} className="font-mono">
+              <span className="font-medium">{cmd?.command}</span>
+              {cmd?.args?.length > 0 && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  {cmd.args.map((a: any) => String(a)).join(" ")}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="text-xs text-muted-foreground">Connection: {maskConnectionString(url)}</div>
+      </div>
+    );
+  };
+
   const renderDataResponse = () => {
     let data = output?.data;
     if (
@@ -402,26 +492,32 @@ export function CallSystemComponent({
         : JSON.stringify(normalized.data, null, 2);
 
     const lineCount = dataStr.split("\n").length;
-    const estimatedHeight = Math.min(140, Math.max(80, lineCount * 18 + 24));
+    const estimatedHeight = Math.min(360, Math.max(80, lineCount * 18 + 24));
 
     return (
       <div className="space-y-2">
         <div className="text-sm font-medium">
-          {protocol === "postgres" ? "Query Results" : "Response Data"}
+          {protocol === "postgres" || protocol === "mssql"
+            ? "Query Results"
+            : protocol === "redis"
+              ? "Command Results"
+              : "Response Data"}
         </div>
         {normalized.isJson ? (
-          <JsonCodeEditor
+          <JsonEditor
             value={dataStr}
             readOnly
             maxHeight={`${estimatedHeight}px`}
             overlayPlacement="corner"
+            tableEnabled
+            defaultView="table"
           />
         ) : (
           <div className="relative rounded border border-border p-3">
             <div className="absolute top-1 right-1">
               <CopyButton text={dataStr} />
             </div>
-            <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words max-h-64 overflow-y-auto pr-6">
+            <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words max-h-[360px] overflow-y-auto pr-6">
               {dataStr}
             </pre>
           </div>
@@ -433,8 +529,10 @@ export function CallSystemComponent({
   const getWarningMessage = () => {
     if (protocol === "http") {
       return `This ${method} request may modify data. Review carefully before confirming.`;
-    } else if (protocol === "postgres") {
+    } else if (protocol === "postgres" || protocol === "mssql") {
       return "This database query will be executed. Review carefully before confirming.";
+    } else if (protocol === "redis") {
+      return "This Redis command will be executed. Review carefully before confirming.";
     } else {
       return "This file operation will be executed. Review carefully before confirming.";
     }
@@ -442,7 +540,8 @@ export function CallSystemComponent({
 
   const getRunningMessage = () => {
     if (protocol === "http") return "Executing request...";
-    if (protocol === "postgres") return "Executing query...";
+    if (protocol === "postgres" || protocol === "mssql") return "Executing query...";
+    if (protocol === "redis") return "Executing command...";
     return "Executing operation...";
   };
 
@@ -453,10 +552,13 @@ export function CallSystemComponent({
 
         {!isPending && protocol === "http" && renderHttpHeader()}
         {!isPending && protocol === "postgres" && renderPostgresHeader()}
+        {!isPending && protocol === "mssql" && renderMssqlHeader()}
+        {!isPending && protocol === "redis" && renderRedisHeader()}
         {!isPending && protocol === "sftp" && renderSftpHeader()}
         {!isPending && protocol === "smb" && renderSmbHeader()}
 
         {detailsExpanded && protocol === "http" && renderHttpDetails()}
+        {detailsExpanded && protocol === "redis" && renderRedisDetails()}
         {detailsExpanded && protocol === "sftp" && renderSftpDetails()}
         {detailsExpanded && protocol === "smb" && renderSmbDetails()}
 
@@ -488,7 +590,7 @@ export function CallSystemComponent({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ask_every_time">Ask every time</SelectItem>
-                  <SelectItem value="run_gets_only">Run GETs only</SelectItem>
+                  <SelectItem value="run_gets_only">Run reads only</SelectItem>
                   <SelectItem value="run_everything">Run everything</SelectItem>
                 </SelectContent>
               </Select>
@@ -514,9 +616,11 @@ export function CallSystemComponent({
             title={
               protocol === "http"
                 ? "Request returned an error"
-                : protocol === "postgres"
+                : protocol === "postgres" || protocol === "mssql"
                   ? "Query returned an error"
-                  : "Operation returned an error"
+                  : protocol === "redis"
+                    ? "Command returned an error"
+                    : "Operation returned an error"
             }
             message={
               typeof output.error === "string"
@@ -536,7 +640,7 @@ export function CallSystemComponent({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ask_every_time">Ask every time</SelectItem>
-                <SelectItem value="run_gets_only">Run GETs only</SelectItem>
+                <SelectItem value="run_gets_only">Run reads only</SelectItem>
                 <SelectItem value="run_everything">Run everything</SelectItem>
               </SelectContent>
             </Select>

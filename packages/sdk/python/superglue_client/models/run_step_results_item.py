@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,14 +19,14 @@ class RunStepResultsItem:
     Attributes:
         step_id (str): ID of the step that was executed
         success (bool): Whether the step completed successfully
-        data (RunStepResultsItemData | Unset): Step execution result data
-        error (str | Unset): Error message if step failed
+        data (Union[Unset, RunStepResultsItemData]): Step execution result data
+        error (Union[Unset, str]): Error message if step failed
     """
 
     step_id: str
     success: bool
-    data: RunStepResultsItemData | Unset = UNSET
-    error: str | Unset = UNSET
+    data: Union[Unset, "RunStepResultsItemData"] = UNSET
+    error: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,7 +34,7 @@ class RunStepResultsItem:
 
         success = self.success
 
-        data: dict[str, Any] | Unset = UNSET
+        data: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.data, Unset):
             data = self.data.to_dict()
 
@@ -67,7 +65,7 @@ class RunStepResultsItem:
         success = d.pop("success")
 
         _data = d.pop("data", UNSET)
-        data: RunStepResultsItemData | Unset
+        data: Union[Unset, RunStepResultsItemData]
         if isinstance(_data, Unset):
             data = UNSET
         else:

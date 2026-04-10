@@ -23,8 +23,8 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { JsonCodeEditor } from "@/src/components/editors/JsonCodeEditor";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { JsonEditor } from "@/src/components/editors/JsonEditor";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ToolDiff } from "@superglue/shared";
 import {
   DiffLine,
@@ -32,7 +32,7 @@ import {
   EnrichedDiff,
   formatTargetLabel,
 } from "@/src/lib/config-diff-utils";
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems } from "@/src/queries/systems";
 
 type DiffApprovalState = "pending" | "approved" | "rejected";
 
@@ -78,6 +78,7 @@ interface DiffApprovalComponentProps {
     partial: boolean;
     approvedDiffs: ToolDiff[];
     rejectedDiffs: ToolDiff[];
+    saveAfterAccept?: boolean;
   }) => void;
   onRunWithDiffs?: (approvedDiffs: ToolDiff[], payload?: Record<string, any>) => void;
   onAbortTest?: () => void;
@@ -85,6 +86,10 @@ interface DiffApprovalComponentProps {
   testLogs?: Array<{ message: string; timestamp: Date }>;
   testResult?: { success: boolean; data?: any; error?: string } | null;
   initialPayload?: string;
+  isSubmitting?: boolean;
+  submitMode?: "accept" | "accept_and_save" | null;
+  defaultSaveOnAccept?: boolean;
+  allowDraftOnlyAccept?: boolean;
 }
 
 /**
@@ -136,11 +141,13 @@ function DiffApprovalItem({
   state,
   onApprove,
   onReject,
+  disabled = false,
 }: {
   enrichedDiff: EnrichedDiff;
   state: DiffApprovalState;
   onApprove: () => void;
   onReject: () => void;
+  disabled?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -196,11 +203,13 @@ function DiffApprovalItem({
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={onReject}
+            disabled={disabled}
             className={cn(
               "p-1 rounded transition-colors",
               state === "rejected"
                 ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                 : "hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 dark:hover:text-red-400",
+              disabled && "cursor-not-allowed opacity-50",
             )}
             title={state === "rejected" ? "Click to undo rejection" : "Reject this change"}
           >
@@ -208,11 +217,13 @@ function DiffApprovalItem({
           </button>
           <button
             onClick={onApprove}
+            disabled={disabled}
             className={cn(
               "p-1 rounded transition-colors",
               state === "approved"
                 ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                 : "hover:bg-green-100 dark:hover:bg-green-900/30 text-muted-foreground hover:text-green-600 dark:hover:text-green-400",
+              disabled && "cursor-not-allowed opacity-50",
             )}
             title={state === "approved" ? "Click to undo approval" : "Approve this change"}
           >
@@ -264,24 +275,46 @@ export function DiffApprovalComponent({
   testLogs,
   testResult,
   initialPayload,
+  isSubmitting = false,
+  submitMode = null,
+  defaultSaveOnAccept = true,
+  allowDraftOnlyAccept = true,
 }: DiffApprovalComponentProps) {
   const [diffStates, setDiffStates] = useState<Map<number, DiffApprovalState>>(
     () => new Map(enrichedDiffs.map((_, i) => [i, "approved"])),
   );
   const [editablePayload, setEditablePayload] = useState<string>(initialPayload || "{}");
-  const [payloadError, setPayloadError] = useState<string | null>(null);
-  const [hasUserEdited, setHasUserEdited] = useState(false);
+  const [confirmMenuOpen, setConfirmMenuOpen] = useState(false);
+  const confirmActionRef = useRef<HTMLDivElement | null>(null);
+  const [confirmActionWidth, setConfirmActionWidth] = useState<number | null>(null);
 
   useEffect(() => {
-    if (
-      !hasUserEdited &&
-      initialPayload &&
-      initialPayload !== "{}" &&
-      initialPayload !== editablePayload
-    ) {
+    if (initialPayload && initialPayload !== "{}" && initialPayload !== editablePayload) {
       setEditablePayload(initialPayload);
     }
-  }, [initialPayload, hasUserEdited, editablePayload]);
+  }, [initialPayload, editablePayload]);
+
+  useEffect(() => {
+    const actionGroup = confirmActionRef.current;
+    if (!actionGroup) return;
+
+    const updateWidth = () => {
+      setConfirmActionWidth(actionGroup.offsetWidth);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(actionGroup);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const approvedCount = useMemo(
     () => [...diffStates.values()].filter((s) => s === "approved").length,
@@ -302,6 +335,7 @@ export function DiffApprovalComponent({
   }, []);
 
   const handleRejectAll = useCallback(() => {
+    if (isSubmitting) return;
     if (isRunning && onAbortTest) {
       onAbortTest();
     }
@@ -312,38 +346,44 @@ export function DiffApprovalComponent({
       partial: false,
       approvedDiffs: [],
       rejectedDiffs: enrichedDiffs.map((ed) => ed.diff),
+      saveAfterAccept: false,
     });
-  }, [enrichedDiffs, onComplete, isRunning, onAbortTest]);
+  }, [enrichedDiffs, onComplete, isRunning, onAbortTest, isSubmitting]);
 
-  const handleConfirm = useCallback(() => {
-    if (isRunning && onAbortTest) {
-      onAbortTest();
-    }
-
-    const approvedDiffs: ToolDiff[] = [];
-    const rejectedDiffs: ToolDiff[] = [];
-
-    for (const [index, state] of diffStates) {
-      if (state === "approved") {
-        approvedDiffs.push(enrichedDiffs[index].diff);
-      } else if (state === "rejected") {
-        rejectedDiffs.push(enrichedDiffs[index].diff);
+  const handleConfirm = useCallback(
+    (saveAfterAccept = false) => {
+      if (isSubmitting) return;
+      if (isRunning && onAbortTest) {
+        onAbortTest();
       }
-    }
 
-    const allApproved = rejectedDiffs.length === 0 && approvedDiffs.length > 0;
-    const allRejected = approvedDiffs.length === 0 && rejectedDiffs.length > 0;
-    const partial = approvedDiffs.length > 0 && rejectedDiffs.length > 0;
+      const approvedDiffs: ToolDiff[] = [];
+      const rejectedDiffs: ToolDiff[] = [];
 
-    onComplete({
-      approved: allApproved,
-      partial,
-      approvedDiffs,
-      rejectedDiffs,
-    });
-  }, [diffStates, enrichedDiffs, onComplete, isRunning, onAbortTest]);
+      for (const [index, state] of diffStates) {
+        if (state === "approved") {
+          approvedDiffs.push(enrichedDiffs[index].diff);
+        } else if (state === "rejected") {
+          rejectedDiffs.push(enrichedDiffs[index].diff);
+        }
+      }
+
+      const allApproved = rejectedDiffs.length === 0 && approvedDiffs.length > 0;
+      const partial = approvedDiffs.length > 0 && rejectedDiffs.length > 0;
+
+      onComplete({
+        approved: allApproved,
+        partial,
+        approvedDiffs,
+        rejectedDiffs,
+        saveAfterAccept,
+      });
+    },
+    [diffStates, enrichedDiffs, onComplete, isRunning, onAbortTest, isSubmitting],
+  );
 
   const handleRunWithApproved = useCallback(() => {
+    if (isSubmitting) return;
     const approvedDiffs: ToolDiff[] = [];
     for (const [index, state] of diffStates) {
       if (state === "approved") {
@@ -357,7 +397,15 @@ export function DiffApprovalComponent({
       }
     } catch {}
     onRunWithDiffs?.(approvedDiffs, payload);
-  }, [diffStates, enrichedDiffs, onRunWithDiffs, editablePayload]);
+  }, [diffStates, enrichedDiffs, onRunWithDiffs, editablePayload, isSubmitting]);
+
+  const primaryLabel = defaultSaveOnAccept ? "Accept & Save" : "Accept";
+  const submitLabel =
+    submitMode === "accept_and_save"
+      ? "Accepting & Saving..."
+      : submitMode === "accept"
+        ? "Accepting..."
+        : primaryLabel;
 
   return (
     <div className="space-y-3">
@@ -381,6 +429,7 @@ export function DiffApprovalComponent({
             state={diffStates.get(index) || "pending"}
             onApprove={() => handleApprove(index)}
             onReject={() => handleReject(index)}
+            disabled={isSubmitting}
           />
         ))}
       </div>
@@ -406,6 +455,7 @@ export function DiffApprovalComponent({
                     variant="glass"
                     onClick={handleRunWithApproved}
                     className="h-9 text-xs rounded-r-none flex-1"
+                    disabled={isSubmitting}
                   >
                     <Play className="w-3 h-3 mr-1" />
                     Test {approvedCount} change{approvedCount !== 1 ? "s" : ""}
@@ -415,6 +465,7 @@ export function DiffApprovalComponent({
                       size="sm"
                       variant="glass"
                       className="h-9 px-2 text-xs rounded-l-none border-l-0"
+                      disabled={isSubmitting}
                     >
                       <ChevronDown className="w-3 h-3" />
                     </Button>
@@ -422,34 +473,9 @@ export function DiffApprovalComponent({
                 </div>
                 <DropdownMenuContent align="start" className="w-[400px] p-3">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Test Payload</span>
-                      {payloadError && <span className="text-xs text-red-500">(Invalid JSON)</span>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Edit the payload to test with different inputs.
-                    </p>
-                    <JsonCodeEditor
-                      value={editablePayload}
-                      onChange={(val) => {
-                        setHasUserEdited(true);
-                        setEditablePayload(val || "");
-                        try {
-                          if (val?.trim()) {
-                            JSON.parse(val);
-                            setPayloadError(null);
-                          } else {
-                            setPayloadError(null);
-                          }
-                        } catch (e) {
-                          setPayloadError((e as Error).message);
-                        }
-                      }}
-                      readOnly={false}
-                      maxHeight="200px"
-                      resizable={true}
-                      showValidation={true}
-                    />
+                    <span className="text-sm font-medium">Test Payload</span>
+                    <p className="text-xs text-muted-foreground">Payload used for testing.</p>
+                    <JsonEditor value={editablePayload} readOnly maxHeight="200px" />
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -461,20 +487,79 @@ export function DiffApprovalComponent({
           variant="glass"
           onClick={handleRejectAll}
           className="h-9 text-xs flex-1 basis-[140px]"
+          disabled={isSubmitting}
         >
           <X className="w-3 h-3 mr-1" />
           Reject all
         </Button>
-        <Button
-          size="sm"
-          variant="glass-primary"
-          onClick={handleConfirm}
-          disabled={approvedCount === 0}
-          className="h-9 text-xs flex-1 basis-[140px]"
-        >
-          <Check className="w-3 h-3 mr-1" />
-          Confirm {approvedCount} change{approvedCount !== 1 ? "s" : ""}
-        </Button>
+        <div className="flex flex-1 basis-[180px]">
+          {allowDraftOnlyAccept ? (
+            <DropdownMenu open={confirmMenuOpen} onOpenChange={setConfirmMenuOpen}>
+              <div ref={confirmActionRef} className="flex w-full">
+                <Button
+                  size="sm"
+                  variant="glass-primary"
+                  onClick={() => handleConfirm(defaultSaveOnAccept)}
+                  disabled={approvedCount === 0 || isSubmitting}
+                  className="h-9 text-xs rounded-r-none flex-1"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Check className="w-3 h-3 mr-1" />
+                  )}
+                  {submitLabel}
+                </Button>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="glass-primary"
+                    disabled={approvedCount === 0 || isSubmitting}
+                    className="h-9 px-3 text-xs rounded-l-none border-l-0"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </div>
+              <DropdownMenuContent
+                align="end"
+                className="min-w-0 rounded-md border-0 bg-transparent p-0 shadow-none dark:border-0 dark:bg-transparent dark:from-transparent dark:to-transparent dark:shadow-none"
+                style={confirmActionWidth ? { width: confirmActionWidth } : undefined}
+              >
+                <div className="p-0">
+                  <Button
+                    size="sm"
+                    variant="glass-primary"
+                    onClick={() => {
+                      setConfirmMenuOpen(false);
+                      handleConfirm(!defaultSaveOnAccept);
+                    }}
+                    disabled={approvedCount === 0 || isSubmitting}
+                    className="h-9 w-full justify-center px-3 text-xs"
+                  >
+                    <Check className="w-3 h-3 mr-1" />
+                    {defaultSaveOnAccept ? "Accept" : "Accept & Save"}
+                  </Button>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              size="sm"
+              variant="glass-primary"
+              onClick={() => handleConfirm(defaultSaveOnAccept)}
+              disabled={approvedCount === 0 || isSubmitting}
+              className="h-9 text-xs flex-1"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <Check className="w-3 h-3 mr-1" />
+              )}
+              {submitLabel}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Test run status */}
@@ -508,7 +593,7 @@ export function DiffApprovalComponent({
                     <CheckCircle className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
                     <span className="text-xs font-medium">Test Results</span>
                   </div>
-                  <JsonCodeEditor
+                  <JsonEditor
                     value={JSON.stringify(testResult.data, null, 2)}
                     readOnly
                     maxHeight="200px"

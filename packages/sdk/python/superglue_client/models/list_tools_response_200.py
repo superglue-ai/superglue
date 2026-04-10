@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,22 +17,22 @@ T = TypeVar("T", bound="ListToolsResponse200")
 class ListToolsResponse200:
     """
     Attributes:
-        data (list[Tool] | Unset):
-        page (int | Unset):  Example: 1.
-        limit (int | Unset):  Example: 50.
-        total (int | Unset):  Example: 127.
-        has_more (bool | Unset):  Example: True.
+        data (Union[Unset, list['Tool']]):
+        page (Union[Unset, int]):  Example: 1.
+        limit (Union[Unset, int]):  Example: 50.
+        total (Union[Unset, int]):  Example: 127.
+        has_more (Union[Unset, bool]):  Example: True.
     """
 
-    data: list[Tool] | Unset = UNSET
-    page: int | Unset = UNSET
-    limit: int | Unset = UNSET
-    total: int | Unset = UNSET
-    has_more: bool | Unset = UNSET
+    data: Union[Unset, list["Tool"]] = UNSET
+    page: Union[Unset, int] = UNSET
+    limit: Union[Unset, int] = UNSET
+    total: Union[Unset, int] = UNSET
+    has_more: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        data: list[dict[str, Any]] | Unset = UNSET
+        data: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.data, Unset):
             data = []
             for data_item_data in self.data:
@@ -70,14 +68,12 @@ class ListToolsResponse200:
         from ..models.tool import Tool
 
         d = dict(src_dict)
+        data = []
         _data = d.pop("data", UNSET)
-        data: list[Tool] | Unset = UNSET
-        if _data is not UNSET:
-            data = []
-            for data_item_data in _data:
-                data_item = Tool.from_dict(data_item_data)
+        for data_item_data in _data or []:
+            data_item = Tool.from_dict(data_item_data)
 
-                data.append(data_item)
+            data.append(data_item)
 
         page = d.pop("page", UNSET)
 

@@ -10,6 +10,7 @@ import {
   ResponseFilter,
   Tool,
   isRequestConfig,
+  isTransformConfig,
 } from "@superglue/shared";
 import {
   createContext,
@@ -23,6 +24,82 @@ import {
 } from "react";
 import { PayloadState, ToolConfigContextValue, ToolDefinition } from "./types";
 
+// Normalize a value that might be a JSON string or an object
+// This ensures consistent comparison regardless of whether the value
+// is stored as a parsed object or a JSON string
+function normalizeJsonValue(val: unknown): unknown {
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return val;
+      }
+    }
+  }
+  return val;
+}
+
+function normalizeFunctionLikeString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.includes("=>") && !trimmed.startsWith("function")) {
+    return value;
+  }
+
+  // Normalize whitespace and formatting to prevent prettier changes from triggering "unsaved"
+  return trimmed
+    .replace(/;+$/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([{}()[\],;:])\s*/g, "$1")
+    .trim();
+}
+
+// Deep normalize an object, parsing any JSON strings found in headers/queryParams/body
+function deepNormalizeForComparison(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(deepNormalizeForComparison);
+  }
+  if (typeof obj === "string") {
+    return normalizeFunctionLikeString(obj);
+  }
+  if (typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Normalize JSON-like fields
+      if (key === "headers" || key === "queryParams" || key === "body") {
+        result[key] = normalizeJsonValue(value);
+      } else {
+        result[key] = deepNormalizeForComparison(value);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
+type ComparisonStateInput = {
+  steps: ToolStep[];
+  instruction: string;
+  outputTransform: string;
+  inputSchema: string | null;
+  outputSchema: string;
+  folder?: string;
+  responseFilters: ResponseFilter[];
+};
+
+function normalizeComparisonState({ responseFilters, ...state }: ComparisonStateInput): unknown {
+  return deepNormalizeForComparison({
+    ...state,
+    ...(state.folder ? { folder: state.folder } : {}),
+    ...(responseFilters.length > 0 ? { responseFilters } : {}),
+  });
+}
+
 function checkPayloadKeysReferenced(
   steps: ToolStep[],
   outputTransform: string,
@@ -35,8 +112,12 @@ function checkPayloadKeysReferenced(
     let pattern = patternCache.get(key);
     if (!pattern) {
       const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Match any of:
+      // - sourceData.key or sourceData["key"] (explicit sourceData reference)
+      // - <<key>> (template syntax)
+      // - .key or ["key"] preceded by word char (any object property access, e.g., s.key, data.key)
       pattern = new RegExp(
-        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]|<<\\s*${escaped}\\s*>>`,
+        `sourceData\\.${escaped}(?![a-zA-Z0-9_])|sourceData\\[\\s*\\\\?['"]${escaped}\\\\?['"]\\s*\\]|<<\\s*${escaped}\\s*>>|\\w\\.${escaped}(?![a-zA-Z0-9_])|\\w\\[\\s*['"]${escaped}['"]\\s*\\]`,
       );
       patternCache.set(key, pattern);
     }
@@ -58,13 +139,18 @@ function checkPayloadKeysReferenced(
     const { dataSelector } = step;
     if (checkStringForAnyKey(dataSelector)) return true;
 
-    // Only check request step config fields
+    // Check request step config fields
     if (isRequestConfig(step.config)) {
       const config = step.config as RequestStepConfig;
       if (checkValueForAnyKey(config.url)) return true;
       if (checkValueForAnyKey(config.body)) return true;
       if (checkValueForAnyKey(config.queryParams)) return true;
       if (checkValueForAnyKey(config.headers)) return true;
+    }
+
+    // Check transform step transformCode
+    if (isTransformConfig(step.config)) {
+      if (checkStringForAnyKey(step.config.transformCode)) return true;
     }
   }
 
@@ -82,6 +168,8 @@ interface ToolConfigProviderProps {
   externalUploadedFiles?: UploadedFileInfo[];
   externalFilePayloads?: Record<string, any>;
   onExternalFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
+  // Skip loading payload from local storage (e.g., when restoring a run)
+  skipLocalPayloadLoad?: boolean;
   children: ReactNode;
 }
 
@@ -95,6 +183,10 @@ export function useToolConfig(): ToolConfigContextValue {
   return context;
 }
 
+export function useToolConfigOptional(): ToolConfigContextValue | null {
+  return useContext(ToolConfigContext);
+}
+
 export function ToolConfigProvider({
   initialTool,
   initialPayload = "{}",
@@ -103,6 +195,7 @@ export function ToolConfigProvider({
   externalUploadedFiles,
   externalFilePayloads,
   onExternalFilesChange,
+  skipLocalPayloadLoad = false,
   children,
 }: ToolConfigProviderProps) {
   const [toolId, setToolId] = useState(initialTool?.id || "");
@@ -131,6 +224,8 @@ export function ToolConfigProvider({
   const [hasUserEdited, setHasUserEdited] = useState(false);
   const initialStateRef = useRef<string | null>(null);
   const [initialStateReady, setInitialStateReady] = useState(false);
+  const [baselineVersion, setBaselineVersion] = useState(0); // Triggers re-computation of hasUnsavedChanges
+  const [unsavedChangesSuppressed, setUnsavedChangesSuppressed] = useState(false);
 
   // Set initial baseline state for draft comparison
   useEffect(() => {
@@ -138,17 +233,21 @@ export function ToolConfigProvider({
 
     // Case 1: Tool loaded from server (initialTool provided)
     if (initialTool?.id) {
-      const state = JSON.stringify({
-        steps: initialTool.steps || [],
-        instruction: initialInstruction || initialTool.instruction || "",
-        outputTransform: initialTool.outputTransform || "(sourceData) => { return {} }",
-        inputSchema: initialTool.inputSchema
-          ? JSON.stringify(initialTool.inputSchema, null, 2)
-          : null,
-        outputSchema: initialTool.outputSchema
-          ? JSON.stringify(initialTool.outputSchema, null, 2)
-          : "",
-      });
+      const state = JSON.stringify(
+        normalizeComparisonState({
+          steps: initialTool.steps || [],
+          instruction: initialInstruction || initialTool.instruction || "",
+          outputTransform: initialTool.outputTransform || "(sourceData) => { return {} }",
+          inputSchema: initialTool.inputSchema
+            ? JSON.stringify(initialTool.inputSchema, null, 2)
+            : null,
+          outputSchema: initialTool.outputSchema
+            ? JSON.stringify(initialTool.outputSchema, null, 2)
+            : "",
+          folder: initialTool.folder,
+          responseFilters: initialTool.responseFilters || [],
+        }),
+      );
       initialStateRef.current = state;
       lastAttemptedSaveRef.current = null; // Allow detecting first change
       setInitialStateReady(true);
@@ -157,13 +256,17 @@ export function ToolConfigProvider({
 
     // Case 2: Tool state exists but no initialTool (e.g., created in-session)
     if (toolId && steps.length > 0) {
-      const state = JSON.stringify({
-        steps,
-        instruction,
-        outputTransform,
-        inputSchema,
-        outputSchema,
-      });
+      const state = JSON.stringify(
+        normalizeComparisonState({
+          steps,
+          instruction,
+          outputTransform,
+          inputSchema,
+          outputSchema,
+          folder,
+          responseFilters,
+        }),
+      );
       initialStateRef.current = state;
       lastAttemptedSaveRef.current = state; // Don't save current state as draft
       setInitialStateReady(true);
@@ -177,6 +280,8 @@ export function ToolConfigProvider({
     outputTransform,
     inputSchema,
     outputSchema,
+    folder,
+    responseFilters,
     initialStateReady,
   ]);
 
@@ -184,7 +289,7 @@ export function ToolConfigProvider({
   const filePayloads = externalFilePayloads ?? localFilePayloads;
 
   useEffect(() => {
-    if (!toolId) return;
+    if (!toolId || skipLocalPayloadLoad) return;
 
     let cancelled = false;
 
@@ -214,7 +319,7 @@ export function ToolConfigProvider({
     return () => {
       cancelled = true;
     };
-  }, [toolId, initialPayload]);
+  }, [toolId, initialPayload, skipLocalPayloadLoad]);
 
   // Persist payload to IndexedDB whenever it changes (debounced)
   const payloadSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -299,13 +404,16 @@ export function ToolConfigProvider({
       return;
     }
 
-    const currentState = JSON.stringify({
-      steps,
-      instruction,
-      outputTransform,
-      inputSchema,
-      outputSchema,
-    });
+    // Normalize to ensure consistent comparison with initialStateRef and lastAttemptedSaveRef
+    const currentState = JSON.stringify(
+      deepNormalizeForComparison({
+        steps,
+        instruction,
+        outputTransform,
+        inputSchema,
+        outputSchema,
+      }),
+    );
 
     if (currentState === initialStateRef.current) {
       pendingDraftRef.current = null;
@@ -491,23 +599,78 @@ export function ToolConfigProvider({
     [steps, systems],
   );
 
-  // Mark current state as baseline to prevent auto-save after restore
+  // Keep a ref to the latest state values so markCurrentStateAsBaseline always captures current state
+  // Updated during render (not in useEffect) to ensure it's always in sync when markCurrentStateAsBaseline is called
+  const latestStateRef = useRef({
+    steps,
+    instruction,
+    outputTransform,
+    inputSchema,
+    outputSchema,
+    folder,
+    responseFilters,
+  });
+  latestStateRef.current = {
+    steps,
+    instruction,
+    outputTransform,
+    inputSchema,
+    outputSchema,
+    folder,
+    responseFilters,
+  };
+
+  // Mark current state as baseline - always uses latest state from ref
+  // Normalize to ensure consistent comparison
   const markCurrentStateAsBaseline = useCallback(() => {
-    const currentState = JSON.stringify({
-      steps,
-      instruction,
-      outputTransform,
-      inputSchema,
-      outputSchema,
-    });
+    const currentState = JSON.stringify(
+      normalizeComparisonState({
+        steps: latestStateRef.current.steps,
+        instruction: latestStateRef.current.instruction,
+        outputTransform: latestStateRef.current.outputTransform,
+        inputSchema: latestStateRef.current.inputSchema,
+        outputSchema: latestStateRef.current.outputSchema,
+        folder: latestStateRef.current.folder,
+        responseFilters: latestStateRef.current.responseFilters,
+      }),
+    );
     initialStateRef.current = currentState;
     lastAttemptedSaveRef.current = currentState;
-  }, [steps, instruction, outputTransform, inputSchema, outputSchema]);
+    setBaselineVersion((v) => v + 1); // Trigger re-computation of hasUnsavedChanges
+  }, []);
 
   const isPayloadReferenced = useMemo(() => {
     const payloadKeys = Object.keys(computedPayload || {});
     return checkPayloadKeysReferenced(steps, outputTransform, payloadKeys);
   }, [steps, outputTransform, computedPayload]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (unsavedChangesSuppressed) return false;
+    if (!initialStateReady || !initialStateRef.current) return false;
+    const currentState = JSON.stringify(
+      normalizeComparisonState({
+        steps,
+        instruction,
+        outputTransform,
+        inputSchema,
+        outputSchema,
+        folder,
+        responseFilters,
+      }),
+    );
+    return currentState !== initialStateRef.current;
+  }, [
+    steps,
+    instruction,
+    outputTransform,
+    inputSchema,
+    outputSchema,
+    folder,
+    responseFilters,
+    initialStateReady,
+    baselineVersion,
+    unsavedChangesSuppressed,
+  ]);
 
   const value = useMemo<ToolConfigContextValue>(
     () => ({
@@ -536,6 +699,7 @@ export function ToolConfigProvider({
       setFilesAndPayloads,
       markPayloadEdited: () => setHasUserEdited(true),
       markCurrentStateAsBaseline,
+      setUnsavedChangesSuppressed,
 
       addStep,
       removeStep,
@@ -547,6 +711,7 @@ export function ToolConfigProvider({
       getStepSystem,
 
       isPayloadReferenced,
+      hasUnsavedChanges,
     }),
     [
       tool,
@@ -562,10 +727,12 @@ export function ToolConfigProvider({
       updateStep,
       setFilesAndPayloads,
       markCurrentStateAsBaseline,
+      setUnsavedChangesSuppressed,
       getStepConfig,
       getStepIndex,
       getStepSystem,
       isPayloadReferenced,
+      hasUnsavedChanges,
     ],
   );
 

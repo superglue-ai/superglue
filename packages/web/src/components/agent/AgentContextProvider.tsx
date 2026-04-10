@@ -2,10 +2,11 @@
 
 import { useToast } from "@/src/hooks/use-toast";
 import type { Message, ToolCall } from "@superglue/shared";
-import { UserAction, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
-import { AgentType } from "@/src/lib/agent/registry/agents";
-import { useTools } from "@/src/app/tools-context";
-import { useSystems } from "@/src/app/systems-context";
+import { ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
+import { AgentType } from "@/src/lib/agent/registries/agent-registry";
+import { useInvalidateTools } from "@/src/queries/tools";
+import { useInvalidateSystems } from "@/src/queries/systems";
+import { ToolMutation } from "@/src/lib/agent/agent-tools/tool-call-state";
 import React, {
   createContext,
   useCallback,
@@ -50,13 +51,17 @@ export interface AgentContextValue {
   // Tools
   handleToolInputChange: (newInput: any) => void;
   handleToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
+  handleToolMutation: (toolCallId: string, mutation: ToolMutation) => void;
 
   // Request
   sendAgentRequest: (
     userMessage?: string,
-    options?: { userActions?: UserAction[] },
+    options?: {
+      hiddenStarterMessage?: string;
+      hideUserMessage?: boolean;
+      resumeToolCallId?: string;
+    },
   ) => Promise<void>;
-  bufferAction: (action: UserAction) => void;
 
   // Files
   pendingFiles: UploadedFile[];
@@ -84,7 +89,7 @@ export interface AgentContextValue {
   handleSendMessage: (content: string, attachedFiles?: UploadedFile[]) => Promise<void>;
   startTemplatePrompt: (
     userPrompt: string,
-    hiddenContext?: string,
+    hiddenStarterMessage?: string,
     options?: { hideUserMessage?: boolean; chatTitle?: string; chatIcon?: string },
   ) => void;
 
@@ -99,6 +104,9 @@ export interface AgentContextValue {
   toolExecutionPolicies: ToolExecutionPolicies;
   setToolPolicy: (toolName: string, policy: Record<string, any>) => void;
   getToolPolicy: (toolName: string) => Record<string, any> | undefined;
+
+  // Skills
+  loadedSkills: string[];
 }
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -116,7 +124,8 @@ interface AgentContextProviderProps {
   config?: Partial<AgentConfig>;
   initialPrompts?: {
     userPrompt: string;
-    systemPrompt: string;
+    hiddenStarterMessage: string;
+    hideUserMessage?: boolean;
     chatTitle?: string;
     chatIcon?: string;
   } | null;
@@ -134,10 +143,11 @@ export function AgentContextProvider({
   const config: AgentConfig = { ...DEFAULT_CONFIG, ...configProp };
   const { toast } = useToast();
   const welcomeRef = useRef<AgentWelcomeRef>(null);
-  const { refreshTools } = useTools();
-  const { refreshSystems } = useSystems();
+  const invalidateTools = useInvalidateTools();
+  const invalidateSystems = useInvalidateSystems();
 
   const [toolExecutionPolicies, setToolExecutionPolicies] = useState<ToolExecutionPolicies>({});
+  const [loadedSkills, setLoadedSkills] = useState<string[]>([]);
 
   const setToolPolicy = useCallback((toolName: string, policy: Record<string, any>) => {
     setToolExecutionPolicies((prev) => ({
@@ -189,15 +199,19 @@ export function AgentContextProvider({
         });
       });
 
-      // Refresh tools context when save_tool completes successfully
-      if (data?.toolCall?.name === "save_tool") {
+      // Refresh tools context when a tool mutation persisted a saved tool.
+      if (
+        data?.toolCall?.name === "save_tool" ||
+        data?.toolCall?.name === "build_tool" ||
+        data?.toolCall?.name === "edit_tool"
+      ) {
         try {
           const output =
             typeof data.toolCall.output === "string"
               ? JSON.parse(data.toolCall.output)
               : data.toolCall.output;
-          if (output?.success) {
-            refreshTools();
+          if (output?.success && output?.persistence === "saved") {
+            invalidateTools();
           }
         } catch {
           // ignore parse errors
@@ -211,12 +225,33 @@ export function AgentContextProvider({
               ? JSON.parse(data.toolCall.output)
               : data.toolCall.output;
           if (output?.success) {
-            refreshSystems();
+            invalidateSystems();
+          }
+        } catch {}
+      }
+
+      if (data?.toolCall?.name === "load_skill") {
+        try {
+          const output =
+            typeof data.toolCall.output === "string"
+              ? JSON.parse(data.toolCall.output)
+              : data.toolCall.output;
+          if (output?.success && Array.isArray(output.loaded)) {
+            setLoadedSkills((prev) => {
+              const next = new Set(prev);
+              for (const s of output.loaded) next.add(s);
+              return [...next];
+            });
           }
         } catch {}
       }
     },
-    [messagesHook.setMessages, messagesHook.updateMessageWithData, refreshTools, refreshSystems],
+    [
+      messagesHook.setMessages,
+      messagesHook.updateMessageWithData,
+      invalidateTools,
+      invalidateSystems,
+    ],
   );
 
   // Now create the final streaming hook with all dependencies
@@ -230,6 +265,7 @@ export function AgentContextProvider({
   // Tools hook
   const toolsHook = useAgentTools({
     setMessages: messagesHook.setMessages,
+    messagesRef: messagesHook.messagesRef,
   });
 
   // Request hook - the main way to send requests
@@ -246,11 +282,13 @@ export function AgentContextProvider({
     findAndResumeMessageWithTool: messagesHook.findAndResumeMessageWithTool,
     processStreamData: streamingHook.processStreamData,
     currentStreamControllerRef: streamingHook.currentStreamControllerRef,
+    streamStateRef: streamingHook.streamStateRef,
     uploadedFiles: allUploadedFiles,
     pendingFiles: fileUpload.pendingFiles,
     sessionFiles: fileUpload.sessionFiles,
     filePayloads: fileUpload.filePayloads,
     toolExecutionPolicies,
+    loadedSkills,
     conversationIdRef,
     toast,
   });
@@ -262,6 +300,7 @@ export function AgentContextProvider({
     clearFiles: useCallback(() => {
       fileUpload.clearFiles();
       requestHook.resetFileTracking();
+      setLoadedSkills([]);
     }, [fileUpload, requestHook]),
     welcomeRef,
   });
@@ -276,8 +315,9 @@ export function AgentContextProvider({
       streamingHook.currentStreamControllerRef.current.abort();
       messagesHook.cleanupInterruptedStream("\n\n");
       messagesHook.setIsLoading(false);
+      streamingHook.streamStateRef.current = "idle";
     }
-  }, [streamingHook.currentStreamControllerRef, messagesHook]);
+  }, [streamingHook.currentStreamControllerRef, streamingHook.streamStateRef, messagesHook]);
 
   const handleSaveEdit = useCallback(
     async (messageId: string) => {
@@ -323,9 +363,13 @@ export function AgentContextProvider({
   );
 
   const startTemplatePrompt = useCallback(
-    (userPrompt: string, hiddenContext?: string, options?: { hideUserMessage?: boolean }) => {
+    (
+      userPrompt: string,
+      hiddenStarterMessage?: string,
+      options?: { hideUserMessage?: boolean },
+    ) => {
       requestHook.sendAgentRequest(userPrompt, {
-        hiddenContext,
+        hiddenStarterMessage,
         hideUserMessage: options?.hideUserMessage,
       });
     },
@@ -342,8 +386,8 @@ export function AgentContextProvider({
       !hasTriggeredInitialPromptsRef.current
     ) {
       hasTriggeredInitialPromptsRef.current = true;
-      const hideUserMessage = !!initialPrompts.chatTitle;
-      startTemplatePrompt(initialPrompts.userPrompt, initialPrompts.systemPrompt, {
+      const hideUserMessage = initialPrompts.hideUserMessage ?? !!initialPrompts.chatTitle;
+      startTemplatePrompt(initialPrompts.userPrompt, initialPrompts.hiddenStarterMessage, {
         hideUserMessage,
       });
     }
@@ -375,10 +419,10 @@ export function AgentContextProvider({
       // Tools
       handleToolInputChange: toolsHook.handleToolInputChange,
       handleToolUpdate: toolsHook.handleToolUpdate,
+      handleToolMutation: toolsHook.handleToolMutation,
 
       // Request
       sendAgentRequest: requestHook.sendAgentRequest,
-      bufferAction: requestHook.bufferAction,
 
       // Files
       pendingFiles: fileUpload.pendingFiles,
@@ -417,6 +461,9 @@ export function AgentContextProvider({
       toolExecutionPolicies,
       setToolPolicy,
       getToolPolicy,
+
+      // Skills
+      loadedSkills,
     }),
     [
       messagesHook,
@@ -433,6 +480,7 @@ export function AgentContextProvider({
       toolExecutionPolicies,
       setToolPolicy,
       getToolPolicy,
+      loadedSkills,
     ],
   );
 

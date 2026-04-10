@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -18,11 +16,11 @@ class Pagination:
 
     Attributes:
         type_ (PaginationType):  Example: cursorBased.
-        page_size (str | Unset): Number of items per page. Becomes available as <<(sourceData) => sourceData.limit>> in
-            request templates. Example: 50.
-        cursor_path (str | Unset): JSONPath to extract next page cursor from response body (e.g. "meta.next_cursor" for
-            {meta:{next_cursor:"abc"}}) Example: meta.next_cursor.
-        stop_condition (str | Unset): JavaScript function to determine when to stop pagination. Format: (response,
+        page_size (Union[Unset, str]): Number of items per page. Becomes available as <<(sourceData) =>
+            sourceData.limit>> in request templates. Example: 50.
+        cursor_path (Union[Unset, str]): JSONPath to extract next page cursor from response body (e.g.
+            "meta.next_cursor" for {meta:{next_cursor:"abc"}}) Example: meta.next_cursor.
+        stop_condition (Union[Unset, str]): JavaScript function to determine when to stop pagination. Format: (response,
             pageInfo) => boolean
             - response: Object with {data: ..., headers: ...} - access response body via response.data
             - pageInfo: Object with {page: number, offset: number, cursor: any, totalFetched: number}
@@ -31,9 +29,9 @@ class Pagination:
     """
 
     type_: PaginationType
-    page_size: str | Unset = UNSET
-    cursor_path: str | Unset = UNSET
-    stop_condition: str | Unset = UNSET
+    page_size: Union[Unset, str] = UNSET
+    cursor_path: Union[Unset, str] = UNSET
+    stop_condition: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

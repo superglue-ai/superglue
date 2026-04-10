@@ -1,7 +1,14 @@
 import { Message, ToolCall } from "@superglue/shared";
 import { Conversation } from "../ConversationHistory";
-import { AgentType } from "@/src/lib/agent/registry/agents";
-import { DraftLookup, UserAction, ExecutionMode } from "@/src/lib/agent/agent-types";
+import { AgentType } from "@/src/lib/agent/registries/agent-registry";
+import {
+  DraftLookup,
+  ExecutionMode,
+  SystemPlaygroundContext,
+  AccessRulesContext,
+} from "@/src/lib/agent/agent-types";
+import { ToolMutation } from "@/src/lib/agent/agent-tools/tool-call-state";
+import type { StreamState } from "./use-agent-streaming";
 
 export interface ToolConfirmationMetadata {
   executionMode: ExecutionMode;
@@ -41,6 +48,7 @@ export interface UseAgentStreamingReturn {
     createMessageIfNeeded: () => Message,
   ) => Promise<void>;
   currentStreamControllerRef: React.MutableRefObject<AbortController | null>;
+  streamStateRef: React.MutableRefObject<StreamState>;
   abortStream: () => void;
   startDrip: (assistantMessageId: string) => void;
   stopDrip: () => void;
@@ -50,15 +58,18 @@ export interface UseAgentStreamingReturn {
 export interface UseAgentToolsReturn {
   handleToolInputChange: (newInput: any) => void;
   handleToolUpdate: (toolCallId: string, updates: Partial<ToolCall>) => void;
+  handleToolMutation: (toolCallId: string, mutation: ToolMutation) => void;
 }
 
 export interface UseAgentRequestReturn {
   sendAgentRequest: (
     userMessage?: string,
-    options?: { userActions?: UserAction[]; hiddenContext?: string; hideUserMessage?: boolean },
+    options?: {
+      hiddenStarterMessage?: string;
+      hideUserMessage?: boolean;
+      resumeToolCallId?: string;
+    },
   ) => Promise<void>;
-  bufferAction: (action: UserAction) => void;
-  actionBufferRef: React.MutableRefObject<UserAction[]>;
   resetFileTracking: () => void;
 }
 
@@ -91,10 +102,11 @@ export interface UseAgentConversationReturn {
 
 export interface AgentConfig {
   agentId: AgentType;
-  hiddenContextBuilder?: () => string;
   initialMessages?: Message[];
   chatEndpoint?: string;
   getAuthToken?: () => string;
   onToolComplete?: (toolName: string, toolId: string, output: any) => void;
   playgroundDraftBuilder?: () => DraftLookup | null;
+  systemPlaygroundContextBuilder?: () => SystemPlaygroundContext | null;
+  accessRulesContextBuilder?: () => AccessRulesContext | null;
 }

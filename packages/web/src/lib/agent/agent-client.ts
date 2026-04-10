@@ -19,11 +19,14 @@ import {
   prepareMessages,
   buildToolsForAISDK,
   processConfirmations,
+  registerSkillGatedTools as registerSkillTools,
 } from "./agent-request";
-import { TOOL_REGISTRY } from "./registry/tool-definitions";
-import { getEffectiveMode, getPendingOutput } from "./registry/tool-policies";
+import { TOOL_REGISTRY } from "./registries/tool-registry";
+import { getEffectiveMode, getPendingOutput } from "./agent-tools/tool-policies";
 import { EESuperglueClient } from "../ee-superglue-client";
 import { getErrorMessage } from "./agent-helpers";
+import { SKILL_NAMES, type SkillName } from "./skills/index";
+import { getLangfuseFunctionId } from "./observability/langfuse";
 
 export interface StreamChunk {
   type:
@@ -47,6 +50,8 @@ export interface StreamChunk {
     input?: any;
     output?: any;
     status?: "completed" | "declined" | "awaiting_confirmation";
+    confirmationState?: string | null;
+    confirmationData?: unknown;
     error?: string;
     logs?: Array<{
       id: string;
@@ -77,10 +82,7 @@ export class AgentClient {
   constructor(config: AgentClientConfig) {
     this.config = config;
 
-    this.model = initializeAIModel({
-      providerEnvVar: "FRONTEND_LLM_PROVIDER",
-      defaultModel: "claude-sonnet-4-5",
-    });
+    this.model = initializeAIModel();
 
     this.superglueClient = new EESuperglueClient({
       apiKey: config.token,
@@ -150,38 +152,63 @@ export class AgentClient {
                 content: [{ type: "text", text: errorText }],
               });
             } else if (part.type === "tool") {
-              if (part.tool?.status === "awaiting_confirmation") {
+              const interactionLog = part.tool?.interactionLog;
+              const hasInteractionLog = !!interactionLog && interactionLog.length > 0;
+
+              if (part.tool?.status === "awaiting_confirmation" && !hasInteractionLog) {
                 continue;
               }
 
               if (part.tool?.id && part.tool?.name) {
                 let output: { type: "error-text" | "json"; value: any };
+                let outputObj: any = part.tool.output ?? {};
+
+                if (typeof outputObj === "string") {
+                  try {
+                    outputObj = JSON.parse(outputObj);
+                  } catch {
+                    outputObj = { result: outputObj };
+                  }
+                }
+
+                if (Array.isArray(outputObj)) {
+                  outputObj = { result: outputObj };
+                } else if (typeof outputObj !== "object" || outputObj === null) {
+                  outputObj = { result: outputObj };
+                }
+
+                if (hasInteractionLog) {
+                  outputObj = {
+                    ...outputObj,
+                    interactionLog,
+                  };
+                }
 
                 switch (part.tool.status) {
                   case "pending":
                     output = { type: "error-text", value: "Tool pending" };
                     break;
-                  case "declined":
-                    output = { type: "error-text", value: "Tool execution declined by user" };
+                  case "declined": {
+                    let declineMessage = "Tool execution declined by user";
+                    if (outputObj?.message) {
+                      declineMessage = outputObj.message;
+                    }
+                    output = hasInteractionLog
+                      ? {
+                          type: "json",
+                          value: { ...outputObj, message: declineMessage, success: false },
+                        }
+                      : { type: "error-text", value: declineMessage };
+                    break;
+                  }
+                  case "awaiting_confirmation":
+                    output = { type: "json", value: outputObj };
                     break;
                   case "running":
                     output = { type: "error-text", value: "Tool running" };
                     break;
                   case "completed":
                   case "error": {
-                    let outputObj = part.tool.output ?? {};
-                    if (typeof outputObj === "string") {
-                      try {
-                        outputObj = JSON.parse(outputObj);
-                      } catch {
-                        outputObj = { result: outputObj };
-                      }
-                    }
-                    if (Array.isArray(outputObj)) {
-                      outputObj = { result: outputObj };
-                    } else if (typeof outputObj !== "object") {
-                      outputObj = { result: outputObj };
-                    }
                     output = { type: "json", value: outputObj };
                     break;
                   }
@@ -238,7 +265,22 @@ export class AgentClient {
         )
       : {};
 
+    const initialSkills = new Set<SkillName>();
+
+    if (validated.loadedSkills?.length) {
+      for (const s of validated.loadedSkills) {
+        if (SKILL_NAMES.includes(s as SkillName)) initialSkills.add(s as SkillName);
+      }
+    }
+
+    if (validated.agent.preloadedSkills) {
+      for (const skill of validated.agent.preloadedSkills) {
+        initialSkills.add(skill);
+      }
+    }
+
     const executionContext: ToolExecutionContext = {
+      agentId: validated.agentId,
       superglueClient: this.superglueClient,
       filePayloads: unwrappedFilePayloads,
       messages: [],
@@ -246,6 +288,9 @@ export class AgentClient {
       abortSignal: this.config.abortSignal,
       toolExecutionPolicies: validated.toolExecutionPolicies,
       playgroundDraft: validated.playgroundDraft,
+      systemPlaygroundContext: validated.systemPlaygroundContext,
+      accessRulesContext: validated.accessRulesContext,
+      loadedSkills: initialSkills,
     };
 
     const { messages: preparedMessages, systemMessage } = await prepareMessages(
@@ -271,13 +316,29 @@ export class AgentClient {
           name: result.toolName,
           output: result.output,
           status: result.status,
+          confirmationState: result.confirmationState,
+          confirmationData: result.confirmationData,
         },
       };
     }
 
     const tools = buildToolsForAISDK(validated.agent.toolSet, TOOL_REGISTRY, executionContext);
 
-    yield* this.streamLLMResponse(preparedMessages, tools, executionContext, validated.agentId);
+    registerSkillTools(
+      tools,
+      validated.agent.toolSet,
+      executionContext.loadedSkills,
+      TOOL_REGISTRY,
+      executionContext,
+    );
+
+    yield* this.streamLLMResponse(
+      preparedMessages,
+      tools,
+      executionContext,
+      validated.agentId,
+      validated.agent.toolSet,
+    );
   }
 
   private async *streamLLMResponse(
@@ -285,6 +346,7 @@ export class AgentClient {
     tools: Record<string, any>,
     ctx: ToolExecutionContext,
     agentId?: string,
+    baseToolSet?: string[],
   ): AsyncGenerator<StreamChunk> {
     try {
       const toolInputQueues = new Map<string, string[]>();
@@ -302,15 +364,23 @@ export class AgentClient {
 
       const aiMessages = this.convertToAIMessages(messages);
 
+      const lastMsg = aiMessages.findLast((m: any) => m.role !== "system");
+      if (lastMsg && lastMsg.role === "assistant") {
+        aiMessages.push({ role: "user", content: "Continue." });
+      }
+
       const result = streamText({
         model: this.model,
         messages: aiMessages,
         tools,
-        stopWhen: stepCountIs(10),
+        stopWhen: stepCountIs(50),
         abortSignal: ctx.abortSignal,
+        onStepFinish: () => {
+          registerSkillTools(tools, baseToolSet ?? [], ctx.loadedSkills, TOOL_REGISTRY, ctx);
+        },
         experimental_telemetry: {
           isEnabled: true,
-          functionId: "superglue-agent-chat",
+          functionId: getLangfuseFunctionId(agentId),
           metadata: {
             agentId: agentId ?? "unknown",
           },
@@ -355,6 +425,7 @@ export class AgentClient {
                   input: p.input,
                   output: pendingOutput,
                   status: "awaiting_confirmation",
+                  confirmationState: "pending",
                 },
                 awaitingConfirmation: true,
               };
@@ -413,6 +484,7 @@ export class AgentClient {
                   input: toolInput,
                   output: pendingOutput,
                   status: "awaiting_confirmation",
+                  confirmationState: "pending",
                 },
                 awaitingConfirmation: true,
               };
@@ -449,6 +521,7 @@ export class AgentClient {
                   input: outputObj.toolCall?.input,
                   output: outputObj.toolCall?.output,
                   ...(shouldPause && { status: "awaiting_confirmation" as const }),
+                  ...(shouldPause && { confirmationState: "pending" }),
                 },
                 ...(shouldPause && { awaitingConfirmation: true }),
               };
@@ -480,6 +553,7 @@ export class AgentClient {
                   name: p.toolName,
                   output: finalOutput,
                   status: "awaiting_confirmation",
+                  confirmationState: "pending",
                 },
                 awaitingConfirmation: true,
               };

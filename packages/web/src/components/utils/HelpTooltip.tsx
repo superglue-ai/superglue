@@ -15,7 +15,7 @@ export function HelpTooltip({ text }: { text: string }) {
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">
-          <p className="max-w-xs text-sm">{text}</p>
+          <p className="max-w-xs text-sm whitespace-pre-line">{text}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

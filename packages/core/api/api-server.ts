@@ -1,64 +1,65 @@
-import { ServiceMetadata } from "@superglue/shared";
+import cors from "@fastify/cors";
+import formbody from "@fastify/formbody";
+import multipart from "@fastify/multipart";
+import type { Role, ServiceMetadata } from "@superglue/shared";
+import { getBaseRoleId, getRoleIds } from "@superglue/shared";
 import Fastify, { FastifyRequest } from "fastify";
 import { registerAllRoutes } from "../api/index.js";
 import { extractTokenFromFastifyRequest, validateToken } from "../auth/auth.js";
+import { resolveUserRoles, BaseRoleViolationError } from "../auth/role-resolver.js";
+import {
+  isToolAllowed,
+  isSystemVisible,
+  getSystemAccessLevel,
+} from "../auth/access-rule-evaluator.js";
+import { SystemAccessLevel } from "@superglue/shared";
+import { EEDataStore } from "../datastore/ee/types.js";
 import { mcpHandler } from "../mcp/mcp-server.js";
+import { getTunnelService } from "../tunnel/index.js";
 import { logMessage } from "../utils/logs.js";
 import { registerTelemetryHook } from "../utils/telemetry-hook.js";
 import { generateTraceId } from "../utils/trace-id.js";
 import type { WorkerPools } from "../worker/types.js";
 import { getRoutePermission } from "./registry.js";
-import { AuthenticatedFastifyRequest } from "./types.js";
-import type { DataStore } from "../datastore/types.js";
+import type { AuthenticatedFastifyRequest, BaseRoleId } from "./types.js";
+import { server_defaults } from "../default.js";
 
-// Check if restricted API key can access this route (uses route permissions from registry)
-export function checkRestrictedAccess(
-  authInfo: AuthenticatedFastifyRequest["authInfo"],
-  request: FastifyRequest,
+export function checkRouteAccess(
+  roles: Role[],
+  allowedBaseRoles?: BaseRoleId[],
 ): { allowed: boolean; error?: string } {
-  if (!authInfo.isRestricted) return { allowed: true };
-
-  // Use Fastify's routeOptions.url which gives us the matched route pattern (e.g., /v1/tools/:toolId)
-  const routePath = request.routeOptions?.url;
-  if (!routePath) {
-    logMessage("warn", `routeOptions.url is undefined for ${request.method} ${request.url}`);
-    return { allowed: false, error: "This API key cannot access this endpoint" };
+  if (!allowedBaseRoles) return { allowed: true };
+  const baseRole = getBaseRoleId(roles);
+  if (!baseRole || !(allowedBaseRoles as string[]).includes(baseRole)) {
+    return { allowed: false, error: "Your role does not have access to this endpoint" };
   }
-
-  const permissions = getRoutePermission(request.method, routePath);
-
-  // No permissions defined or not allowed for restricted keys
-  if (!permissions?.allowRestricted) {
-    return { allowed: false, error: "This API key cannot access this endpoint" };
-  }
-
-  // Resource-level permission is now handled by allowedSystems in the async check
-  // The sync check here just validates the route is accessible to restricted keys
-
   return { allowed: true };
 }
 
-export async function startApiServer(datastore: DataStore, workerPools: WorkerPools) {
+export async function startApiServer(datastore: EEDataStore, workerPools: WorkerPools) {
   const DEFAULT_API_PORT = 3002;
   const PORT = process.env.API_PORT ? parseInt(process.env.API_PORT) : DEFAULT_API_PORT;
 
   const fastify = Fastify({
     logger: false,
     bodyLimit: 1024 * 1024 * 1024, // 1GB
+    routerOptions: {
+      ignoreTrailingSlash: true,
+    },
+    requestTimeout: 30 * 60 * 1000, // 30 min — tools like backfill can run for 10+ min
   });
 
   // Register CORS
-  await fastify.register(import("@fastify/cors"), {
+  await fastify.register(cors, {
     origin: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   });
 
   // Register form body parser for application/x-www-form-urlencoded (used by webhooks)
-  await fastify.register(import("@fastify/formbody"));
+  await fastify.register(formbody);
 
   // Register multipart for file uploads (used by /v1/extract)
-  await fastify.register(import("@fastify/multipart"), {
-    limits: { fileSize: 1000000000 },
-  });
+  await fastify.register(multipart, { limits: { fileSize: 1000000000 } });
 
   // Error handler to log errors with traceId
   fastify.setErrorHandler(async (error: any, request, reply) => {
@@ -81,23 +82,17 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
-    // Use client-provided trace ID if available, otherwise generate one
     const clientTraceId = request.headers["x-trace-id"];
     const traceId =
       typeof clientTraceId === "string" && clientTraceId ? clientTraceId : generateTraceId();
 
-    // Skip authentication for health check
     if (request.url === "/v1/health") {
-      const metadata: ServiceMetadata = { traceId };
-      logMessage("debug", `(REST API) ${request.method} ${request.url}`, metadata);
       return;
     }
 
-    // Authentication logic
     const token = extractTokenFromFastifyRequest(request);
     const authResult = await validateToken(token);
 
-    // If authentication fails, return 401 error
     if (!authResult.success) {
       const metadata: ServiceMetadata = { traceId };
       logMessage(
@@ -114,35 +109,52 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
 
     const authenticatedRequest = request as AuthenticatedFastifyRequest;
 
-    let allowedSystems: string[] | null | undefined = undefined;
+    let roles: Role[];
+    try {
+      roles = await resolveUserRoles({
+        userId: authResult.userId,
+        orgId: authResult.orgId,
+        datastore,
+      });
+    } catch (error) {
+      if (error instanceof BaseRoleViolationError) {
+        const metadata: ServiceMetadata = { traceId, orgId: authResult.orgId };
+        logMessage(
+          "warn",
+          `(REST API) ${request.method} ${request.url} - ${error.message}`,
+          metadata,
+        );
+        return reply.code(403).send({ success: false, error: error.message });
+      }
+      throw error;
+    }
 
-    // Add auth info including orgId to request context
     authenticatedRequest.authInfo = {
       orgId: authResult.orgId,
       userId: authResult.userId,
+      userEmail: authResult.userEmail,
       orgName: authResult.orgName,
-      orgRole: authResult.orgRole,
-      allowedSystems,
-      isRestricted: authResult.isRestricted,
+      roles,
     };
 
-    // Add datastore, workerPools and traceId to request context
     authenticatedRequest.datastore = datastore;
     authenticatedRequest.workerPools = workerPools;
     authenticatedRequest.traceId = traceId;
 
-    // Add helper method to extract metadata
     authenticatedRequest.toMetadata = function () {
       return {
         orgId: this.authInfo.orgId,
         traceId: this.traceId,
         userId: this.authInfo.userId,
+        userEmail: this.authInfo.userEmail,
         isRestricted: this.authInfo.isRestricted,
+        roleIds: getRoleIds(this.authInfo.roles),
       };
     };
 
-    // Check restricted API key access (uses route permissions from registry)
-    const accessCheck = checkRestrictedAccess(authenticatedRequest.authInfo, request);
+    const routePath = request.routeOptions?.url || request.url;
+    const permissions = getRoutePermission(request.method, routePath);
+    const accessCheck = checkRouteAccess(roles, permissions?.allowedBaseRoles);
 
     if (!accessCheck.allowed) {
       const metadata: ServiceMetadata = { traceId, orgId: authResult.orgId };
@@ -157,7 +169,38 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
       });
     }
 
-    // Single log per request with method, endpoint, using ServiceMetadata
+    if (permissions?.checkResourceId) {
+      const params = request.params as Record<string, string>;
+      const resourceId = params[permissions.checkResourceId];
+      if (resourceId) {
+        let resourceCheck: { allowed: boolean; error?: string } = { allowed: true };
+        if (permissions.checkResourceId === "toolId") {
+          resourceCheck = isToolAllowed(roles, resourceId);
+        } else if (permissions.checkResourceId === "systemId") {
+          if (permissions.type === "read") {
+            resourceCheck = isSystemVisible(roles, resourceId);
+          } else {
+            const level = getSystemAccessLevel(roles, resourceId);
+            if (level !== SystemAccessLevel.READ_WRITE) {
+              resourceCheck = {
+                allowed: false,
+                error: `Your role does not have ${permissions.type} access to system '${resourceId}'`,
+              };
+            }
+          }
+        }
+        if (!resourceCheck.allowed) {
+          const metadata: ServiceMetadata = { traceId, orgId: authResult.orgId };
+          logMessage(
+            "warn",
+            `(REST API) ${request.method} ${request.url} - Resource access denied: ${resourceCheck.error}`,
+            metadata,
+          );
+          return reply.code(403).send({ success: false, error: resourceCheck.error });
+        }
+      }
+    }
+
     const metadata = authenticatedRequest.toMetadata();
     logMessage("debug", `(REST API) ${request.method} ${request.url}`, metadata);
   });
@@ -167,11 +210,6 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
 
   // Register all API routes from modules
   await registerAllRoutes(fastify);
-
-  // Health check endpoint (no authentication required)
-  fastify.get("/v1/health", async (request, reply) => {
-    return { status: "ok", timestamp: new Date().toISOString() };
-  });
 
   // MCP routes - use raw Node request/response with parsed body and auth context
   const mcpRouteHandler = async (request: any, reply: any) => {
@@ -184,6 +222,20 @@ export async function startApiServer(datastore: DataStore, workerPools: WorkerPo
   fastify.post("/mcp", mcpRouteHandler);
   fastify.get("/mcp", mcpRouteHandler);
   fastify.delete("/mcp", mcpRouteHandler);
+
+  // Attach tunnel WebSocket service for secure gateway connections
+  const tunnelService = getTunnelService();
+  tunnelService.attachToServer(fastify);
+
+  // Health check endpoint (no authentication required)
+  fastify.get("/v1/health", async (request, reply) => {
+    return {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      version: server_defaults.VERSION,
+      minCliVersion: server_defaults.MIN_CLI_VERSION,
+    };
+  });
 
   // Start server
   try {

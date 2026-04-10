@@ -1,5 +1,5 @@
-import { useConfig } from "@/src/app/config-context";
-import { useSchedules } from "@/src/app/schedules-context";
+import { useArchiveTool } from "@/src/queries/tools";
+import { useSchedules } from "@/src/queries/schedules";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
-import { createSuperglueClient } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
 import { useMemo } from "react";
 
@@ -27,7 +26,7 @@ export function ArchiveConfigDialog({
   onClose,
   onArchived,
 }: ArchiveConfigDialogProps) {
-  const superglueConfig = useConfig();
+  const archiveTool = useArchiveTool();
   const { getSchedulesForTool, isInitiallyLoading } = useSchedules();
 
   const activeSchedules = useMemo(() => {
@@ -35,22 +34,21 @@ export function ArchiveConfigDialog({
     return getSchedulesForTool(config.id).filter((s) => s.enabled);
   }, [config, getSchedulesForTool]);
 
-  const handleArchive = async () => {
+  const handleArchive = () => {
     if (!config || activeSchedules.length > 0) return;
-
-    try {
-      const client = createSuperglueClient(superglueConfig.apiEndpoint);
-      await client.archiveWorkflow(config.id, true);
-
-      const archivedId = config.id;
-      onClose();
-
-      if (onArchived) {
-        onArchived(archivedId);
-      }
-    } catch (error) {
-      console.error("Error archiving config:", error);
-    }
+    archiveTool.mutate(
+      { id: config.id, archived: true },
+      {
+        onSuccess: () => {
+          const archivedId = config.id;
+          onClose();
+          onArchived?.(archivedId);
+        },
+        onError: (error: any) => {
+          console.error("Error archiving config:", error);
+        },
+      },
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

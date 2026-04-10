@@ -1,4 +1,5 @@
 import { startApiServer } from "./api/api-server.js";
+import { bootstrapOss } from "./bootstrap/oss-bootstrap.js";
 import { createDataStore } from "./datastore/datastore.js";
 import { validateEnvironment } from "./shared/environment.js";
 import { initializeWorkerPools } from "./worker/worker-pool-registry.js";
@@ -7,6 +8,7 @@ async function startServer() {
   validateEnvironment();
 
   const datastore = await createDataStore({ type: "postgres" });
+  await bootstrapOss(datastore);
 
   const workerPools = initializeWorkerPools(datastore);
 

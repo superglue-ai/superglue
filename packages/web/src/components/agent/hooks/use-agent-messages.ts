@@ -3,6 +3,10 @@
 import { Message, ToolCall } from "@superglue/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UseAgentMessagesReturn } from "./types";
+import {
+  applyToolMutation,
+  createToolInteractionEntry,
+} from "@/src/lib/agent/agent-tools/tool-call-state";
 
 export function useAgentMessages(
   stopDrip: () => void,
@@ -48,6 +52,12 @@ export function useAgentMessages(
 
         case "tool_call_start": {
           const existingToolIndex = msg.tools?.findIndex((t) => t.id === data.toolCall.id);
+          const existingTool =
+            existingToolIndex !== undefined && existingToolIndex >= 0
+              ? msg.tools?.[existingToolIndex]
+              : msg.parts?.find(
+                  (part) => part.type === "tool" && part.tool?.id === data.toolCall.id,
+                )?.tool;
           const status =
             data.executionMode === "confirm_before_execution"
               ? "awaiting_confirmation"
@@ -61,6 +71,15 @@ export function useAgentMessages(
             input: data.toolCall.input,
             status,
             startTime: new Date(),
+            ...(existingTool?.interactionLog
+              ? { interactionLog: existingTool.interactionLog }
+              : {}),
+            ...(existingTool?.confirmationState !== undefined
+              ? { confirmationState: existingTool.confirmationState }
+              : {}),
+            ...(existingTool?.confirmationData !== undefined
+              ? { confirmationData: existingTool.confirmationData }
+              : {}),
           };
 
           let updatedTools: ToolCall[];
@@ -150,8 +169,13 @@ export function useAgentMessages(
 
           const alreadyCompleted =
             existingTool?.status === "completed" || existingTool?.status === "declined";
+          const hasNewCompletionData =
+            data.toolCall.output !== undefined ||
+            data.toolCall.status !== undefined ||
+            data.toolCall.confirmationState !== undefined ||
+            data.toolCall.confirmationData !== undefined;
 
-          if (alreadyCompleted) {
+          if (alreadyCompleted && !hasNewCompletionData) {
             return msg;
           }
 
@@ -164,6 +188,14 @@ export function useAgentMessages(
           } catch {}
 
           const isErrorOutput = parsedOutput?.success === false && parsedOutput?.error;
+          const confirmationState =
+            data.toolCall.confirmationState !== undefined
+              ? data.toolCall.confirmationState
+              : parsedOutput?.confirmationState;
+          const confirmationData =
+            data.toolCall.confirmationData !== undefined
+              ? data.toolCall.confirmationData
+              : parsedOutput?.confirmationData;
 
           let finalStatus: "completed" | "declined" | "awaiting_confirmation" | "error" =
             data.toolCall.status || "completed";
@@ -173,18 +205,18 @@ export function useAgentMessages(
           }
 
           const needsConfirmation = finalStatus === "awaiting_confirmation";
+          const mutation = {
+            status: finalStatus,
+            output: data.toolCall.output,
+            error: isErrorOutput ? parsedOutput.error : null,
+            endTime: needsConfirmation ? undefined : new Date(),
+            ...(confirmationState !== undefined ? { confirmationState } : {}),
+            ...(confirmationData !== undefined ? { confirmationData } : {}),
+          };
 
           const completedTools =
             msg.tools?.map((tool) =>
-              tool.id === data.toolCall.id
-                ? {
-                    ...tool,
-                    status: finalStatus,
-                    output: data.toolCall.output,
-                    error: isErrorOutput ? parsedOutput.error : undefined,
-                    endTime: needsConfirmation ? undefined : new Date(),
-                  }
-                : tool,
+              tool.id === data.toolCall.id ? applyToolMutation(tool, mutation) : tool,
             ) || [];
 
           const updatedParts =
@@ -192,13 +224,7 @@ export function useAgentMessages(
               part.type === "tool" && part.tool?.id === data.toolCall.id
                 ? {
                     ...part,
-                    tool: {
-                      ...part.tool,
-                      status: finalStatus,
-                      output: data.toolCall.output,
-                      error: isErrorOutput ? parsedOutput.error : undefined,
-                      endTime: needsConfirmation ? undefined : new Date(),
-                    },
+                    tool: applyToolMutation(part.tool, mutation),
                   }
                 : part,
             ) || [];
@@ -286,41 +312,57 @@ export function useAgentMessages(
   );
 
   const setAwaitingToolsToDeclined = useCallback(() => {
-    const updateMessages = (msgs: Message[]) =>
-      msgs.map((msg) => ({
+    const updateMessages = (msgs: Message[]) => {
+      const interactionEntries = new Map<string, ReturnType<typeof createToolInteractionEntry>>();
+      const getEntry = (toolCallId: string) => {
+        const existing = interactionEntries.get(toolCallId);
+        if (existing) return existing;
+        const created = createToolInteractionEntry("tool_auto_declined_due_to_new_user_message");
+        interactionEntries.set(toolCallId, created);
+        return created;
+      };
+
+      return msgs.map((msg) => ({
         ...msg,
         tools: msg.tools?.map((tool) =>
           tool.status === "awaiting_confirmation"
-            ? {
-                ...tool,
-                status: "declined" as const,
+            ? applyToolMutation(tool, {
+                status: "declined",
                 output: JSON.stringify({
                   success: false,
                   cancelled: true,
-                  message: "Request auto-declined (user sent new message)",
+                  message:
+                    "Auto-declined: user sent a new message instead of clicking Confirm/Decline. The proposed changes were NOT applied.",
                 }),
                 endTime: new Date(),
-              }
+                interactionEntry: getEntry(tool.id),
+                confirmationState: null,
+                confirmationData: null,
+              })
             : tool,
         ),
         parts: msg.parts?.map((part) =>
           part.type === "tool" && part.tool?.status === "awaiting_confirmation"
             ? {
                 ...part,
-                tool: {
-                  ...part.tool,
-                  status: "declined" as const,
+                tool: applyToolMutation(part.tool, {
+                  status: "declined",
                   output: JSON.stringify({
                     success: false,
                     cancelled: true,
-                    message: "Request auto-declined (user sent new message)",
+                    message:
+                      "Auto-declined: user sent a new message instead of clicking Confirm/Decline. The proposed changes were NOT applied.",
                   }),
                   endTime: new Date(),
-                },
+                  interactionEntry: getEntry(part.tool.id),
+                  confirmationState: null,
+                  confirmationData: null,
+                }),
               }
             : part,
         ),
       }));
+    };
 
     messagesRef.current = updateMessages(messagesRef.current);
     setMessages(updateMessages);

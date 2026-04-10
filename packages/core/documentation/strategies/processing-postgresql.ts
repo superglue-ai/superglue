@@ -5,7 +5,7 @@
  */
 
 import { RequestStepConfig, ServiceMetadata } from "@superglue/shared";
-import { callPostgres } from "../../tools/strategies/postgres/postgres.js";
+import { callPostgres } from "../../utils/postgres.js";
 import { logMessage } from "../../utils/logs.js";
 import { DocumentationConfig, DocumentationProcessingStrategy } from "../types.js";
 

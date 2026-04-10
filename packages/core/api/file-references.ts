@@ -476,43 +476,71 @@ registerApiModule({
       method: "POST",
       path: "/file-references",
       handler: createFileReference,
-      permissions: { type: "write", resource: "file-reference" },
+      permissions: {
+        type: "write",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "GET",
       path: "/file-references/:id",
       handler: getFileReference,
-      permissions: { type: "read", resource: "file-reference" },
+      permissions: {
+        type: "read",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "PATCH",
       path: "/file-references/:id",
       handler: updateFileReference,
-      permissions: { type: "write", resource: "file-reference" },
+      permissions: {
+        type: "write",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
     {
       method: "GET",
       path: "/file-references",
       handler: listFileReferences,
-      permissions: { type: "read", resource: "file-reference" },
+      permissions: {
+        type: "read",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "DELETE",
       path: "/file-references/:id",
       handler: deleteFileReference,
-      permissions: { type: "delete", resource: "file-reference" },
+      permissions: {
+        type: "delete",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
     {
       method: "POST",
       path: "/file-references/process",
       handler: processFileReference,
-      permissions: { type: "execute", resource: "file-reference" },
+      permissions: {
+        type: "execute",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "POST",
       path: "/file-references/batch",
       handler: batchCreateFileReferences,
-      permissions: { type: "write", resource: "file-reference" },
+      permissions: {
+        type: "write",
+        resource: "file-reference",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
   ],
 });

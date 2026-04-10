@@ -13,6 +13,7 @@ import type {
 } from "@superglue/shared";
 import { RunStatus, RequestSource as RSrc, sampleResultObject } from "@superglue/shared";
 import type { DataStore } from "../datastore/types.js";
+import { generateRunResultsUri, getRunResultsService } from "../ee/run-results-service.js";
 import { isFileStorageAvailable } from "../filestore/file-service.js";
 import { NotificationService } from "../notifications/index.js";
 import { logMessage } from "../utils/logs.js";
@@ -49,6 +50,7 @@ export interface StartRunParams {
   options?: RequestOptions;
   requestSource: RequestSource;
   userId?: string; // User or end user who triggered this run
+  executionMode?: "dev" | "prod";
 }
 
 export interface RunContext {
@@ -57,6 +59,7 @@ export interface RunContext {
   tool: Tool;
   startedAt: Date;
   requestSource: RequestSource;
+  executionMode?: "dev" | "prod";
   options?: RequestOptions;
 }
 
@@ -88,7 +91,7 @@ export class RunLifecycleManager {
    * Returns the full context needed for completeRun/abortRun
    */
   async startRun(params: StartRunParams): Promise<RunContext> {
-    const { tool, payload, options, requestSource, userId } = params;
+    const { tool, payload, options, requestSource, userId, executionMode } = params;
     const runId = params.runId || crypto.randomUUID();
     const startedAt = new Date();
 
@@ -99,6 +102,7 @@ export class RunLifecycleManager {
       startedAt,
       requestSource,
       options,
+      executionMode,
     };
 
     await this.datastore.createRun({
@@ -111,6 +115,7 @@ export class RunLifecycleManager {
         options,
         requestSource,
         userId: userId || this.metadata.userId,
+        executionMode,
         metadata: {
           startedAt: startedAt.toISOString(),
         },
@@ -306,5 +311,35 @@ export class RunLifecycleManager {
    * Fire-and-forget: Check org settings and store run results to S3 if enabled
    * Also updates the run with the storage URI in the database
    */
-  private maybeStoreRunResults(_results: StoredRunResults): void {}
+  private maybeStoreRunResults(results: StoredRunResults): void {
+    setImmediate(async () => {
+      try {
+        const enabled = await this.isRunResultsStorageEnabled();
+        if (!enabled) return;
+
+        const storageUri = generateRunResultsUri(results.runId, this.orgId);
+        if (!storageUri) return;
+
+        // Update run with storage URI
+        await this.datastore.updateRun({
+          id: results.runId,
+          orgId: this.orgId,
+          updates: {
+            resultStorageUri: storageUri,
+          },
+        });
+
+        // Upload to S3 with full (non-truncated) payload and result
+        await getRunResultsService().storeResults(storageUri, results, { orgId: this.orgId });
+
+        logMessage("debug", `Stored run results to S3: ${storageUri}`, this.metadata);
+      } catch (err) {
+        logMessage(
+          "warn",
+          `Failed to store run results for ${results.runId}: ${err}`,
+          this.metadata,
+        );
+      }
+    });
+  }
 }

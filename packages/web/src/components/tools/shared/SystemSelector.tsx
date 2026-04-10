@@ -1,6 +1,6 @@
 "use client";
 
-import { useSystems } from "@/src/app/systems-context";
+import { useSystems } from "@/src/queries/systems";
 import {
   Select,
   SelectContent,

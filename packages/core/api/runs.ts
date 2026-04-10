@@ -1,4 +1,6 @@
-import { RequestSource, Run, RunStatus, Tool } from "@superglue/shared";
+import { RequestSource, Run, RunStatus, type Role } from "@superglue/shared";
+import { getAllowedToolIds, isToolAllowed } from "../auth/access-rule-evaluator.js";
+import type { DataStore } from "../datastore/types.js";
 import { RunLifecycleManager } from "../runs/run-lifecycle.js";
 import { logMessage } from "../utils/logs.js";
 import { registerApiModule } from "./registry.js";
@@ -7,6 +9,7 @@ import {
   mapOpenAPIRequestSourceToInternal,
   mapOpenAPIStatusToInternal,
   mapRunStatusToOpenAPI,
+  parseMultiValueQueryParam,
   parsePaginationParams,
   sendError,
 } from "./response-helpers.js";
@@ -16,6 +19,23 @@ import type {
   OpenAPIRun,
   RouteHandler,
 } from "./types.js";
+
+async function forwardCancelToScheduler(runId: string, authorization?: string): Promise<void> {
+  const schedulerUrl = process.env.SCHEDULER_URL;
+  if (!schedulerUrl || process.env.START_SCHEDULER_SERVER === "true") return;
+
+  try {
+    await fetch(`${schedulerUrl}/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      headers: authorization ? { Authorization: authorization } : {},
+    });
+  } catch (error) {
+    logMessage(
+      "warn",
+      `Failed to forward cancel to scheduler: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
 
 // Map internal Run to OpenAPI format - now minimal since types are aligned
 // Just strips internal fields and ensures tool has version
@@ -39,6 +59,7 @@ export function mapRunToOpenAPI(run: Run): OpenAPIRun {
     traceId: run.traceId,
     resultStorageUri: run.resultStorageUri,
     userId: run.userId,
+    executionMode: run.executionMode,
     metadata: run.metadata,
   };
 }
@@ -57,22 +78,40 @@ const getRun: RouteHandler = async (request, reply) => {
     return sendError(reply, 404, "Run not found");
   }
 
+  const toolCheck = isToolAllowed(authReq.authInfo.roles || [], run.toolId);
+  if (!toolCheck.allowed) {
+    return sendError(reply, 403, toolCheck.error || "Access denied");
+  }
+
   return addTraceHeader(reply, authReq.traceId).code(200).send(mapRunToOpenAPI(run));
 };
 
-// GET /runs - List runs
-const listRuns: RouteHandler = async (request, reply) => {
-  const authReq = request as AuthenticatedFastifyRequest;
-  const query = request.query as {
-    toolId?: string;
-    status?: string;
-    requestSources?: string;
-    page?: string;
-    limit?: string;
-    userId?: string;
-    systemId?: string;
-  };
+export type ListRunsQuery = {
+  toolId?: string;
+  search?: string;
+  searchUserIds?: string;
+  includeTotal?: string;
+  startedAfter?: string;
+  status?: string;
+  requestSources?: string;
+  page?: string;
+  limit?: string;
+  userId?: string;
+  systemId?: string;
+};
 
+type RunsListFilters = Omit<NonNullable<Parameters<DataStore["listRuns"]>[0]>, "limit" | "offset">;
+
+export function buildListRunsRequest(
+  query: ListRunsQuery,
+  orgId: string,
+): {
+  page: number;
+  limit: number;
+  offset: number;
+  filters: RunsListFilters;
+  includeTotal: boolean;
+} {
   const { page, limit, offset } = parsePaginationParams(query);
   const internalStatus = query.status ? mapOpenAPIStatusToInternal(query.status) : undefined;
 
@@ -80,29 +119,95 @@ const listRuns: RouteHandler = async (request, reply) => {
   if (query.requestSources) {
     internalRequestSources = query.requestSources
       .split(",")
-      .map((s) => mapOpenAPIRequestSourceToInternal(s.trim()))
-      .filter((s): s is RequestSource => s !== undefined);
+      .map((source) => mapOpenAPIRequestSourceToInternal(source.trim()))
+      .filter((source): source is RequestSource => source !== undefined);
   }
 
-  const result = await authReq.datastore.listRuns({
+  const startedAfter =
+    query.startedAfter && !Number.isNaN(new Date(query.startedAfter).getTime())
+      ? new Date(query.startedAfter)
+      : undefined;
+
+  return {
+    page,
     limit,
     offset,
-    configId: query.toolId,
-    status: internalStatus,
-    requestSources: internalRequestSources,
-    orgId: authReq.authInfo.orgId,
-    userId: query.userId,
-    systemId: query.systemId,
+    includeTotal: query.includeTotal !== "false",
+    filters: {
+      configId: query.toolId,
+      search: query.search?.trim() || undefined,
+      searchUserIds: parseMultiValueQueryParam(query.searchUserIds),
+      startedAfter,
+      status: internalStatus,
+      requestSources: internalRequestSources,
+      orgId,
+      userId: query.userId,
+      systemId: query.systemId,
+    },
+  };
+}
+
+export async function listAuthorizedRunsPage({
+  datastore,
+  roles,
+  filters,
+  limit,
+  offset,
+  includeTotal,
+}: {
+  datastore: Pick<DataStore, "listRuns">;
+  roles: Role[];
+  filters: RunsListFilters;
+  limit: number;
+  offset: number;
+  includeTotal?: boolean;
+}): Promise<{ items: Run[]; total: number; hasMore: boolean }> {
+  const allowedToolIds = getAllowedToolIds(roles);
+  if (allowedToolIds && allowedToolIds.length === 0) {
+    return {
+      items: [],
+      total: 0,
+      hasMore: false,
+    };
+  }
+
+  const result = await datastore.listRuns({
+    ...filters,
+    allowedToolIds,
+    ...(includeTotal === undefined ? {} : { includeTotal }),
+    limit,
+    offset,
   });
 
-  const data = result.items.map(mapRunToOpenAPI);
-  const hasMore = offset + result.items.length < result.total;
+  return {
+    items: result.items,
+    total: result.total,
+    hasMore: offset + result.items.length < result.total,
+  };
+}
+
+const listRuns: RouteHandler = async (request, reply) => {
+  const authReq = request as AuthenticatedFastifyRequest;
+  const query = request.query as ListRunsQuery;
+  const { page, limit, offset, filters, includeTotal } = buildListRunsRequest(
+    query,
+    authReq.authInfo.orgId,
+  );
+  const { items, total, hasMore } = await listAuthorizedRunsPage({
+    datastore: authReq.datastore,
+    roles: authReq.authInfo.roles || [],
+    filters,
+    limit,
+    offset,
+    includeTotal,
+  });
+  const data = items.map(mapRunToOpenAPI);
 
   return addTraceHeader(reply, authReq.traceId).code(200).send({
     data,
     page,
     limit,
-    total: result.total,
+    total,
     hasMore,
   });
 };
@@ -122,39 +227,41 @@ const cancelRun: RouteHandler = async (request, reply) => {
     return sendError(reply, 404, "Run not found");
   }
 
-  if (run.status !== RunStatus.RUNNING) {
+  const toolCheck = isToolAllowed(authReq.authInfo.roles || [], run.toolId);
+  if (!toolCheck.allowed) {
+    return sendError(reply, 403, toolCheck.error || "Access denied");
+  }
+
+  if (run.status !== RunStatus.RUNNING && run.status !== RunStatus.ABORTED) {
     return sendError(reply, 400, `Run is not currently running (status: ${run.status})`);
   }
 
-  if (run.requestSource === RequestSource.SCHEDULER) {
-    return sendError(reply, 400, "Scheduled runs cannot be cancelled");
-  }
-
-  logMessage("info", `Cancelling run ${params.runId}`, metadata);
-
-  // Abort the task
   authReq.workerPools.toolExecution.abortTask(params.runId);
 
-  const now = new Date();
-  const startedAt = new Date(run.metadata.startedAt);
+  if (run.status === RunStatus.RUNNING) {
+    logMessage("info", `Cancelling run ${params.runId}`, metadata);
 
-  // Update the run status
-  await authReq.datastore.updateRun({
-    id: params.runId,
-    orgId: authReq.authInfo.orgId,
-    updates: {
-      status: RunStatus.ABORTED,
-      tool: run.tool,
-      error: `Run cancelled by user`,
-      metadata: {
-        ...run.metadata,
-        completedAt: now.toISOString(),
-        durationMs: now.getTime() - startedAt.getTime(),
+    const now = new Date();
+    const startedAt = new Date(run.metadata.startedAt);
+
+    await authReq.datastore.updateRun({
+      id: params.runId,
+      orgId: authReq.authInfo.orgId,
+      updates: {
+        status: RunStatus.ABORTED,
+        tool: run.tool,
+        error: `Run cancelled by user`,
+        metadata: {
+          ...run.metadata,
+          completedAt: now.toISOString(),
+          durationMs: now.getTime() - startedAt.getTime(),
+        },
       },
-    },
-  });
+    });
 
-  // Fetch the updated run
+    forwardCancelToScheduler(params.runId, request.headers.authorization);
+  }
+
   const updatedRun = await authReq.datastore.getRun({
     id: params.runId,
     orgId: authReq.authInfo.orgId,
@@ -258,25 +365,37 @@ registerApiModule({
       method: "GET",
       path: "/runs/:runId",
       handler: getRun,
-      permissions: { type: "read", resource: "run", allowRestricted: true },
+      permissions: {
+        type: "read",
+        resource: "run",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "GET",
       path: "/runs",
       handler: listRuns,
-      permissions: { type: "read", resource: "run", allowRestricted: true },
+      permissions: {
+        type: "read",
+        resource: "run",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "POST",
       path: "/runs/:runId/cancel",
       handler: cancelRun,
-      permissions: { type: "execute", resource: "run", allowRestricted: true },
+      permissions: {
+        type: "execute",
+        resource: "run",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "POST",
       path: "/runs",
       handler: createRun,
-      permissions: { type: "write", resource: "run", allowRestricted: false },
+      permissions: { type: "write", resource: "run", allowedBaseRoles: ["admin", "member"] },
     },
   ],
 });

@@ -1,22 +1,117 @@
 "use client";
 
+import { useSystems, useDeleteSystem } from "@/src/queries/systems";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/src/components/ui/alert-dialog";
 import { Button } from "@/src/components/ui/button";
+import { EnvironmentBadge } from "@/src/components/ui/environment-label";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { HelpTooltip } from "@/src/components/utils/HelpTooltip";
 import { URLField } from "@/src/components/utils/URLField";
+import { useToast } from "@/src/hooks/use-toast";
 import { cn, searchSimpleIcons } from "@/src/lib/general-utils";
-import { icons } from "lucide-react";
+import { icons, Shield, GitBranch, Plus, Trash2, Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSystemConfig } from "../context";
 
 export function ConfigurationSection() {
   const { system, isNewSystem, setSystemId, setSystemName, setUrl, setIcon } = useSystemConfig();
+  const { toast } = useToast();
+  const { systems, isTunnelConnected } = useSystems();
+  const deleteSystemMutation = useDeleteSystem();
+  const router = useRouter();
 
   const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
   const [isIconMenuOpen, setIsIconMenuOpen] = useState(false);
   const [iconSearch, setIconSearch] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const isPrivateSystem = !!system.tunnel;
+  const tunnelConnected = isPrivateSystem && isTunnelConnected(system.tunnel!.tunnelId);
+
+  // Environment state computation
+  // With composite key model, linked systems have the same ID but different environment
+  const linkedDevSystem = useMemo(() => {
+    if (!system.id) return null;
+    // Find a dev system with the same ID (but we're not viewing dev)
+    if (system.environment === "dev") return null;
+    return systems.find((s) => s.id === system.id && s.environment === "dev") || null;
+  }, [systems, system.id, system.environment]);
+
+  const linkedProdSystem = useMemo(() => {
+    if (!system.id) return null;
+    // Find a prod system with the same ID (but we're not viewing prod)
+    if (system.environment === "prod") return null;
+    return systems.find((s) => s.id === system.id && s.environment === "prod") || null;
+  }, [systems, system.id, system.environment]);
+
+  const envState = useMemo(() => {
+    const isDev = system.environment === "dev";
+    const isProd = system.environment === "prod";
+
+    // With composite key, if both dev and prod exist for same ID, they're linked
+    if (isDev && linkedProdSystem) return "linked-dev";
+    if (isProd && linkedDevSystem) return "linked-prod";
+    if (isDev) return "standalone-dev";
+    if (isProd) return "standalone-prod";
+    return "standalone-prod"; // Default to prod (all systems are now either dev or prod)
+  }, [system.environment, linkedDevSystem, linkedProdSystem]);
+
+  const handleCreateDevSystem = useCallback(() => {
+    const systemName = system.name || system.id;
+    const prompt = encodeURIComponent(
+      `Create a development version of the "${systemName}" system with the same ID (${system.id}) but environment='dev'. The dev system should have the same structure but with development/sandbox credentials.`,
+    );
+    router.push(`/?prompt=${prompt}`);
+  }, [system.id, system.name, router]);
+
+  const handleCreateProdSystem = useCallback(() => {
+    const systemName = system.name || system.id;
+    const prompt = encodeURIComponent(
+      `Create a production version of the "${systemName}" system with the same ID (${system.id}) but environment='prod'. The prod system should have the same structure but with production credentials.`,
+    );
+    router.push(`/?prompt=${prompt}`);
+  }, [system.id, system.name, router]);
+
+  const isViewingDev = system.environment === "dev";
+
+  const handleDeleteLinkedSystem = useCallback(async () => {
+    // With composite key model, delete the linked environment (same ID, different environment)
+    const systemToDelete = isViewingDev ? linkedProdSystem : linkedDevSystem;
+    if (!systemToDelete) return;
+
+    deleteSystemMutation.mutate(
+      { id: systemToDelete.id, options: { environment: systemToDelete.environment } },
+      {
+        onSuccess: () => {
+          setDeleteDialogOpen(false);
+          toast({
+            title: "System deleted",
+            description: `The ${isViewingDev ? "production" : "development"} configuration has been deleted.`,
+          });
+        },
+        onError: (error) => {
+          console.error("Error deleting system:", error);
+          toast({
+            title: "Error",
+            description: "Failed to delete system",
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  }, [isViewingDev, linkedProdSystem, linkedDevSystem, deleteSystemMutation, toast]);
 
   const handleUrlChange = useCallback(
     (url: string, _queryParams: Record<string, string>) => {
@@ -82,6 +177,33 @@ export function ConfigurationSection() {
 
   return (
     <div className="space-y-5">
+      {isPrivateSystem && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/30">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Private System</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full",
+                tunnelConnected ? "bg-green-500" : "bg-gray-400",
+              )}
+            />
+            <span>{tunnelConnected ? "Connected" : "Disconnected"}</span>
+          </div>
+          <div className="ml-auto text-xs text-muted-foreground">
+            Tunnel: <span className="font-mono">{system.tunnel!.tunnelId}</span>
+            {system.tunnel!.targetName && (
+              <>
+                {" "}
+                / Target: <span className="font-mono">{system.tunnel!.targetName}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Label htmlFor="systemName" className="text-sm font-medium">
@@ -250,6 +372,107 @@ export function ConfigurationSection() {
           </div>
         )}
       </div>
+
+      {/* Environment Setting - only show for existing systems */}
+      {!isNewSystem && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Environment</Label>
+            <HelpTooltip text="Shows whether this system is for production or development use. Use the toggle in the header to switch between linked environments." />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/30">
+            {/* Left: Current environment */}
+            <div className="flex items-center gap-2">
+              <EnvironmentBadge type={system.environment === "dev" ? "dev" : "prod"} />
+              <span className="text-sm text-muted-foreground">
+                {system.environment === "dev" ? "Development" : "Production"}
+              </span>
+            </div>
+
+            {/* Middle: Link indicator (only for linked systems) */}
+            {(envState === "linked-dev" || envState === "linked-prod") && (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 border border-border/30">
+                <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  Linked to {envState === "linked-dev" ? "prod" : "dev"}
+                </span>
+              </div>
+            )}
+
+            {/* Right: Action button */}
+            <div>
+              {/* Linked systems: Delete button */}
+              {(envState === "linked-dev" || envState === "linked-prod") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="h-8 gap-1.5 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete {envState === "linked-dev" ? "Prod" : "Dev"}
+                </Button>
+              )}
+
+              {/* Standalone prod: Add dev button */}
+              {envState === "standalone-prod" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCreateDevSystem}
+                  className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Dev
+                </Button>
+              )}
+
+              {/* Standalone dev: Add prod button */}
+              {envState === "standalone-dev" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCreateProdSystem}
+                  className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Prod
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete linked system confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {isViewingDev ? "Production" : "Development"} System?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the linked {isViewingDev ? "production" : "development"} system. The
+              current system will become a standalone {isViewingDev ? "development" : "production"}{" "}
+              system. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSystemMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLinkedSystem}
+              disabled={deleteSystemMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteSystemMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

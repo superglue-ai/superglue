@@ -5,6 +5,7 @@ import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
 import { ErrorMessage } from "@/src/components/ui/error-message";
+import { copyToClipboard } from "@/src/components/tools/shared/CopyButton";
 
 interface DefaultComponentProps {
   tool: ToolCall;
@@ -22,14 +23,6 @@ export function DefaultComponent({ tool, onInputChange }: DefaultComponentProps)
       setActiveTab("input");
     }
   }, [tool.status, tool.output]);
-
-  const copyToClipboard = async (content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
 
   return (
     <ToolCallWrapper tool={tool}>

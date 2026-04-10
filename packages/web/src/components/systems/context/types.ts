@@ -22,6 +22,11 @@ export interface SystemDefinition {
   icon?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  tunnel?: {
+    tunnelId: string;
+    targetName: string;
+  };
+  environment?: "dev" | "prod";
 }
 
 export interface AuthState {
@@ -105,6 +110,7 @@ export interface SystemContextForAgent {
   authType: "none" | "oauth" | "apikey";
   credentialKeys: string[];
   specificInstructions: string;
+  isNewSystem: boolean;
   sectionStatuses: {
     configuration: { isComplete: boolean; label: string };
     authentication: { isComplete: boolean; label: string };

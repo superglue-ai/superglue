@@ -3,18 +3,26 @@ import {
   Run,
   RunStatus,
   StoredRunResults,
+  Tool,
   getDateMessage,
+  safeStringify,
   System,
 } from "@superglue/shared";
-import { truncateToolResult } from "../general-utils";
-import { DraftLookup, SystemPromptResult, ToolExecutionContext } from "./agent-types";
+import {
+  DraftLookup,
+  SystemPlaygroundContext,
+  SystemPromptResult,
+  ToolExecutionContext,
+} from "./agent-types";
 import {
   MAIN_AGENT_SYSTEM_PROMPT,
   TOOL_PLAYGROUND_AGENT_SYSTEM_PROMPT,
   SYSTEM_PLAYGROUND_AGENT_SYSTEM_PROMPT,
-  SUPERGLUE_INFORMATION_PROMPT,
+  ACCESS_RULES_AGENT_SYSTEM_PROMPT,
+  getSuperglueInformationPrompt,
   GENERAL_RULES,
   SKILL_LOADING_INSTRUCTIONS,
+  DeploymentEndpoints,
 } from "./agent-prompts";
 
 export function findDraftInMessages(messages: Message[], draftId: string): DraftLookup | null {
@@ -109,71 +117,71 @@ export interface PlaygroundContextData {
   mergedPayload?: string;
 }
 
-export function formatPlaygroundHiddenContext(ctx: PlaygroundContextData): string {
-  const truncatedPayload =
-    ctx.currentPayload.length > 1000
-      ? ctx.currentPayload.substring(0, 1000) +
-        `\n... [truncated, ${ctx.currentPayload.length} chars total]`
-      : ctx.currentPayload;
+export const TOOL_PLAYGROUND_INIT_MARKER = "[TOOL PLAYGROUND INITIAL STATE]";
+export const SYSTEM_PLAYGROUND_INIT_MARKER = "[SYSTEM PLAYGROUND INITIAL STATE]";
 
-  const hasFiles = ctx.uploadedFiles && ctx.uploadedFiles.length > 0;
+export function buildToolPlaygroundInitializationMessage({
+  config,
+  manualPayload,
+  mergedPayload,
+}: {
+  config: Tool;
+  manualPayload: string;
+  mergedPayload: Record<string, any>;
+}): string {
+  let parsedManualPayload: Record<string, any> | null = null;
+  let manualPayloadIsValid = false;
 
-  let fileSection = "";
-  if (hasFiles) {
-    const fileList = ctx
-      .uploadedFiles!.map((f) => `  - ${f.name} (key: "${f.key}", status: ${f.status || "ready"})`)
-      .join("\n");
-    fileSection = `\nUploaded files:\n${fileList}\n`;
-  }
+  try {
+    const parsed = JSON.parse(manualPayload || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      parsedManualPayload = parsed;
+      manualPayloadIsValid = true;
+    }
+  } catch {}
 
-  let mergedPayloadSection = "";
-  if (hasFiles && ctx.mergedPayload) {
-    const truncatedMerged =
-      ctx.mergedPayload.length > 1000
-        ? ctx.mergedPayload.substring(0, 1000) +
-          `\n... [truncated, ${ctx.mergedPayload.length} chars total]`
-        : ctx.mergedPayload;
-    mergedPayloadSection = `\nMerged payload (manual + files):\n${truncatedMerged}\n`;
-  }
+  const manualKeys = Object.keys(parsedManualPayload || {});
+  const mergedKeys = Object.keys(mergedPayload || {});
+  const hasAdditionalMergedKeys = mergedKeys.some((key) => !manualKeys.includes(key));
+  const hasOverriddenKeys = manualKeys.some(
+    (key) =>
+      key in (mergedPayload || {}) &&
+      JSON.stringify(parsedManualPayload?.[key]) !== JSON.stringify((mergedPayload || {})[key]),
+  );
+  const shouldIncludeManualPayload =
+    !manualPayloadIsValid || hasAdditionalMergedKeys || hasOverriddenKeys;
 
-  const stepsBlock = ctx.steps
-    .map(
-      (s, i) =>
-        `  ${i + 1}. ${s.id} → ${s.systemId || "n/a"} ${s.method || ""} | ${s.status || "pending"}`,
-    )
-    .join("\n");
+  return `${TOOL_PLAYGROUND_INIT_MARKER}
+Initial tool editor snapshot for this conversation. Use inspect_tool if you need refreshed state.
 
-  const inputSchemaDesc =
-    ctx.inputSchemaFields.length > 0
-      ? `inputSchema (${ctx.inputSchemaFields.length} fields: ${ctx.inputSchemaFields.join(", ")})`
-      : "inputSchema: none";
-  const outputSchemaDesc =
-    ctx.outputSchemaFieldCount > 0
-      ? `outputSchema (${ctx.outputSchemaFieldCount} fields)`
-      : "outputSchema: none";
+CONFIG:
+\`\`\`json
+${safeStringify(config, 2)}
+\`\`\`
 
-  return `[PLAYGROUND CONTEXT]
-Tool: ${ctx.toolId || "(unsaved)"}
-Instruction: ${ctx.instruction?.substring(0, 200) || "(none)"}
-Steps (${ctx.steps.length}):
-${stepsBlock}
-Schemas: ${inputSchemaDesc}, ${outputSchemaDesc}
-Has outputTransform: ${ctx.hasOutputTransform ? "yes" : "no"}
-Has responseFilters: ${ctx.hasResponseFilters ? "yes" : "no"}
-Final transform: ${ctx.transformStatus}
-${fileSection}${mergedPayloadSection}
-Payload (${ctx.currentPayload.length} chars):
-${truncatedPayload}
+MERGED PAYLOAD:
+\`\`\`json
+${safeStringify(mergedPayload || {}, 2)}
+\`\`\`${shouldIncludeManualPayload ? `\n\nMANUAL PAYLOAD:\n\`\`\`\n${manualPayload || "{}"}\n\`\`\`` : ""}`;
+}
 
-Draft ID: "playground-draft" — use with edit_tool, run_tool, save_tool.
-`;
+export function buildSystemPlaygroundInitializationMessage(
+  systemConfig: SystemPlaygroundContext,
+): string {
+  return `${SYSTEM_PLAYGROUND_INIT_MARKER}
+Initial system editor snapshot for this conversation. Use inspect_system if you need refreshed state.
+
+STATE:
+\`\`\`json
+${safeStringify(systemConfig, 2)}
+\`\`\``;
 }
 
 async function getToolsForContext(ctx: ToolExecutionContext) {
   try {
-    const result = await ctx.superglueClient.findRelevantTools("*");
+    const { items } = await ctx.superglueClient.listWorkflows(1000);
 
-    if (!result || result.length === 0) {
+    if (items.length === 0) {
       return {
         success: true,
         tools: [],
@@ -181,14 +189,14 @@ async function getToolsForContext(ctx: ToolExecutionContext) {
       };
     }
 
-    const toolsSummary = result.map(({ reason, ...tool }: any) => ({
-      id: tool.id,
-      instruction: tool.instruction?.substring(0, 100) || "",
+    const toolsSummary = items.map((t: any) => ({
+      id: t.id,
+      instruction: t.instruction?.substring(0, 100) || "",
     }));
 
     return {
       success: true,
-      toolIds: result.map((t: any) => t.id),
+      toolIds: items.map((t: any) => t.id),
       tools: toolsSummary,
     };
   } catch (error: any) {
@@ -203,7 +211,8 @@ async function getToolsForContext(ctx: ToolExecutionContext) {
 
 async function getSystemsForContext(ctx: ToolExecutionContext) {
   try {
-    const result = await ctx.superglueClient.listSystems(1000);
+    // Use prod mode by default - shows prod systems + standalone dev systems
+    const result = await ctx.superglueClient.listSystems(1000, 1, { mode: "prod" });
 
     const systemsSummary = result.items.map((system: any) => ({
       id: system?.id,
@@ -223,6 +232,12 @@ async function getSystemsForContext(ctx: ToolExecutionContext) {
   }
 }
 
+function getDeploymentEndpoints(): DeploymentEndpoints {
+  const apiEndpoint = process.env.API_ENDPOINT || "https://api.superglue.cloud";
+  const appEndpoint = process.env.SUPERGLUE_APP_URL || "https://app.superglue.cloud";
+  return { apiEndpoint, appEndpoint };
+}
+
 export async function generateMainAgentSystemPrompt(
   ctx: ToolExecutionContext,
 ): Promise<SystemPromptResult> {
@@ -232,11 +247,12 @@ export async function generateMainAgentSystemPrompt(
   ]);
 
   const dateMessage = getDateMessage();
+  const endpoints = getDeploymentEndpoints();
 
   const content = `${MAIN_AGENT_SYSTEM_PROMPT}
 
 [GENERAL INFORMATION]
-${SUPERGLUE_INFORMATION_PROMPT}
+${getSuperglueInformationPrompt(endpoints)}
 
 AVAILABLE SYSTEMS: ${JSON.stringify(systemsResult.systems || [])}
 
@@ -270,6 +286,32 @@ export async function generateSystemPlaygroundSystemPrompt(
 ${GENERAL_RULES}
 ${SKILL_LOADING_INSTRUCTIONS}
 
+${dateMessage.content}`;
+
+  return { content };
+}
+
+export async function generateAccessRulesSystemPrompt(
+  ctx: ToolExecutionContext,
+): Promise<SystemPromptResult> {
+  const dateMessage = getDateMessage();
+  const arc = ctx.accessRulesContext;
+
+  let roleContext = "";
+  if (arc) {
+    roleContext = `
+CURRENT ROLE: ${arc.role.name} (id: ${arc.role.id})
+${arc.role.isBaseRole ? `This is a base role (${arc.role.id === "admin" ? "immutable" : "tool and system permissions are editable, name and description are not"}).` : "This is a custom role."}
+${arc.isEditing ? "Edit mode is active." : "Read-only mode — the user must click Edit to enable changes."}
+`;
+  }
+
+  const content = `${ACCESS_RULES_AGENT_SYSTEM_PROMPT}
+
+${GENERAL_RULES}
+${SKILL_LOADING_INSTRUCTIONS}
+
+${roleContext}
 ${dateMessage.content}`;
 
   return { content };
@@ -344,24 +386,24 @@ Be conversational and helpful. Guide them toward building useful tools that leve
 }
 
 export function getDiscoveryPrompts(systemIds: string[]): {
-  systemPrompt: string;
+  hiddenStarterMessage: string;
   userPrompt: string;
 } {
   const isSingleIntegration = systemIds.length === 1;
   const systemList = systemIds.join(", ");
 
-  const systemPrompt = getDiscoveryContext(systemIds);
+  const hiddenStarterMessage = getDiscoveryContext(systemIds);
 
   const userPrompt = isSingleIntegration
     ? `I want to set up and test ${systemList}. Help me configure it and build a simple tool to verify it's working.`
     : `I want to build tools using ${systemList}. What can I do with them together?`;
 
-  return { systemPrompt, userPrompt };
+  return { hiddenStarterMessage, userPrompt };
 }
 
 export interface ToolBuilderPrompt {
   userPrompt: string;
-  systemPrompt: string;
+  hiddenStarterMessage: string;
   chatTitle: string;
   chatIcon?: string;
 }
@@ -388,16 +430,14 @@ export function getToolBuilderPrompts({
     ? `I want to build a tool with ${systemLabel}.`
     : "I want to build a tool.";
 
-  const systemPrompt = JSON.stringify({
-    display: hasSystems ? `Build tool with ${systemLabel}` : "Build tool",
-    toolBuilderContext: {
-      systemIds: resolvedIds,
-    },
-  });
+  const hiddenStarterMessage = hasSystems
+    ? `The user opened the build-tool flow for these systems: ${systemLabel}.
+Focus the tool-building flow on these systems unless the user explicitly changes scope.`
+    : `The user opened the generic build-tool flow without preselected systems.`;
 
   return {
     userPrompt,
-    systemPrompt,
+    hiddenStarterMessage,
     chatTitle: "Build tool",
     chatIcon: matchedSystems.length === 1 ? matchedSystems[0].icon : undefined,
   };
@@ -407,15 +447,9 @@ export function getInvestigationPrompts(
   run: Run,
   storedResults?: StoredRunResults | null,
 ): {
-  systemPrompt: string;
+  hiddenStarterMessage: string;
   userPrompt: string;
 } {
-  const truncateJson = (obj: any, maxLength: number = 3000): string => {
-    const str = JSON.stringify(obj, null, 2);
-    if (str.length <= maxLength) return str;
-    return str.substring(0, maxLength) + "\n... [truncated]";
-  };
-
   const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return "unknown";
     try {
@@ -641,34 +675,34 @@ RUN DETAILS:
 3. Offer to help with modifications if needed`;
   }
 
-  const systemPrompt = `${statusIntro}
+  const hiddenStarterMessage = `${statusIntro}
 ${hasStorageUri ? (hasStoredResults ? "- Full results loaded from storage\n" : "- Results stored (URI exists but not fetched)\n") : ""}
 ${toolExistenceSection}${versionSection}${requestSourceSection}
 ${
   run.tool
     ? `TOOL CONFIGURATION (from time of run):
-${truncateJson(run.tool)}`
+${safeStringify(run.tool)}`
     : `NO TOOL CONFIGURATION AVAILABLE - The tool was not saved or has been deleted.`
 }
 
 ${
   stepResults
     ? `STEP RESULTS${hasStoredResults ? " (FULL EXECUTION DATA)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
-${truncateToolResult(stepResults, 20000)}`
+${safeStringify(stepResults)}`
     : ""
 }
 
 ${
   toolResult
     ? `TOOL OUTPUT${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
-${truncateToolResult(toolResult, 10000)}`
+${safeStringify(toolResult)}`
     : ""
 }
 
 ${
   toolPayload
     ? `INPUT PAYLOAD${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
-${truncateToolResult(toolPayload, 5000)}`
+${safeStringify(toolPayload)}`
     : ""
 }
 
@@ -702,33 +736,5 @@ What happened and should I retry?`;
 What happened during this execution?`;
   }
 
-  return { systemPrompt, userPrompt };
-}
-
-export { type SystemContextForAgent as SystemPlaygroundContextData } from "@/src/components/systems/context/types";
-import type { SystemContextForAgent } from "@/src/components/systems/context/types";
-
-export function formatSystemHiddenContext(ctx: SystemContextForAgent): string {
-  const credentialPlaceholders = ctx.credentialKeys
-    .map((key) => `<<${ctx.systemId}_${key}>>`)
-    .join(", ");
-
-  const specificInstructionsLine = ctx.specificInstructions
-    ? `\nSpecific Instructions: ${ctx.specificInstructions.substring(0, 200)}${ctx.specificInstructions.length > 200 ? "..." : ""}`
-    : "";
-
-  return `[SYSTEM PLAYGROUND CONTEXT]
-System ID: ${ctx.systemId || "(not set)"}
-URL: ${ctx.url || "(not set)"}
-Template: ${ctx.templateName || "(custom)"}
-Auth Type: ${ctx.authType}
-Credentials: ${credentialPlaceholders || "(none)"}${specificInstructionsLine}
-
-Section Status:
-- Configuration: ${ctx.sectionStatuses.configuration.label}
-- Authentication: ${ctx.sectionStatuses.authentication.label}
-- Context: ${ctx.sectionStatuses.context.label}
-
-Use edit_system with id="${ctx.systemId}" to make changes.
-Use call_system with placeholders like ${credentialPlaceholders || "<<systemId_keyName>>"} to test.`;
+  return { hiddenStarterMessage, userPrompt };
 }

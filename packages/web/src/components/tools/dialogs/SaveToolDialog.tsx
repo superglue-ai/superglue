@@ -1,5 +1,4 @@
-import { useConfig } from "@/src/app/config-context";
-import { useTools } from "@/src/app/tools-context";
+import { useTools, useUpsertTool } from "@/src/queries/tools";
 import { FolderPicker, UNCATEGORIZED } from "@/src/components/tools/folders/FolderPicker";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -12,7 +11,7 @@ import {
 } from "@/src/components/ui/dialog";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { createSuperglueClient, isValidToolName, validateToolName } from "@/src/lib/client-utils";
+import { isValidToolName, validateToolName } from "@/src/lib/client-utils";
 import { Tool } from "@superglue/shared";
 import { ChevronDown, Folder, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -25,12 +24,11 @@ interface SaveToolDialogProps {
 }
 
 export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialogProps) {
-  const config = useConfig();
   const { tools } = useTools();
+  const upsertTool = useUpsertTool();
   const [toolName, setToolName] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<string | undefined>(undefined);
   const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen && tool) {
@@ -64,32 +62,31 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
       return;
     }
 
-    try {
-      setIsSaving(true);
-      const client = createSuperglueClient(config.apiEndpoint);
-
-      const toolToSave = { ...tool, id: trimmedName, folder: selectedFolder || undefined };
-      const saved = await client.upsertWorkflow(trimmedName, toolToSave as any);
-      if (!saved) throw new Error("Failed to save tool");
-
-      handleClose();
-
-      if (onSaved) {
-        onSaved(saved);
-      }
-    } catch (error: any) {
-      console.error("Error saving tool:", error);
-      setError(error.message || "Failed to save tool");
-    } finally {
-      setIsSaving(false);
-    }
+    const toolToSave = { ...tool, id: trimmedName, folder: selectedFolder || undefined };
+    upsertTool.mutate(
+      { id: trimmedName, input: toolToSave },
+      {
+        onSuccess: (saved) => {
+          handleClose();
+          onSaved?.(saved);
+        },
+        onError: (error: any) => {
+          console.error("Error saving tool:", error);
+          setError(error.message || "Failed to save tool");
+        },
+      },
+    );
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !isSaving && (e.target as HTMLElement).tagName !== "BUTTON") {
+          if (
+            e.key === "Enter" &&
+            !upsertTool.isPending &&
+            (e.target as HTMLElement).tagName !== "BUTTON"
+          ) {
             e.preventDefault();
             handleSave();
           }
@@ -115,7 +112,7 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
                 }
               }}
               placeholder="Enter tool name"
-              disabled={isSaving}
+              disabled={upsertTool.isPending}
               autoFocus
             />
           </div>
@@ -124,14 +121,14 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
             <FolderPicker
               value={selectedFolder}
               onChange={(folder) => setSelectedFolder(folder ?? undefined)}
-              disabled={isSaving}
+              disabled={upsertTool.isPending}
               width="w-[300px]"
               trigger={
                 <Button
                   variant="outline"
                   role="combobox"
                   className="w-full justify-between"
-                  disabled={isSaving}
+                  disabled={upsertTool.isPending}
                 >
                   <div className="flex items-center gap-2 truncate">
                     <Folder className="h-4 w-4 flex-shrink-0" />
@@ -151,11 +148,11 @@ export function SaveToolDialog({ tool, isOpen, onClose, onSaved }: SaveToolDialo
           {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isSaving}>
+          <Button variant="outline" onClick={handleClose} disabled={upsertTool.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
+          <Button onClick={handleSave} disabled={upsertTool.isPending}>
+            {upsertTool.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...

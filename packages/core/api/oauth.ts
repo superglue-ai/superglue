@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { registerApiModule } from "./registry.js";
 import { addTraceHeader, sendError } from "./response-helpers.js";
 import { server_defaults } from "../default.js";
@@ -24,6 +25,7 @@ const cacheSecret: RouteHandler = async (request, reply) => {
 
   await authReq.datastore.cacheOAuthSecret({
     uid: body.uid,
+    orgId: authReq.authInfo.orgId,
     clientId: body.clientId,
     clientSecret: body.clientSecret,
     ttlMs: server_defaults.POSTGRES.OAUTH_SECRET_TTL_MS,
@@ -40,7 +42,10 @@ const getSecret: RouteHandler = async (request, reply) => {
     return sendError(reply, 400, "uid is required");
   }
 
-  const entry = await authReq.datastore.getOAuthSecret({ uid: params.uid });
+  const entry = await authReq.datastore.getOAuthSecret({
+    uid: params.uid,
+    orgId: authReq.authInfo.orgId,
+  });
   if (!entry) {
     return sendError(reply, 404, "Cached OAuth client credentials not found or expired");
   }
@@ -75,6 +80,38 @@ const getTemplateCredentials: RouteHandler = async (request, reply) => {
   });
 };
 
+/**
+ * Returns a derived secret for CLI OAuth encryption.
+ * The secret is derived from MASTER_ENCRYPTION_KEY + orgId so:
+ * 1. The encrypted value cannot be decrypted without server-side secret
+ * 2. Each org gets a unique encryption secret (cross-tenant isolation)
+ * 3. CLI can encrypt API keys that only the server can decrypt
+ * Note: systemId is used as additional salt during encryption, providing per-system uniqueness
+ */
+const getCliOAuthSecret: RouteHandler = async (request, reply) => {
+  const authReq = request as AuthenticatedFastifyRequest;
+  const masterKey = process.env.MASTER_ENCRYPTION_KEY;
+
+  if (!masterKey) {
+    return sendError(reply, 503, "CLI OAuth not available: server encryption not configured");
+  }
+
+  const orgId = authReq.authInfo.orgId;
+
+  // Derive an org-specific secret - never expose the raw master key
+  const derivedSecret = crypto
+    .createHash("sha256")
+    .update(`${masterKey}:cli-oauth-derived:${orgId}`)
+    .digest("hex");
+
+  return addTraceHeader(reply, authReq.traceId)
+    .code(200)
+    .send({
+      success: true,
+      data: { secret: derivedSecret, orgId },
+    });
+};
+
 registerApiModule({
   name: "oauth",
   routes: [
@@ -82,19 +119,41 @@ registerApiModule({
       method: "POST",
       path: "/oauth/secrets",
       handler: cacheSecret,
-      permissions: { type: "write", resource: "system" },
+      permissions: {
+        type: "write",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "GET",
       path: "/oauth/secrets/:uid",
       handler: getSecret,
-      permissions: { type: "read", resource: "system" },
+      permissions: {
+        type: "read",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
     },
     {
       method: "GET",
       path: "/oauth/templates/:templateId/credentials",
       handler: getTemplateCredentials,
-      permissions: { type: "read", resource: "system" }, // should templates be their own resource? Does having this endpoint make any sense?
+      permissions: {
+        type: "read",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member", "enduser"],
+      },
+    },
+    {
+      method: "GET",
+      path: "/oauth/cli-secret",
+      handler: getCliOAuthSecret,
+      permissions: {
+        type: "read",
+        resource: "system",
+        allowedBaseRoles: ["admin", "member"],
+      },
     },
   ],
 });
