@@ -24,6 +24,7 @@ import {
   ServiceMetadata,
   Tool,
   ToolStepResult,
+  validateExternalUrl,
 } from "@superglue/shared";
 import { DataStore } from "../datastore/types.js";
 import { resolveUserRoles } from "../auth/role-resolver.js";
@@ -147,6 +148,17 @@ function handleWebhookNotification({
   mode?: "dev" | "prod";
 }): void {
   if (webhookUrl.startsWith("http")) {
+    // Validate webhook URL against SSRF before making any request
+    try {
+      validateExternalUrl(webhookUrl);
+    } catch (err) {
+      logMessage(
+        "warn",
+        `Webhook URL rejected (SSRF protection): ${(err as Error).message}`,
+        metadata,
+      );
+      return;
+    }
     // HTTP webhook - fire and forget
     notifyWebhook(webhookUrl, runId, success, data, error, metadata);
   } else if (webhookUrl.startsWith("tool:")) {

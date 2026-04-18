@@ -35,22 +35,95 @@ export function isAbortError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Validate that a URL targets an external (public) host.
+ *
+ * Blocks:
+ * - Non-HTTP(S) protocols
+ * - Loopback addresses (127.0.0.0/8, ::1, localhost)
+ * - RFC 1918 private networks (10/8, 172.16/12, 192.168/16)
+ * - Link-local (169.254/16, fe80::/10)
+ * - IPv4-mapped IPv6 (::ffff:x.x.x.x) pointing to private ranges
+ * - IPv6 unique local (fc00::/7)
+ * - Cloud metadata endpoints (.internal suffix)
+ * - Unspecified addresses (0.0.0.0, ::)
+ */
 export function validateExternalUrl(raw: string): URL {
   const parsed = new URL(raw);
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error(`Unsupported protocol: ${parsed.protocol}`);
   }
-  const host = parsed.hostname.toLowerCase();
+
+  let host = parsed.hostname.toLowerCase();
+
+  // Strip IPv6 brackets if present (URL parser may include them)
+  if (host.startsWith("[") && host.endsWith("]")) {
+    host = host.slice(1, -1);
+  }
+
+  // Resolve IPv4-mapped IPv6 addresses to their IPv4 equivalents.
+  // Node's URL parser converts these to hex form (e.g., ::ffff:10.0.0.1 → ::ffff:a00:1),
+  // so we handle both decimal (::ffff:d.d.d.d) and hex (::ffff:HHHH:HHHH) formats.
+  let ipv4Host = host;
+  const ipv4MappedDecimal = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (ipv4MappedDecimal) {
+    ipv4Host = ipv4MappedDecimal[1];
+  } else {
+    const ipv4MappedHex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (ipv4MappedHex) {
+      const high = parseInt(ipv4MappedHex[1], 16);
+      const low = parseInt(ipv4MappedHex[2], 16);
+      ipv4Host = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+    }
+  }
+
+  // Block loopback: localhost, 127.0.0.0/8, ::1
   if (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    host === "0.0.0.0" ||
-    host.startsWith("169.254.") ||
-    host.endsWith(".internal")
+    ipv4Host === "localhost" ||
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ipv4Host) ||
+    host === "::1"
   ) {
     throw new Error(`URL target is not allowed: ${host}`);
   }
+
+  // Block unspecified addresses
+  if (ipv4Host === "0.0.0.0" || host === "::") {
+    throw new Error(`URL target is not allowed: ${host}`);
+  }
+
+  // Block RFC 1918 private networks
+  if (
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ipv4Host) ||
+    /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(ipv4Host) ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(ipv4Host)
+  ) {
+    throw new Error(`URL target is not allowed: ${host}`);
+  }
+
+  // Block link-local: 169.254.0.0/16 (IPv4), fe80::/10 (IPv6, covers fe80–febf)
+  if (ipv4Host.startsWith("169.254.")) {
+    throw new Error(`URL target is not allowed: ${host}`);
+  }
+  if (host.includes(":")) {
+    const firstHextetMatch = host.match(/^([0-9a-f]{1,4})(?::|$)/);
+    if (firstHextetMatch) {
+      const firstHextet = parseInt(firstHextetMatch[1], 16);
+      // fe80::/10 → top 10 bits = 0x3FA0, mask 0xFFC0 → match 0xFE80
+      if ((firstHextet & 0xffc0) === 0xfe80) {
+        throw new Error(`URL target is not allowed: ${host}`);
+      }
+      // fc00::/7 → top 7 bits, mask 0xFE00 → match 0xFC00 (covers fc00::–fdff::)
+      if ((firstHextet & 0xfe00) === 0xfc00) {
+        throw new Error(`URL target is not allowed: ${host}`);
+      }
+    }
+  }
+
+  // Block cloud metadata / internal service discovery
+  if (host.endsWith(".internal")) {
+    throw new Error(`URL target is not allowed: ${host}`);
+  }
+
   return parsed;
 }
 
