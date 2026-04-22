@@ -32,6 +32,12 @@ function coerceExtension(extension: unknown): AnyExtension {
   return extension as AnyExtension;
 }
 
+function coerceEditorOptions(options: unknown): Parameters<typeof useEditor>[0] {
+  // Cast the entire options object at the hook boundary so mixed @tiptap/core
+  // identities in CI cannot leak through nested extension arrays.
+  return options as Parameters<typeof useEditor>[0];
+}
+
 export function TemplateAwareTextEditor({
   value,
   onChange,
@@ -75,44 +81,46 @@ export function TemplateAwareTextEditor({
 
   useEffect(() => cleanupSuggestion, [cleanupSuggestion]);
 
-  const editor = useEditor({
-    extensions: [
-      SingleLineDocument,
-      Paragraph,
-      Text,
-      History,
-      coerceExtension(TemplateExtension.configure({ stepId })),
-      coerceExtension(VariableSuggestion.configure({ suggestion: suggestionConfig })),
-    ],
-    content: templateStringToTiptap(value),
-    editable: !disabled,
-    immediatelyRender: false,
-    editorProps: {
-      attributes: {
-        class: cn(
-          "w-full min-h-9 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/30 shadow-sm",
-          "focus:outline-none overflow-x-auto overflow-y-hidden scrollbar-thin",
-          disabled && "opacity-50 cursor-not-allowed",
-        ),
-        style: "line-height: 20px;",
+  const editor = useEditor(
+    coerceEditorOptions({
+      extensions: [
+        SingleLineDocument,
+        Paragraph,
+        Text,
+        History,
+        coerceExtension(TemplateExtension.configure({ stepId })),
+        coerceExtension(VariableSuggestion.configure({ suggestion: suggestionConfig })),
+      ] as unknown as Parameters<typeof useEditor>[0]["extensions"],
+      content: templateStringToTiptap(value),
+      editable: !disabled,
+      immediatelyRender: false,
+      editorProps: {
+        attributes: {
+          class: cn(
+            "w-full min-h-9 px-3 py-2 text-xs font-mono rounded-lg border bg-muted/30 shadow-sm",
+            "focus:outline-none overflow-x-auto overflow-y-hidden scrollbar-thin",
+            disabled && "opacity-50 cursor-not-allowed",
+          ),
+          style: "line-height: 20px;",
+        },
       },
-    },
-    onUpdate: ({ editor }) => {
-      if (isUpdatingRef.current) return;
-      // Skip the initial update that fires when the editor is created
-      if (!isInitializedRef.current) {
-        isInitializedRef.current = true;
-        // Update lastValueRef to the normalized value to prevent spurious onChange
-        lastValueRef.current = tiptapToTemplateString(editor.getJSON());
-        return;
-      }
-      const newValue = tiptapToTemplateString(editor.getJSON());
-      if (newValue !== lastValueRef.current) {
-        lastValueRef.current = newValue;
-        debouncedOnChange(newValue);
-      }
-    },
-  });
+      onUpdate: ({ editor }) => {
+        if (isUpdatingRef.current) return;
+        // Skip the initial update that fires when the editor is created
+        if (!isInitializedRef.current) {
+          isInitializedRef.current = true;
+          // Update lastValueRef to the normalized value to prevent spurious onChange
+          lastValueRef.current = tiptapToTemplateString(editor.getJSON());
+          return;
+        }
+        const newValue = tiptapToTemplateString(editor.getJSON());
+        if (newValue !== lastValueRef.current) {
+          lastValueRef.current = newValue;
+          debouncedOnChange(newValue);
+        }
+      },
+    }),
+  );
 
   useEffect(() => {
     editorRef.current = editor;
