@@ -1,4 +1,5 @@
 import {
+  ExecutionFileEnvelope,
   Tool,
   RequestOptions,
   ToolStepResult,
@@ -18,6 +19,9 @@ export interface ToolExecutionPayload {
   runId: string;
   workflow: Tool;
   payload?: Record<string, any>;
+  files?: Record<string, ExecutionFileEnvelope>;
+  /** Internal-only: return produced file envelopes inline for step-by-step execution */
+  returnProducedFiles?: boolean;
   credentials?: Record<string, string>;
   options?: RequestOptions;
   systems: System[];
@@ -37,6 +41,7 @@ export interface ToolExecutionResult {
   data?: any;
   error?: string;
   stepResults: ToolStepResult[];
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
   tool?: Tool;
   startedAt: Date;
   completedAt: Date;

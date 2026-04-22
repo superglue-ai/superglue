@@ -9,7 +9,7 @@ import {
   useMemo,
 } from "react";
 import { useConfig } from "./config-context";
-import { useOrgOptional } from "./org-context";
+import { hasResolvedOrgId, useOrgOptional } from "./org-context";
 import { tokenRegistry } from "../lib/token-registry";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -32,7 +32,7 @@ export function EnvironmentProvider({ children }: { children: ReactNode }) {
   const config = useConfig();
   const org = useOrgOptional();
   const orgId = org?.orgId;
-  const storageKey = orgId ? `${BASE_STORAGE_KEY}:${orgId}` : BASE_STORAGE_KEY;
+  const storageKey = hasResolvedOrgId(orgId) ? `${BASE_STORAGE_KEY}:${orgId}` : BASE_STORAGE_KEY;
   const [mode, setModeState] = useState<ExecutionMode>("prod");
   const queryClient = useQueryClient();
 

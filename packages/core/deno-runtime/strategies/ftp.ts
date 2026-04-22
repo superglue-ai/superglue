@@ -12,12 +12,21 @@ import * as path from "node:path";
 import type {
   RequestStepConfig,
   RequestOptions,
+  RawFileBytes,
+  RuntimeExecutionFile,
+  RuntimeFilePointer,
   ServiceMetadata,
   StepExecutionResult,
 } from "../types.ts";
 import { DENO_DEFAULTS } from "../types.ts";
 import { replaceVariables } from "../utils/transform.ts";
-import { parseJSON, parseFile } from "../utils/files.ts";
+import {
+  buildRuntimeFile,
+  contentToBuffer,
+  guessContentType,
+  parseJSON,
+  resolveFileTokens,
+} from "../utils/files.ts";
 import { debug } from "../utils/logging.ts";
 
 const SUPPORTED_OPERATIONS = [
@@ -35,9 +44,14 @@ const SUPPORTED_OPERATIONS = [
 interface FTPOperation {
   operation: "list" | "get" | "put" | "delete" | "rename" | "mkdir" | "rmdir" | "exists" | "stat";
   path?: string;
-  content?: string | Uint8Array;
+  content?: string | Uint8Array | RawFileBytes | RuntimeFilePointer;
   newPath?: string;
   recursive?: boolean;
+}
+
+interface FtpOperationResult {
+  data: unknown;
+  producedFiles?: Record<string, RuntimeExecutionFile>;
 }
 
 /**
@@ -46,19 +60,23 @@ interface FTPOperation {
 export async function executeFtpStep(
   config: RequestStepConfig,
   payload: Record<string, unknown>,
+  fileLookup: Record<string, RuntimeExecutionFile>,
   credentials: Record<string, unknown>,
   options: RequestOptions,
   metadata: ServiceMetadata,
+  stepId?: string,
 ): Promise<StepExecutionResult> {
   try {
     const result = await callFTP({
       endpoint: config,
       stepInputData: payload,
+      fileLookup,
       credentials,
       options,
       metadata,
+      stepId,
     });
-    return { success: true, data: result };
+    return { success: true, data: result.data, producedFiles: result.producedFiles };
   } catch (error) {
     return { success: false, error: (error as Error).message };
   }
@@ -146,67 +164,66 @@ function resolveOperationPaths(operations: FTPOperation[], basePath?: string): F
 }
 
 /**
- * Convert content to Buffer
- */
-function contentToBuffer(content: string | Uint8Array | unknown): Uint8Array {
-  if (content instanceof Uint8Array) {
-    return content;
-  }
-  if (typeof content === "string") {
-    return new TextEncoder().encode(content);
-  }
-  return new TextEncoder().encode(JSON.stringify(content, null, 2));
-}
-
-/**
  * Execute SFTP operation
  */
-async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation): Promise<unknown> {
+async function executeSFTPOperation(
+  client: SFTPClient,
+  operation: FTPOperation,
+  fileLookup: Record<string, RuntimeExecutionFile>,
+): Promise<FtpOperationResult> {
   switch (operation.operation) {
     case "list": {
       const listPath = operation.path || "/";
       const files = await client.list(listPath);
-      return files.map(
-        (file: {
-          name: string;
-          size: number;
-          type: string;
-          modifyTime: number;
-          accessTime: number;
-          rights?: { user: string; group: string; other: string };
-          owner: number;
-          group: number;
-        }) => ({
-          name: file.name,
-          path: listPath + (listPath.endsWith("/") ? "" : "/") + file.name,
-          size: file.size,
-          type:
-            file.type === "d"
-              ? "directory"
-              : file.type === "-"
-                ? "file"
-                : file.type === "l"
-                  ? "symlink"
-                  : "unknown",
-          modifyTime: new Date(file.modifyTime).toISOString(),
-          accessTime: new Date(file.accessTime).toISOString(),
-          permissions: file.rights
-            ? { user: file.rights.user, group: file.rights.group, other: file.rights.other }
-            : null,
-          owner: file.owner,
-          group: file.group,
-        }),
-      );
+      return {
+        data: files.map(
+          (file: {
+            name: string;
+            size: number;
+            type: string;
+            modifyTime: number;
+            accessTime: number;
+            rights?: { user: string; group: string; other: string };
+            owner: number;
+            group: number;
+          }) => ({
+            name: file.name,
+            path: listPath + (listPath.endsWith("/") ? "" : "/") + file.name,
+            size: file.size,
+            type:
+              file.type === "d"
+                ? "directory"
+                : file.type === "-"
+                  ? "file"
+                  : file.type === "l"
+                    ? "symlink"
+                    : "unknown",
+            modifyTime: new Date(file.modifyTime).toISOString(),
+            accessTime: new Date(file.accessTime).toISOString(),
+            permissions: file.rights
+              ? { user: file.rights.user, group: file.rights.group, other: file.rights.other }
+              : null,
+            owner: file.owner,
+            group: file.group,
+          }),
+        ),
+      };
     }
 
     case "get": {
       if (!operation.path) throw new Error("path required for get operation");
       const buffer = (await client.get(operation.path)) as Buffer;
-      try {
-        return await parseFile(new Uint8Array(buffer), "AUTO");
-      } catch {
-        return new TextDecoder().decode(buffer);
-      }
+      const file = await buildRuntimeFile(
+        new Uint8Array(buffer),
+        path.basename(operation.path),
+        guessContentType(operation.path),
+      );
+      return {
+        data: file.extracted,
+        producedFiles: {
+          [path.basename(operation.path)]: file,
+        },
+      };
     }
 
     case "put": {
@@ -214,19 +231,21 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       if (operation.content === undefined || operation.content === null) {
         throw new Error("content required for put operation");
       }
-      const buffer = contentToBuffer(operation.content);
+      const buffer = contentToBuffer(operation.content, fileLookup);
       await client.put(Buffer.from(buffer), operation.path);
       return {
-        success: true,
-        message: `Uploaded content to ${operation.path}`,
-        size: buffer.length,
+        data: {
+          success: true,
+          message: `Uploaded content to ${operation.path}`,
+          size: buffer.length,
+        },
       };
     }
 
     case "delete": {
       if (!operation.path) throw new Error("path required for delete operation");
       await client.delete(operation.path);
-      return { success: true, message: `Deleted ${operation.path}` };
+      return { data: { success: true, message: `Deleted ${operation.path}` } };
     }
 
     case "rename": {
@@ -234,26 +253,28 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
         throw new Error("Both path and newPath required for rename operation");
       }
       await client.rename(operation.path, operation.newPath);
-      return { success: true, message: `Renamed ${operation.path} to ${operation.newPath}` };
+      return {
+        data: { success: true, message: `Renamed ${operation.path} to ${operation.newPath}` },
+      };
     }
 
     case "mkdir": {
       if (!operation.path) throw new Error("path required for mkdir operation");
       await client.mkdir(operation.path, operation.recursive);
-      return { success: true, message: `Created directory ${operation.path}` };
+      return { data: { success: true, message: `Created directory ${operation.path}` } };
     }
 
     case "rmdir": {
       if (!operation.path) throw new Error("path required for rmdir operation");
       await client.rmdir(operation.path);
-      return { success: true, message: `Removed directory ${operation.path}` };
+      return { data: { success: true, message: `Removed directory ${operation.path}` } };
     }
 
     case "exists": {
       if (!operation.path) throw new Error("path required for exists operation");
       const existsResult = await client.exists(operation.path);
       // ssh2-sftp-client returns "d"/"-"/"l" for different file types, or false if doesn't exist
-      return { exists: existsResult !== false, path: operation.path };
+      return { data: { exists: existsResult !== false, path: operation.path } };
     }
 
     case "stat": {
@@ -261,18 +282,20 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
       try {
         const stats = await client.stat(operation.path);
         return {
-          exists: true,
-          path: operation.path,
-          size: stats.size,
-          type: stats.isDirectory ? "directory" : stats.isFile ? "file" : "unknown",
-          modifyTime: new Date(stats.modifyTime).toISOString(),
-          accessTime: new Date(stats.accessTime).toISOString(),
-          mode: stats.mode,
-          uid: stats.uid,
-          gid: stats.gid,
+          data: {
+            exists: true,
+            path: operation.path,
+            size: stats.size,
+            type: stats.isDirectory ? "directory" : stats.isFile ? "file" : "unknown",
+            modifyTime: new Date(stats.modifyTime).toISOString(),
+            accessTime: new Date(stats.accessTime).toISOString(),
+            mode: stats.mode,
+            uid: stats.uid,
+            gid: stats.gid,
+          },
         };
       } catch {
-        return { exists: false, path: operation.path };
+        return { data: { exists: false, path: operation.path } };
       }
     }
 
@@ -286,25 +309,31 @@ async function executeSFTPOperation(client: SFTPClient, operation: FTPOperation)
 /**
  * Execute FTP operation
  */
-async function executeFTPOperation(client: FTPClient, operation: FTPOperation): Promise<unknown> {
+async function executeFTPOperation(
+  client: FTPClient,
+  operation: FTPOperation,
+  fileLookup: Record<string, RuntimeExecutionFile>,
+): Promise<FtpOperationResult> {
   switch (operation.operation) {
     case "list": {
       const listPath = operation.path || "/";
       const files = await client.list(listPath);
-      return files.map((file) => ({
-        name: file.name,
-        path: listPath + (listPath.endsWith("/") ? "" : "/") + file.name,
-        size: file.size,
-        type: file.isDirectory
-          ? "directory"
-          : file.isFile
-            ? "file"
-            : file.isSymbolicLink
-              ? "symlink"
-              : "unknown",
-        modifyTime: file.modifiedAt?.toISOString() || null,
-        permissions: file.permissions || null,
-      }));
+      return {
+        data: files.map((file) => ({
+          name: file.name,
+          path: listPath + (listPath.endsWith("/") ? "" : "/") + file.name,
+          size: file.size,
+          type: file.isDirectory
+            ? "directory"
+            : file.isFile
+              ? "file"
+              : file.isSymbolicLink
+                ? "symlink"
+                : "unknown",
+          modifyTime: file.modifiedAt?.toISOString() || null,
+          permissions: file.permissions || null,
+        })),
+      };
     }
 
     case "get": {
@@ -324,11 +353,17 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
         content.set(chunk, offset);
         offset += chunk.length;
       }
-      try {
-        return await parseFile(content, "AUTO");
-      } catch {
-        return new TextDecoder().decode(content);
-      }
+      const file = await buildRuntimeFile(
+        content,
+        path.basename(operation.path),
+        guessContentType(operation.path),
+      );
+      return {
+        data: file.extracted,
+        producedFiles: {
+          [path.basename(operation.path)]: file,
+        },
+      };
     }
 
     case "put": {
@@ -336,20 +371,22 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       if (operation.content === undefined || operation.content === null) {
         throw new Error("content required for put operation");
       }
-      const buffer = contentToBuffer(operation.content);
+      const buffer = contentToBuffer(operation.content, fileLookup);
       const stream = Readable.from(Buffer.from(buffer));
       await client.uploadFrom(stream, operation.path);
       return {
-        success: true,
-        message: `Uploaded content to ${operation.path}`,
-        size: buffer.length,
+        data: {
+          success: true,
+          message: `Uploaded content to ${operation.path}`,
+          size: buffer.length,
+        },
       };
     }
 
     case "delete": {
       if (!operation.path) throw new Error("path required for delete operation");
       await client.remove(operation.path);
-      return { success: true, message: `Deleted ${operation.path}` };
+      return { data: { success: true, message: `Deleted ${operation.path}` } };
     }
 
     case "rename": {
@@ -357,19 +394,21 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
         throw new Error("Both path and newPath required for rename operation");
       }
       await client.rename(operation.path, operation.newPath);
-      return { success: true, message: `Renamed ${operation.path} to ${operation.newPath}` };
+      return {
+        data: { success: true, message: `Renamed ${operation.path} to ${operation.newPath}` },
+      };
     }
 
     case "mkdir": {
       if (!operation.path) throw new Error("path required for mkdir operation");
       await client.ensureDir(operation.path);
-      return { success: true, message: `Created directory ${operation.path}` };
+      return { data: { success: true, message: `Created directory ${operation.path}` } };
     }
 
     case "rmdir": {
       if (!operation.path) throw new Error("path required for rmdir operation");
       await client.removeDir(operation.path);
-      return { success: true, message: `Removed directory ${operation.path}` };
+      return { data: { success: true, message: `Removed directory ${operation.path}` } };
     }
 
     case "exists": {
@@ -378,7 +417,7 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       const fileName = path.basename(operation.path);
       const dirList = await client.list(dirPath);
       const exists = dirList.some((item) => item.name === fileName);
-      return { exists, path: operation.path };
+      return { data: { exists, path: operation.path } };
     }
 
     case "stat": {
@@ -389,17 +428,19 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
       const file = dirList.find((item) => item.name === fileName);
 
       if (!file) {
-        return { exists: false, path: operation.path };
+        return { data: { exists: false, path: operation.path } };
       }
 
       return {
-        exists: true,
-        path: operation.path,
-        name: file.name,
-        size: file.size,
-        type: file.isDirectory ? "directory" : file.isFile ? "file" : "unknown",
-        modifyTime: file.modifiedAt?.toISOString() || null,
-        permissions: file.permissions || null,
+        data: {
+          exists: true,
+          path: operation.path,
+          name: file.name,
+          size: file.size,
+          type: file.isDirectory ? "directory" : file.isFile ? "file" : "unknown",
+          modifyTime: file.modifiedAt?.toISOString() || null,
+          permissions: file.permissions || null,
+        },
       };
     }
 
@@ -416,16 +457,20 @@ async function executeFTPOperation(client: FTPClient, operation: FTPOperation): 
 async function callFTP({
   endpoint,
   stepInputData,
+  fileLookup,
   credentials,
   options,
   metadata,
+  stepId,
 }: {
   endpoint: RequestStepConfig;
   stepInputData?: Record<string, unknown>;
+  fileLookup: Record<string, RuntimeExecutionFile>;
   credentials: Record<string, unknown>;
   options: RequestOptions;
   metadata: ServiceMetadata;
-}): Promise<unknown> {
+  stepId?: string;
+}): Promise<{ data: unknown; producedFiles: Record<string, RuntimeExecutionFile> }> {
   const allVars = { ...stepInputData, ...credentials };
 
   const connectionString = await replaceVariables(endpoint.url || "", allVars, metadata);
@@ -434,7 +479,7 @@ async function callFTP({
   let operations: FTPOperation[] = [];
   try {
     const resolvedBody = await replaceVariables(endpoint.body || "", allVars, metadata);
-    const body = parseJSON(resolvedBody);
+    const body = resolveFileTokens(parseJSON(resolvedBody), fileLookup, { stepId });
     if (!Array.isArray(body)) {
       operations.push(body as FTPOperation);
     } else {
@@ -462,11 +507,15 @@ async function callFTP({
 
   let attempts = 0;
   let results: unknown[] = [];
+  let producedFiles: Record<string, RuntimeExecutionFile> = {};
   const maxRetries = options?.retries || DENO_DEFAULTS.FTP.DEFAULT_RETRIES;
   const timeout = options?.timeout || DENO_DEFAULTS.FTP.DEFAULT_TIMEOUT;
 
   while (attempts <= maxRetries) {
     try {
+      const attemptResults: unknown[] = [];
+      const attemptProducedFiles: Record<string, RuntimeExecutionFile> = {};
+
       if (connectionInfo.protocol === "sftp") {
         const sftp = new SFTPClient();
         try {
@@ -481,13 +530,19 @@ async function callFTP({
             retries: 1,
             retry_minTimeout: 1000,
             timeout: timeout,
+            algorithms: {
+              cipher: ["aes128-ctr", "aes192-ctr", "aes256-ctr"],
+            },
           });
 
           const resolvedOps = resolveOperationPaths(operations, connectionInfo.basePath);
           for (const operation of resolvedOps) {
             debug(`Executing SFTP operation: ${operation.operation}`, metadata);
-            const result = await executeSFTPOperation(sftp, operation);
-            results.push(result);
+            const result = await executeSFTPOperation(sftp, operation, fileLookup);
+            attemptResults.push(result.data);
+            if (result.producedFiles) {
+              Object.assign(attemptProducedFiles, result.producedFiles);
+            }
           }
         } finally {
           await sftp.end();
@@ -510,14 +565,19 @@ async function callFTP({
           const resolvedOps = resolveOperationPaths(operations, connectionInfo.basePath);
           for (const operation of resolvedOps) {
             debug(`Executing FTP operation: ${operation.operation}`, metadata);
-            const result = await executeFTPOperation(ftp, operation);
-            results.push(result);
+            const result = await executeFTPOperation(ftp, operation, fileLookup);
+            attemptResults.push(result.data);
+            if (result.producedFiles) {
+              Object.assign(attemptProducedFiles, result.producedFiles);
+            }
           }
         } finally {
           ftp.close();
         }
       }
 
+      results = attemptResults;
+      producedFiles = attemptProducedFiles;
       break;
     } catch (error) {
       attempts++;
@@ -534,5 +594,8 @@ async function callFTP({
     }
   }
 
-  return results.length === 1 ? results[0] : results;
+  return {
+    data: results.length === 1 ? results[0] : results,
+    producedFiles,
+  };
 }

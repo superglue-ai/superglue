@@ -412,16 +412,16 @@ export function resolveSystemIcon(system: Partial<System>): ResolvedIcon {
   return null;
 }
 
-// Computes the execution-ready payload by merging manual JSON with file payloads
+// Computes the execution-ready payload from the manual JSON only.
+// Uploaded files are carried separately via the dedicated `files` channel.
 export const computeToolPayload = (
   manualPayloadText: string,
-  filePayloads: Record<string, any>,
+  _filePayloads?: Record<string, unknown>,
 ): any => {
   try {
-    const manualPayload = JSON.parse(manualPayloadText || "{}");
-    return { ...manualPayload, ...filePayloads };
+    return JSON.parse(manualPayloadText || "{}");
   } catch {
-    return { ...filePayloads };
+    return {};
   }
 };
 

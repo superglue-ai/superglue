@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { queryKeys } from "./query-keys";
 import { useEESuperglueClient } from "./use-client";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 import type { ApiKey } from "@/src/lib/ee-superglue-client";
 
 export function useApiKeys() {
@@ -14,7 +14,7 @@ export function useApiKeys() {
       const client = createClient();
       return client.listApiKeys();
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 }
 

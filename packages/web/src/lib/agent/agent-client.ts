@@ -259,12 +259,6 @@ export class AgentClient {
   }
 
   async *streamResponse(validated: ValidatedAgentRequest): AsyncGenerator<StreamChunk> {
-    const unwrappedFilePayloads = validated.filePayloads
-      ? Object.fromEntries(
-          Object.entries(validated.filePayloads).map(([key, { content }]) => [key, content]),
-        )
-      : {};
-
     const initialSkills = new Set<SkillName>();
 
     if (validated.loadedSkills?.length) {
@@ -282,7 +276,7 @@ export class AgentClient {
     const executionContext: ToolExecutionContext = {
       agentId: validated.agentId,
       superglueClient: this.superglueClient,
-      filePayloads: unwrappedFilePayloads,
+      filePayloads: validated.filePayloads || {},
       messages: [],
       subscriptionClient: this.subscriptionClient,
       abortSignal: this.config.abortSignal,

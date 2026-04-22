@@ -18,6 +18,12 @@ interface OrgContextValue {
 
 const OrgContext = createContext<OrgContextValue | null>(null);
 
+// In OSS, the personal/default org is represented as the empty string.
+// Treat empty string as a resolved org ID; only null/undefined mean "no org context".
+export function hasResolvedOrgId(orgId: string | null | undefined): orgId is string {
+  return orgId !== null && orgId !== undefined;
+}
+
 export function useOrg() {
   const context = useContext(OrgContext);
   if (!context) {

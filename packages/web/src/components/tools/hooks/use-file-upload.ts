@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useToast } from "@/src/hooks/use-toast";
 import { useSuperglueClient } from "@/src/queries/use-client";
+import { ExecutionFileEnvelope } from "@superglue/shared";
 import {
   formatBytes,
   generateUniqueKey,
@@ -13,22 +14,25 @@ import { removeFileKeysFromPayload } from "@/src/lib/general-utils";
 
 interface UseFileUploadOptions {
   maxTotalSize?: number;
-  onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
+  onFilesChange?: (
+    files: UploadedFileInfo[],
+    payloads: Record<string, ExecutionFileEnvelope>,
+  ) => void;
   onPayloadTextUpdate?: (updater: (prev: string) => string) => void;
   onUserEdit?: () => void;
   externalFiles?: UploadedFileInfo[];
-  externalPayloads?: Record<string, any>;
+  externalPayloads?: Record<string, ExecutionFileEnvelope>;
 }
 
 interface UseFileUploadReturn {
   uploadedFiles: UploadedFileInfo[];
-  filePayloads: Record<string, any>;
+  filePayloads: Record<string, ExecutionFileEnvelope>;
   totalFileSize: number;
   isProcessing: boolean;
   uploadFiles: (files: File[]) => Promise<void>;
   removeFile: (key: string) => void;
   setUploadedFiles: (files: UploadedFileInfo[]) => void;
-  setFilePayloads: (payloads: Record<string, any>) => void;
+  setFilePayloads: (payloads: Record<string, ExecutionFileEnvelope>) => void;
 }
 
 export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUploadReturn {
@@ -45,7 +49,9 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
   const { toast } = useToast();
 
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
-  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
+  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, ExecutionFileEnvelope>>(
+    {},
+  );
   const [isProcessing, setIsProcessing] = useState(false);
 
   const uploadedFiles = externalFiles ?? localUploadedFiles;
@@ -73,7 +79,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
 
         const existingKeys = uploadedFiles.map((f) => f.key);
         const newFiles: UploadedFileInfo[] = [];
-        const newPayloads: Record<string, any> = { ...filePayloads };
+        const newPayloads: Record<string, ExecutionFileEnvelope> = { ...filePayloads };
         const keysToRemove: string[] = [];
 
         for (const file of files) {
@@ -83,6 +89,8 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
           const fileInfo: UploadedFileInfo = {
             name: file.name,
             size: file.size,
+            originalSize: file.size,
+            contentType: file.type || "application/octet-stream",
             key,
             status: "processing",
           };
@@ -91,9 +99,9 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
 
           try {
             const client = createClient();
-            const parsedData = await processAndExtractFile(file, client);
+            const envelope = await processAndExtractFile(file, client);
 
-            newPayloads[key] = parsedData;
+            newPayloads[key] = envelope;
             fileInfo.status = "ready";
             keysToRemove.push(key);
           } catch (error: any) {

@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { Tool } from "@superglue/shared";
 import { queryKeys } from "./query-keys";
 import { useSuperglueClient, useEESuperglueClient } from "./use-client";
-import { useOrg, useOrgOptional } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg, useOrgOptional } from "@/src/app/org-context";
 
 export function useInvalidateTools() {
   const { orgId } = useOrg();
@@ -24,7 +24,7 @@ function useToolsInternal(orgId: string | undefined) {
       const result = await client.listWorkflows(1000, 0);
       return result.items;
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   return {
@@ -43,7 +43,7 @@ export function useTools() {
 export function useToolsOptional() {
   const org = useOrgOptional();
   const result = useToolsInternal(org?.orgId);
-  if (!org?.orgId) {
+  if (!org) {
     return null;
   }
   return result;
@@ -120,7 +120,7 @@ export function useToolsIncludingArchived() {
       const result = await client.listWorkflows(1000, 0, true);
       return result.items;
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   return {

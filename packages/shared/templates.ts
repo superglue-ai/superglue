@@ -1,4 +1,5 @@
 import { System } from "./types";
+import { ConnectionFieldDef } from "./utils";
 
 export interface SystemConfig {
   name: string;
@@ -8,7 +9,8 @@ export interface SystemConfig {
   docsUrl: string;
   openApiUrl?: string;
   openApiSchema?: string;
-  preferredAuthType?: "oauth" | "apikey" | "none";
+  preferredAuthType?: "oauth" | "apikey" | "basic" | "none" | "connection_string";
+  connectionFields?: ConnectionFieldDef[];
   oauth?: {
     authUrl?: string;
     tokenUrl?: string;
@@ -32,7 +34,14 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*(postgres|postgresql).*$",
     icon: "postgresql",
     docsUrl: "",
-    preferredAuthType: "apikey",
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "db.example.com", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: "5432", placeholder: "5432" },
+      { key: "database", label: "Database", placeholder: "mydb", required: true },
+      { key: "username", label: "Username", placeholder: "postgres", required: true },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
     keywords: ["database", "sql", "postgres", "postgresql", "api key", "tables"],
   },
   redis_direct: {
@@ -41,8 +50,15 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*(rediss?://).*$",
     icon: "redis",
     docsUrl: "https://redis.io/docs/latest/commands/",
-    preferredAuthType: "apikey",
-    keywords: ["database", "cache", "redis", "key-value", "nosql", "api key"],
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "redis.example.com", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: "6379", placeholder: "6379" },
+      { key: "database", label: "Database Index", placeholder: "0" },
+      { key: "username", label: "Username", placeholder: "default" },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
+    keywords: ["database", "cache", "redis", "key-value", "nosql"],
   },
   azure_sql: {
     name: "azure_sql",
@@ -50,7 +66,13 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*(azure.*sql|sql.*azure|database\\.windows\\.net).*$",
     icon: "default",
     docsUrl: "https://learn.microsoft.com/en-us/azure/azure-sql/",
-    preferredAuthType: "apikey",
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "myserver.database.windows.net", required: true },
+      { key: "database", label: "Database", placeholder: "mydb", required: true },
+      { key: "username", label: "Username", required: true },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
     keywords: [
       "database",
       "sql",
@@ -62,6 +84,22 @@ export const systems: Record<string, SystemConfig> = {
       "mssql",
       "sqlserver",
     ],
+  },
+  sftp: {
+    name: "sftp",
+    apiUrl: "sftp://<<username>>:<<password>>@<<host>>:<<port>><<path>>",
+    regex: "^.*(sftp|ftp):\\/\\/.*$",
+    icon: "default",
+    docsUrl: "",
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "sftp.example.com", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: "22", placeholder: "22" },
+      { key: "path", label: "Base Path", placeholder: "/uploads" },
+      { key: "username", label: "Username", required: true },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
+    keywords: ["sftp", "ftp", "file", "transfer", "upload", "download"],
   },
   stripe: {
     name: "stripe",

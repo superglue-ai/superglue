@@ -15,7 +15,7 @@ export const loadFromCacheAsync = async <T>(prefix: string): Promise<T | null> =
 
   try {
     const scopeIdentifier = getCacheScopeIdentifier();
-    if (!scopeIdentifier) return null;
+    if (scopeIdentifier === null) return null;
 
     const cacheKey = getCacheKey(scopeIdentifier, prefix);
 
@@ -47,7 +47,7 @@ export const saveToCache = (prefix: string, data: unknown): void => {
   if (typeof window === "undefined") return;
 
   const scopeIdentifier = getCacheScopeIdentifier();
-  if (!scopeIdentifier) return;
+  if (scopeIdentifier === null) return;
 
   const cacheKey = getCacheKey(scopeIdentifier, prefix);
 

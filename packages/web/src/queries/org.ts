@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEESuperglueClient } from "./use-client";
 import { queryKeys } from "./query-keys";
+import { hasResolvedOrgId } from "@/src/app/org-context";
 
 export interface BillingStatus {
   isPro: boolean;
@@ -12,7 +13,7 @@ export function useOrgProfileQuery(orgId: string | undefined, token: string | nu
   return useQuery({
     queryKey: [...queryKeys.org.me(orgId ?? ""), token ?? ""],
     queryFn: () => createClient().getMe(),
-    enabled: !!orgId && !!token,
+    enabled: hasResolvedOrgId(orgId) && !!token,
   });
 }
 

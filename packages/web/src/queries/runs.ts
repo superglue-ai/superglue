@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "./query-keys";
 import { useSuperglueClient } from "./use-client";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 
 interface UseRunsParams {
   page: number;
@@ -71,7 +71,7 @@ export function useRuns({
 
       return client.listRuns(params);
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
     placeholderData: (previousData) => previousData,
   });
 }
@@ -104,6 +104,6 @@ export function useToolRuns(
       }
       return client.listRuns(params);
     },
-    enabled: options?.enabled !== false && !!orgId && !!toolId,
+    enabled: options?.enabled !== false && hasResolvedOrgId(orgId) && !!toolId,
   });
 }

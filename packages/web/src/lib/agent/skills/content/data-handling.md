@@ -1,23 +1,21 @@
-# Data Handling: Variables, Selectors & Transforms
-
-Most tool building and editing failures trace back to incorrect variable syntax, wrong data selector returns, or misunderstanding of the tool result envelope.
+# Data Handling
 
 ## Variable Replacement (`<<>>` Syntax)
 
-The `<<expression>>` syntax injects dynamic values into step config fields (URL, headers, body, queryParams).
+The `<<expression>>` syntax injects dynamic values into step config fields (url, headers, body, queryParams).
 
-### Simple Variables (top-level keys only)
+### Available top-level variable keys
 
 ```
-<<userId>>           payload keys
+<<userId>>           payload tool inputs
 <<currentItem>>      whole current loop item
-<<page>>             pagination variable
-<<systemId_api_key>> system credential
-<<systemId_url>>     system base URL
+<<page>>             pagination vars
+<<systemId_api_key>> system credentials
+<<systemId_url>>     system base URLs
 <<sg_auth_email>>    email of the authenticated user
 ```
 
-**CRITICAL**: Simple `<<varName>>` only works for top-level keys. NO dots, NO nesting.
+**CRITICAL**: Simple `<<varName>>` references only work for the above list of top-level keys. NO dots, NO nesting.
 
 - VALID: `<<userId>>`, `<<currentItem>>`, `<<page>>`, `<<stripe_api_key>>`, `<<stripe_url>>`, `<<sg_auth_email>>`
 - INVALID: `<<currentItem.id>>`, `<<sourceData.userId>>`, `<<user.name>>` — these FAIL at runtime
@@ -38,7 +36,7 @@ The `<<expression>>` syntax injects dynamic values into step config fields (URL,
 
 ### Variable Sources
 
-All variables come from a single merged object:
+Variables come from a single merged object:
 
 ```javascript
 {
@@ -58,14 +56,6 @@ All variables come from a single merged object:
 Context variables provide information about the execution environment:
 
 - `<<sg_auth_email>>` — Email address of the authenticated user who triggered the tool execution
-
-**Use case**: Personalize tool outputs based on who is running the tool. For example:
-
-- Different permissions in Tableau based on user
-- User-specific account lookups
-- Audit logging with user identity
-
-**Important**: `sg_auth_email` is NOT available in scheduled executions (cron jobs). If a tool references `<<sg_auth_email>>` and runs via scheduler, it will fail with a clear error message.
 
 ### Return Type Handling
 
@@ -91,10 +81,9 @@ Credentials are available via `<<>>` syntax. Two sources, payload takes preceden
    ```javascript
    // Payload: { user_access_token: "abc" }
    // Available as: <<user_access_token>>
-   // Or: <<(sourceData) => sourceData.user_access_token>>
    ```
 
-For OAuth systems, use `<<systemId_access_token>>` — the token value is auto-refreshed, but the header itself must be present in the step config.
+For OAuth systems, use `<<systemId_access_token>>` — the token value is auto-refreshed during tool execution, but the header itself must be present in the step config.
 
 ## System URL Resolution
 
@@ -115,7 +104,6 @@ System URLs are available via `<<systemId_url>>` syntax. This enables environmen
 
 - Same tool works across dev/prod environments without modification
 - When switching execution mode, the system URL resolves to the appropriate environment
-- Avoids hardcoding base URLs that differ between environments
 
 ## Data Selectors
 
@@ -195,7 +183,6 @@ sourceData.stepId = [
 // Access:
 sourceData.stepId.map(item => item.data)                     // all responses
 sourceData.stepId.flatMap(item => item.data.results)          // nested arrays
-sourceData.stepId.filter(item => item.success).map(i => i.data) // only successes
 ```
 
 ### From Paginated Step
@@ -236,8 +223,13 @@ sourceData = {
 
   // Current item (only within a loop step's config)
   currentItem: { id: 1 },
+
+  // Runtime file map — see file-handling skill for full reference
+  __files__: { ... }
 }
 ```
+
+Treat `sourceData.__files__` as read-only. See the file-handling skill for file detection, the `RuntimeExecutionFile` shape, aliasing rules, and how to access files in transforms.
 
 ## Three Transformation Points
 
@@ -257,7 +249,11 @@ Results are wrapped in the **same envelope** as request steps:
 sourceData.formatForInsert = { currentItem: <dataSelector output>, data: <transformCode result>, success: true }
 ```
 
-If the step has a dataSelector returning an array, the transform runs once per item. Load the tool-building skill for when to use transform steps vs dataSelectors vs outputTransform.
+If the step has a dataSelector returning an array, the transform runs once per item. See tool-building guidelines for when to use transform steps vs dataSelectors vs outputTransform.
+
+### Returning Files From a Transform
+
+Transform steps can produce files by returning a reserved `__files__` key in the result. See the file-handling skill for the full shape, aliasing rules, and access patterns.
 
 ## Output Transform
 
@@ -267,7 +263,6 @@ Final transformation shaping the tool's output. Runs after all steps complete. C
 
 - Function signature: `(sourceData) => { ... }`
 - **Must have a return statement**
-- Pure synchronous — no async/await, no side effects
 - NEVER include newlines or tabs in the code string
 
 ## JS Code Constraints (all transform points)
@@ -279,7 +274,6 @@ Runs in a Deno subprocess sandbox:
 - No filesystem access — `--deny-read`, `--deny-write`
 - No subprocess spawning — `--deny-run`
 - Network access IS available (`--allow-net`) — transforms can make HTTP requests
-- Environment variables are sandboxed — only safe vars (PATH, HOME, DENO_DIR) are visible, no server secrets
 - JSON-serializable I/O only
 - Must return a value (undefined returns null)
 

@@ -48,17 +48,7 @@ All user-provided JS (data selectors, transforms, stop conditions) runs in an is
 
 ## File Handling
 
-superglue auto-parses files from any source:
-
-- CSV → array of objects (auto-detects delimiters/headers)
-- Excel → `{sheetName: [rows]}`
-- JSON → parsed (resilient parser with repair)
-- PDF → `{textContent, structuredContent}`
-- XML → nested objects via SAX
-- ZIP → extracts + parses each file
-- DOCX → raw text
-
-User files are injected via `file::<key>` syntax in payloads.
+Load the file-handling skill for file detection, parsing, `file::` syntax, aliases, and transform access patterns.
 
 ## Deployments
 
@@ -107,7 +97,7 @@ Use this when a tool should run automatically on a fixed cadence without app cod
 2. Define a schedule with explicit timezone and interval
 3. Provide any static payload defaults required by the workflow
 4. Validate first runs in staging before enabling in production
-5. Set up alerting/monitoring on failure rates and duration. superglue has a dedicated notifications feature for this in the Enterprise edition. It is not part of the OSS product surface.
+5. Set up alerting/monitoring on failure rates and duration. superglue has a dedicated notifications feature for this. You can find it under Control Panel -> Notifications. Enterprise-only.
 
 ### 3) MCP deployment (for agent interfaces)
 
@@ -198,7 +188,9 @@ instructions, patterns, and examples:
     sg skill databases              Print the databases reference
     sg skill integration            Print the SDK/REST/webhook reference
     sg skill file-servers           Print the file servers reference
-    sg skill transforms-and-output  Print the transforms reference
+    sg skill data-handling          Print the data handling reference
+    sg skill file-handling          Print the file handling reference
+    sg skill http-apis              Print the HTTP APIs reference
     sg skill redis                  Print the Redis reference
 
 The main skill reference covers: tool building, system setup, OAuth flows,

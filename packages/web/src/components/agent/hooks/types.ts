@@ -1,4 +1,4 @@
-import { Message, ToolCall } from "@superglue/shared";
+import { ExecutionFileEnvelope, Message, ToolCall } from "@superglue/shared";
 import { Conversation } from "../ConversationHistory";
 import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import {
@@ -17,6 +17,8 @@ export interface ToolConfirmationMetadata {
 export interface UploadedFile {
   name: string;
   size: number;
+  originalSize?: number;
+  contentType?: string;
   key: string;
   status: "processing" | "ready" | "error";
   error?: string;
@@ -76,8 +78,10 @@ export interface UseAgentRequestReturn {
 export interface UseAgentFileUploadReturn {
   pendingFiles: UploadedFile[];
   sessionFiles: UploadedFile[];
-  filePayloads: Record<string, any>;
-  setFilePayloads: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  filePayloads: Record<string, ExecutionFileEnvelope>;
+  setFilePayloads: React.Dispatch<
+    React.SetStateAction<Record<string, ExecutionFileEnvelope>>
+  >;
   isProcessingFiles: boolean;
   isDragging: boolean;
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;

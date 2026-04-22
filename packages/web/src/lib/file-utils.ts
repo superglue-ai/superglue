@@ -1,4 +1,4 @@
-import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
+import { ALLOWED_FILE_EXTENSIONS, ExecutionFileEnvelope } from "@superglue/shared";
 
 export const MAX_TOTAL_FILE_SIZE_CHAT = 10 * 1024 * 1024;
 export const MAX_TOTAL_FILE_SIZE_TOOLS = 1000 * 1024 * 1024;
@@ -7,6 +7,8 @@ export const MAX_TOTAL_FILE_SIZE_DOCUMENTATION = 50 * 1024 * 1024;
 export interface UploadedFileInfo {
   name: string;
   size?: number; // Optional for cases where size is unknown (e.g., from file:// URLs)
+  originalSize?: number;
+  contentType?: string;
   key: string;
   status?: "processing" | "ready" | "error"; // Optional, defaults to 'ready'
   error?: string;
@@ -17,12 +19,18 @@ export function isAllowedFileType(filename: string): boolean {
   return ALLOWED_FILE_EXTENSIONS.includes(`.${ext}` as any);
 }
 
-export async function processAndExtractFile(file: File, client: any): Promise<any> {
-  const extractResult = await client.extract({ file });
+export async function processAndExtractFile(
+  file: File,
+  client: any,
+): Promise<ExecutionFileEnvelope> {
+  const extractResult = await client.extract({ file, envelope: true });
   if (!extractResult.success) {
     throw new Error(extractResult.error || "Failed to extract data");
   }
-  return extractResult.data;
+  if (!extractResult.file) {
+    throw new Error("Extract response did not include a file envelope");
+  }
+  return extractResult.file;
 }
 
 export function sanitizeFileName(
@@ -87,6 +95,19 @@ export function formatBytes(bytes: number): string {
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+export function decodeBase64ToUint8Array(base64: string): Uint8Array {
+  if (typeof atob === "function") {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  return Uint8Array.from(Buffer.from(base64, "base64"));
 }
 
 // truncateFileContent: Needed for Agent File Uploads

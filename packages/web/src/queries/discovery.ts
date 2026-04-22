@@ -1,6 +1,6 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { DiscoveryRun, DiscoveryRunStatus, FileReference, FileStatus } from "@superglue/shared";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 import { queryKeys } from "./query-keys";
 import { useEESuperglueClient } from "./use-client";
 
@@ -72,7 +72,7 @@ export function useDiscoveryRunsQuery() {
       const response = await createClient().listDiscoveryRuns(100, 0);
       return response.success ? response.items || [] : [];
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 }
 
@@ -86,7 +86,7 @@ export function useDiscoveryRunQuery(runId: string | undefined) {
       const response = await createClient().getDiscoveryRun(runId!);
       return response.success ? response.data : null;
     },
-    enabled: !!orgId && !!runId,
+    enabled: hasResolvedOrgId(orgId) && !!runId,
     refetchInterval: (query) =>
       shouldPollDiscoveryRun(query.state.data ?? null) ? DISCOVERY_POLL_INTERVAL_MS : false,
   });
@@ -107,7 +107,7 @@ export function useDiscoveryFilesQuery(runId: string | undefined, fileIds: strin
       const response = await createClient().listFileReferences(fileIds);
       return response.success ? response.items || [] : [];
     },
-    enabled: !!orgId && !!runId && fileIds.length > 0,
+    enabled: hasResolvedOrgId(orgId) && !!runId && fileIds.length > 0,
     refetchInterval: (query) =>
       hasProcessingDiscoveryFiles(query.state.data ?? []) ? DISCOVERY_POLL_INTERVAL_MS : false,
   });

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./query-keys";
 import { useSuperglueClient } from "./use-client";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 import type { SuperglueClient } from "@superglue/shared";
 
 export interface DocFile {
@@ -34,7 +34,7 @@ export function useDocFilesQuery(systemId: string | undefined) {
       const result = await client.listSystemFileReferences(systemId!);
       return result.files as DocFile[];
     },
-    enabled: !!orgId && !!systemId,
+    enabled: hasResolvedOrgId(orgId) && !!systemId,
     refetchInterval: (query) => {
       if (!hasProcessingFiles(query.state.data)) return false;
       const firstFetchTime = query.state.dataUpdatedAt;

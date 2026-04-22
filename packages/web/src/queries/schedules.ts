@@ -2,7 +2,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ToolSchedule } from "@superglue/shared";
 import { queryKeys } from "./query-keys";
 import { useEESuperglueClient } from "./use-client";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 import { useCallback } from "react";
 
 export function useInvalidateSchedules() {
@@ -24,7 +24,7 @@ export function useSchedules() {
       const client = createClient();
       return client.listToolSchedules();
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   const getSchedulesForTool = useCallback(

@@ -4,6 +4,7 @@ import { UploadedFileInfo } from "@/src/lib/file-utils";
 import { computeToolPayload } from "@/src/lib/general-utils";
 import { getPayload, setPayload, addDraft } from "@/src/lib/storage";
 import {
+  ExecutionFileEnvelope,
   RequestStepConfig,
   ToolStep,
   System,
@@ -166,8 +167,11 @@ interface ToolConfigProviderProps {
   systems?: System[];
   // External state for embedded mode
   externalUploadedFiles?: UploadedFileInfo[];
-  externalFilePayloads?: Record<string, any>;
-  onExternalFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
+  externalFilePayloads?: Record<string, ExecutionFileEnvelope>;
+  onExternalFilesChange?: (
+    files: UploadedFileInfo[],
+    payloads: Record<string, ExecutionFileEnvelope>,
+  ) => void;
   // Skip loading payload from local storage (e.g., when restoring a run)
   skipLocalPayloadLoad?: boolean;
   children: ReactNode;
@@ -220,7 +224,9 @@ export function ToolConfigProvider({
 
   const [manualPayloadText, setManualPayloadText] = useState(initialPayload);
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
-  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, any>>({});
+  const [localFilePayloads, setLocalFilePayloads] = useState<
+    Record<string, ExecutionFileEnvelope>
+  >({});
   const [hasUserEdited, setHasUserEdited] = useState(false);
   const initialStateRef = useRef<string | null>(null);
   const [initialStateReady, setInitialStateReady] = useState(false);
@@ -470,7 +476,7 @@ export function ToolConfigProvider({
   }, []);
 
   const setFilesAndPayloads = useCallback(
-    (files: UploadedFileInfo[], payloads: Record<string, any>) => {
+    (files: UploadedFileInfo[], payloads: Record<string, ExecutionFileEnvelope>) => {
       if (onExternalFilesChange) {
         onExternalFilesChange(files, payloads);
       } else {
@@ -494,7 +500,7 @@ export function ToolConfigProvider({
   );
 
   const setFilePayloads = useCallback(
-    (payloads: Record<string, any>) => {
+    (payloads: Record<string, ExecutionFileEnvelope>) => {
       if (onExternalFilesChange) {
         // Use the combined setter to ensure atomic update
         onExternalFilesChange(uploadedFiles, payloads);

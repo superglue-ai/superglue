@@ -7,10 +7,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/src/queries/query-keys";
 import type { System } from "@superglue/shared";
 import {
+  detectSystemAuthType,
   systems as systemTemplates,
   findTemplateForSystem,
   getSystemAuthStatus,
 } from "@superglue/shared";
+import type { ConnectionFieldDef } from "@superglue/shared";
 import {
   createContext,
   ReactNode,
@@ -49,20 +51,6 @@ const DEFAULT_OAUTH_FIELDS: OAuthFields = {
   oauth_cert: "",
   oauth_key: "",
 };
-
-function detectAuthType(credentials: any): "oauth" | "apikey" | "none" {
-  if (!credentials || Object.keys(credentials).length === 0) return "none";
-
-  const allKeys = Object.keys(credentials);
-
-  // OAuth requires client_id AND at least one OAuth URL (token_url or auth_url)
-  // This distinguishes from APIs that just happen to use client_id/client_secret naming
-  const hasClientId = allKeys.includes("client_id");
-  const hasOAuthUrl = allKeys.includes("token_url") || allKeys.includes("auth_url");
-
-  if (hasClientId && hasOAuthUrl) return "oauth";
-  return allKeys.length > 0 ? "apikey" : "none";
-}
 
 function extractOAuthFields(credentials: Record<string, any>): OAuthFields {
   return {
@@ -109,6 +97,13 @@ function extractNonOAuthCredentials(credentials: Record<string, any>): string {
   return Object.keys(nonOAuthCreds).length > 0 ? JSON.stringify(nonOAuthCreds, null, 2) : "{}";
 }
 
+function isSystemUsingTemplateOAuth(system: System | undefined): boolean {
+  if (!system?.credentials?.client_id) return false;
+  const match = findTemplateForSystem(system);
+  const templateClientId = match?.template?.oauth?.client_id;
+  return Boolean(templateClientId && system.credentials.client_id === templateClientId);
+}
+
 interface SystemConfigProviderProps {
   initialSystem?: System;
   isNew?: boolean;
@@ -149,9 +144,14 @@ export function SystemConfigProvider({
   );
 
   const initialAuthType = initialSystem
-    ? detectAuthType(initialSystem.credentials || {})
+    ? detectSystemAuthType(initialSystem.credentials || {}, {
+        url: initialSystem.url,
+        templateName: initialSystem.templateName,
+      })
     : "apikey";
-  const [authType, setAuthType] = useState<"none" | "oauth" | "apikey">(initialAuthType);
+  const [authType, setAuthType] = useState<"none" | "oauth" | "apikey" | "connection_string">(
+    initialAuthType,
+  );
   const [credentials, setCredentials] = useState<Record<string, any>>(
     initialSystem?.credentials || {},
   );
@@ -164,10 +164,29 @@ export function SystemConfigProvider({
     initialSystem?.credentials
       ? initialAuthType === "oauth"
         ? extractNonOAuthCredentials(initialSystem.credentials)
-        : JSON.stringify(initialSystem.credentials, null, 2)
+        : initialAuthType === "connection_string"
+          ? "{}"
+          : JSON.stringify(initialSystem.credentials, null, 2)
       : "{}",
   );
-  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(false);
+  const [connectionStringCredentials, setConnectionStringCredentials] = useState<
+    Record<string, string>
+  >(() => {
+    if (initialAuthType === "connection_string" && initialSystem?.credentials) {
+      const creds: Record<string, string> = {};
+      for (const [key, value] of Object.entries(initialSystem.credentials)) {
+        if (value !== undefined && value !== null) {
+          creds[key] = String(value);
+        }
+      }
+      return creds;
+    }
+    return {};
+  });
+  // Detect if system was created with superglue OAuth by comparing stored client_id with template's
+  const [useSuperglueOAuth, setUseSuperglueOAuth] = useState(() =>
+    isSystemUsingTemplateOAuth(initialSystem),
+  );
   const [multiTenancyMode, setMultiTenancyMode] = useState<"disabled" | "enabled">(
     (initialSystem?.multiTenancyMode as "disabled" | "enabled") || "disabled",
   );
@@ -226,17 +245,29 @@ export function SystemConfigProvider({
       setSpecificInstructions(updatedSystem.specificInstructions || "");
       setMultiTenancyMode((updatedSystem.multiTenancyMode as "disabled" | "enabled") || "disabled");
 
-      const newAuthType = detectAuthType(updatedSystem.credentials || {});
+      const newAuthType = detectSystemAuthType(updatedSystem.credentials || {}, {
+        url: updatedSystem.url,
+        templateName: updatedSystem.templateName,
+      });
       setAuthType(newAuthType);
       setCredentials(updatedSystem.credentials || {});
       setOauthFieldsState(extractOAuthFields(updatedSystem.credentials || {}));
-      setApiKeyCredentials(
-        newAuthType === "oauth"
-          ? extractNonOAuthCredentials(updatedSystem.credentials || {})
-          : JSON.stringify(updatedSystem.credentials || {}, null, 2),
-      );
+      if (newAuthType === "connection_string") {
+        const creds: Record<string, string> = {};
+        for (const [key, value] of Object.entries(updatedSystem.credentials || {})) {
+          if (value !== undefined && value !== null) creds[key] = String(value);
+        }
+        setConnectionStringCredentials(creds);
+        setApiKeyCredentials("{}");
+      } else {
+        setApiKeyCredentials(
+          newAuthType === "oauth"
+            ? extractNonOAuthCredentials(updatedSystem.credentials || {})
+            : JSON.stringify(updatedSystem.credentials || {}, null, 2),
+        );
+      }
 
-      setUseSuperglueOAuth(false);
+      setUseSuperglueOAuth(isSystemUsingTemplateOAuth(updatedSystem));
 
       initialRef.current = updatedSystem;
       setHasUnsavedChanges(false);
@@ -252,7 +283,7 @@ export function SystemConfigProvider({
       url !== (initialSystem.url || "") ||
       icon !== (initialSystem.icon || "") ||
       specificInstructions !== (initialSystem.specificInstructions || "") ||
-      authType !== detectAuthType(initialSystem.credentials || {}) ||
+      authType !== detectSystemAuthType(initialSystem.credentials || {}) ||
       multiTenancyMode !==
         ((initialSystem.multiTenancyMode as "disabled" | "enabled") || "disabled");
 
@@ -308,6 +339,7 @@ export function SystemConfigProvider({
       credentials,
       oauthFields,
       apiKeyCredentials,
+      connectionStringCredentials,
       isOAuthConfigured,
       useSuperglueOAuth,
       multiTenancyMode,
@@ -317,6 +349,7 @@ export function SystemConfigProvider({
       credentials,
       oauthFields,
       apiKeyCredentials,
+      connectionStringCredentials,
       isOAuthConfigured,
       useSuperglueOAuth,
       multiTenancyMode,
@@ -357,6 +390,20 @@ export function SystemConfigProvider({
               label: status.label,
             };
           }
+          if (authType === "connection_string") {
+            const hasHost = Boolean(
+              connectionStringCredentials.host || connectionStringCredentials.hostname,
+            );
+            const hasAuth = Boolean(
+              connectionStringCredentials.username || connectionStringCredentials.password,
+            );
+            const isComplete = hasHost && hasAuth;
+            return {
+              isComplete,
+              hasErrors: false,
+              label: isComplete ? "Connected" : "Connection incomplete",
+            };
+          }
           try {
             const parsed = JSON.parse(apiKeyCredentials);
             const status = getSystemAuthStatus({
@@ -389,6 +436,7 @@ export function SystemConfigProvider({
       isOAuthConfigured,
       oauthFields,
       apiKeyCredentials,
+      connectionStringCredentials,
       specificInstructions,
       docFileCount,
       multiTenancyMode,
@@ -407,6 +455,10 @@ export function SystemConfigProvider({
         additionalKeys = Object.keys(parsed);
       } catch {}
       credentialKeys = [...new Set([...oauthKeys, ...additionalKeys])];
+    } else if (authType === "connection_string") {
+      credentialKeys = Object.keys(connectionStringCredentials).filter(
+        (k) => connectionStringCredentials[k] !== "",
+      );
     } else if (authType === "apikey") {
       try {
         const parsed = JSON.parse(apiKeyCredentials || "{}");
@@ -435,6 +487,7 @@ export function SystemConfigProvider({
     authType,
     oauthFields,
     apiKeyCredentials,
+    connectionStringCredentials,
     specificInstructions,
     getSectionStatus,
     isNew,
@@ -491,6 +544,10 @@ export function SystemConfigProvider({
             }
           }
           finalCredentials = { ...oauthCredsRaw, ...additionalCreds };
+        } else if (authType === "connection_string") {
+          finalCredentials = Object.fromEntries(
+            Object.entries(connectionStringCredentials).filter(([_, v]) => v !== ""),
+          );
         } else if (authType === "apikey") {
           try {
             finalCredentials = JSON.parse(apiKeyCredentials);
@@ -560,6 +617,7 @@ export function SystemConfigProvider({
       authType,
       oauthFields,
       apiKeyCredentials,
+      connectionStringCredentials,
       templateName,
       multiTenancyMode,
       environment,
@@ -579,14 +637,28 @@ export function SystemConfigProvider({
       setTemplateName(initial.templateName || "");
       setIcon(initial.icon || "");
       setEnvironment(initial.environment);
-      setAuthType(detectAuthType(initial.credentials || {}));
+      const resetAuthType = detectSystemAuthType(initial.credentials || {}, {
+        url: initial.url,
+        templateName: initial.templateName,
+      });
+      setAuthType(resetAuthType);
       setCredentials(initial.credentials || {});
       setOauthFieldsState(extractOAuthFields(initial.credentials || {}));
-      setApiKeyCredentials(
-        detectAuthType(initial.credentials || {}) === "oauth"
-          ? extractNonOAuthCredentials(initial.credentials || {})
-          : JSON.stringify(initial.credentials || {}, null, 2),
-      );
+      if (resetAuthType === "connection_string") {
+        const creds: Record<string, string> = {};
+        for (const [key, value] of Object.entries(initial.credentials || {})) {
+          if (value !== undefined && value !== null) creds[key] = String(value);
+        }
+        setConnectionStringCredentials(creds);
+        setApiKeyCredentials("{}");
+      } else {
+        setApiKeyCredentials(
+          resetAuthType === "oauth"
+            ? extractNonOAuthCredentials(initial.credentials || {})
+            : JSON.stringify(initial.credentials || {}, null, 2),
+        );
+        setConnectionStringCredentials({});
+      }
       setSpecificInstructions(initial.specificInstructions || "");
       setMultiTenancyMode((initial.multiTenancyMode as "disabled" | "enabled") || "disabled");
     } else {
@@ -600,6 +672,7 @@ export function SystemConfigProvider({
       setCredentials({});
       setOauthFieldsState(DEFAULT_OAUTH_FIELDS);
       setApiKeyCredentials("{}");
+      setConnectionStringCredentials({});
       setSpecificInstructions("");
       setMultiTenancyMode("disabled");
     }
@@ -618,6 +691,14 @@ export function SystemConfigProvider({
         effectiveGrantType === "client_credentials"
           ? Boolean(oauthFields.access_token)
           : Boolean(oauthFields.access_token && oauthFields.refresh_token);
+    } else if (authType === "connection_string") {
+      const hasHost = Boolean(
+        connectionStringCredentials.host || connectionStringCredentials.hostname,
+      );
+      const hasAuth = Boolean(
+        connectionStringCredentials.username || connectionStringCredentials.password,
+      );
+      authComplete = hasHost && hasAuth;
     } else if (authType === "apikey") {
       try {
         const parsed = JSON.parse(apiKeyCredentials);
@@ -642,6 +723,7 @@ export function SystemConfigProvider({
     oauthFields.refresh_token,
     oauthFields.grant_type,
     apiKeyCredentials,
+    connectionStringCredentials,
     specificInstructions,
   ]);
 
@@ -704,6 +786,10 @@ export function SystemConfigProvider({
       setOAuthFields,
       setApiKeyCredentials: (creds) => {
         setApiKeyCredentials(creds);
+        setHasUnsavedChanges(true);
+      },
+      setConnectionStringCredentials: (creds) => {
+        setConnectionStringCredentials(creds);
         setHasUnsavedChanges(true);
       },
       setUseSuperglueOAuth: (use) => {

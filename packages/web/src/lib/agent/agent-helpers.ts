@@ -1,5 +1,9 @@
 import {
   ALLOWED_PATCH_SYSTEM_FIELDS,
+  ExecutionFileEnvelope,
+  RawFileBytes,
+  getToolInputSchemaSections,
+  maskCredentialValue,
   Message,
   System,
   SystemConfig,
@@ -7,12 +11,13 @@ import {
   Tool,
 } from "@superglue/shared";
 import * as jsonpatch from "fast-json-patch";
+import { decodeBase64ToUint8Array } from "@/src/lib/file-utils";
 import { EditToolSaveResult, ToolExecutionContext } from "./agent-types";
 import { SKILL_INDEX } from "./skills/index";
 import { findDraftInMessages } from "./agent-context";
 
 export const needsSystemMessage = (messages: Message[]): boolean => {
-  return !messages.some((m) => m.role === "system");
+  return !messages.some((m) => m.role === "system" && !m.isHidden);
 };
 
 export const stripLegacyToolFields = (tool: Tool): Tool => {
@@ -24,6 +29,26 @@ export const stripLegacyToolFields = (tool: Tool): Tool => {
     }),
   };
 };
+
+const MAX_INLINE_FILE_BASE64_BYTES = 500 * 1024 * 1024;
+
+function formatInlineFileLimit(limitBytes = MAX_INLINE_FILE_BASE64_BYTES): string {
+  return `${Math.round(limitBytes / (1024 * 1024))} MB`;
+}
+
+function assertEnvelopeSupportsBase64(
+  envelope: ExecutionFileEnvelope,
+  ref: string,
+  limitBytes = MAX_INLINE_FILE_BASE64_BYTES,
+): void {
+  if (envelope.size <= limitBytes) {
+    return;
+  }
+
+  throw new Error(
+    `File '${envelope.filename} (${ref})' is too large for base64 access. Limit is ${formatInlineFileLimit(limitBytes)}. Use .raw instead.`,
+  );
+}
 
 function getEditToolSavedToolSuffix(saveResult: EditToolSaveResult): string {
   return saveResult?.success === true ? ` as "${saveResult.toolId}"` : "";
@@ -99,22 +124,27 @@ export function buildEditToolConfirmationOutput(
 }
 
 export const filterSystemFields = (system: System) => {
-  const credentialKeys = Object.keys(system.credentials || {});
-  const credentialPlaceholders = credentialKeys.map((key) => `<<${system.id}_${key}>>`);
+  const credentials = system.credentials || {};
+  const storedCredentials = Object.fromEntries(
+    Object.entries(credentials).map(([key, value]) => [
+      key,
+      { placeholder: `<<${system.id}_${key}>>`, value: maskCredentialValue(key, value) },
+    ]),
+  );
   return {
     id: system.id,
     name: system.name,
     url: system.url,
     urlPlaceholder: system.url ? `<<${system.id}_url>>` : undefined,
     specificInstructions: system.specificInstructions,
-    credentialPlaceholders: credentialPlaceholders,
+    storedCredentials: Object.keys(storedCredentials).length > 0 ? storedCredentials : undefined,
     environment: system.environment,
   };
 };
 
 export function resolveFileReferences(
   value: any,
-  filePayloads: Record<string, any>,
+  filePayloads: Record<string, ExecutionFileEnvelope>,
   stringifyObjects = false,
 ): any {
   if (typeof value === "string") {
@@ -127,34 +157,29 @@ export function resolveFileReferences(
         const unresolvedFiles: string[] = [];
 
         if (matches.length === 1 && value.trim() === matches[0][0]) {
-          const filename = matches[0][1];
-          const fileData = filePayloads[filename];
-          if (fileData === undefined) {
+          const rawRef = matches[0][1];
+          const resolved = resolveFileRef(rawRef, filePayloads, stringifyObjects);
+          if (resolved === undefined) {
             throw new Error(
-              `File reference 'file::${filename}' could not be resolved.\n` +
+              `File reference 'file::${rawRef}' could not be resolved.\n` +
                 `Available file keys: ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}\n` +
                 `Make sure to use the exact sanitized key shown in the file reference list.`,
             );
           }
-
-          if (stringifyObjects && typeof fileData !== "string") {
-            return JSON.stringify(fileData, null, 2);
-          }
-
-          return fileData;
+          return resolved;
         }
 
         let result = value;
         const fileContents: string[] = [];
 
         for (const match of matches) {
-          const filename = match[1];
-          const fileData = filePayloads[filename];
-          if (fileData === undefined) {
-            unresolvedFiles.push(filename);
+          const rawRef = match[1];
+          const resolved = resolveFileRef(rawRef, filePayloads, true);
+          if (resolved === undefined) {
+            unresolvedFiles.push(rawRef);
           } else {
             const contentStr =
-              typeof fileData === "string" ? fileData : JSON.stringify(fileData, null, 2);
+              typeof resolved === "string" ? resolved : JSON.stringify(resolved, null, 2);
             fileContents.push(contentStr);
           }
         }
@@ -192,14 +217,55 @@ export function resolveFileReferences(
   return value;
 }
 
+function resolveFileRef(
+  rawRef: string,
+  filePayloads: Record<string, ExecutionFileEnvelope>,
+  stringifyObjects: boolean,
+): any | undefined {
+  if (rawRef.endsWith(".raw")) {
+    const key = rawRef.slice(0, -4);
+    const envelope = filePayloads[key];
+    if (!envelope) return undefined;
+    return {
+      kind: "raw_file_bytes",
+      base64: envelope.rawBase64,
+      filename: envelope.filename,
+      contentType: envelope.contentType,
+    } as RawFileBytes;
+  }
+
+  if (rawRef.endsWith(".base64")) {
+    const key = rawRef.slice(0, -7);
+    const envelope = filePayloads[key];
+    if (!envelope) return undefined;
+    assertEnvelopeSupportsBase64(envelope, `file::${rawRef}`);
+    return envelope.rawBase64;
+  }
+
+  if (rawRef.endsWith(".extracted")) {
+    const key = rawRef.slice(0, -10);
+    const envelope = filePayloads[key];
+    if (!envelope) return undefined;
+    if (stringifyObjects && typeof envelope.extracted !== "string") {
+      return JSON.stringify(envelope.extracted ?? null, null, 2);
+    }
+    return envelope.extracted;
+  }
+
+  const envelope = filePayloads[rawRef];
+  if (!envelope) return undefined;
+  if (stringifyObjects) {
+    return JSON.stringify(envelope.extracted ?? null, null, 2);
+  }
+  return envelope;
+}
+
 export const validateRequiredFields = (
   schema: any,
   payload: Record<string, any>,
 ): { valid: true } | { valid: false; missingFields: string[]; schema: any } => {
-  if (!schema) return { valid: true };
-
-  let parsedSchema = typeof schema === "string" ? JSON.parse(schema) : schema;
-  parsedSchema = parsedSchema.properties?.payload || parsedSchema;
+  const parsedSchema = getToolInputSchemaSections(schema).payloadSchema;
+  if (!parsedSchema) return { valid: true };
   if (!parsedSchema?.required || !Array.isArray(parsedSchema.required)) {
     return { valid: true };
   }
@@ -215,9 +281,29 @@ export const validateRequiredFields = (
   return { valid: true };
 };
 
+export const validateRequiredFileInputs = (
+  schema: any,
+  files: Record<string, ExecutionFileEnvelope> | undefined,
+): { valid: true } | { valid: false; missingFiles: string[]; schema: any } => {
+  const parsedSchema = getToolInputSchemaSections(schema).filesSchema;
+  if (!parsedSchema) return { valid: true };
+  if (!parsedSchema.required || !Array.isArray(parsedSchema.required)) {
+    return { valid: true };
+  }
+
+  const resolvedFiles = files || {};
+  const missingFiles = parsedSchema.required.filter((field: string) => !resolvedFiles[field]);
+
+  if (missingFiles.length > 0) {
+    return { valid: false, missingFiles, schema: parsedSchema };
+  }
+
+  return { valid: true };
+};
+
 export function validateFileReferences(
   value: any,
-  availableFiles: Record<string, any>,
+  availableFiles: Record<string, ExecutionFileEnvelope>,
 ): { valid: true } | { valid: false; missingFiles: string[]; availableKeys: string[] } {
   const filePattern = /file::([^,\s)}\]"']+)/g;
   const valueStr = typeof value === "string" ? value : JSON.stringify(value || {});
@@ -226,7 +312,17 @@ export function validateFileReferences(
   if (matches.length === 0) return { valid: true };
 
   const availableKeys = Object.keys(availableFiles || {});
-  const referencedKeys = [...new Set(matches.map((m) => m[1]))];
+  const referencedKeys = [
+    ...new Set(
+      matches.map((m) => {
+        let key = m[1];
+        if (key.endsWith(".raw")) key = key.slice(0, -4);
+        else if (key.endsWith(".base64")) key = key.slice(0, -7);
+        else if (key.endsWith(".extracted")) key = key.slice(0, -10);
+        return key;
+      }),
+    ),
+  ];
   const missingFiles = referencedKeys.filter((key) => !availableKeys.includes(key));
 
   if (missingFiles.length > 0) {
@@ -245,10 +341,13 @@ export type FileResolutionError = {
 
 export function resolvePayloadWithFiles(
   payload: any,
-  filePayloads: Record<string, any> | undefined,
+  filePayloads: Record<string, ExecutionFileEnvelope> | undefined,
   stringifyObjects = false,
 ): FileResolutionSuccess | FileResolutionError {
-  const validation = validateFileReferences(payload, filePayloads || {});
+  const validation = validateFileReferences(
+    payload,
+    (filePayloads || {}) as Record<string, ExecutionFileEnvelope>,
+  );
   if (validation.valid === false) {
     return {
       success: false,
@@ -272,6 +371,50 @@ export function resolvePayloadWithFiles(
   }
 }
 
+export function resolveFileInputBindings(
+  files: any,
+  filePayloads: Record<string, ExecutionFileEnvelope> | undefined,
+): FileResolutionSuccess | FileResolutionError {
+  if (!files || typeof files !== "object") {
+    return { success: true, resolved: {} };
+  }
+
+  const resolution = resolvePayloadWithFiles(files, filePayloads, false);
+  if (!resolution.success) {
+    return resolution;
+  }
+
+  const resolvedEntries = Object.entries(resolution.resolved as Record<string, unknown>);
+  const invalidAliases = resolvedEntries.filter(
+    ([, value]) =>
+      !(
+        typeof value === "object" &&
+        value !== null &&
+        (value as ExecutionFileEnvelope).kind === "execution_file"
+      ),
+  );
+
+  if (invalidAliases.length > 0) {
+    return {
+      success: false,
+      error:
+        `Invalid file input binding${invalidAliases.length > 1 ? "s" : ""}: ` +
+        invalidAliases
+          .map(
+            ([alias]) =>
+              `'${alias}' must resolve to a full file envelope via a bare file:: reference`,
+          )
+          .join(", "),
+      availableFiles: Object.keys(filePayloads || {}).map((k) => `file::${k}`),
+    };
+  }
+
+  return {
+    success: true,
+    resolved: resolution.resolved as Record<string, ExecutionFileEnvelope>,
+  };
+}
+
 export function validateDraftOrToolId(
   draftId?: string,
   toolId?: string,
@@ -290,7 +433,7 @@ export function validateDraftOrToolId(
 
 export function resolveDocumentationFiles(
   documentation: string | undefined,
-  filePayloads: Record<string, any> | undefined,
+  filePayloads: Record<string, ExecutionFileEnvelope> | undefined,
   setDocUrl: (refs: string[]) => string,
 ): { documentation?: string; documentationUrl?: string } | { error: string } {
   if (!filePayloads || Object.keys(filePayloads).length === 0 || !documentation) {
@@ -338,9 +481,16 @@ export function buildScrapeInput(
 
 export function extractFilePayloadsForUpload(
   filesInput: string | undefined,
-  filePayloads: Record<string, any> | undefined,
+  filePayloads: Record<string, ExecutionFileEnvelope> | undefined,
 ):
-  | { files: Array<{ fileName: string; content: string; contentType?: string }> }
+  | {
+      files: Array<{
+        fileName: string;
+        content: string | Uint8Array;
+        contentType?: string;
+        contentLength?: number;
+      }>;
+    }
   | { error: string } {
   if (!filesInput || !filePayloads || Object.keys(filePayloads).length === 0) {
     return { files: [] };
@@ -353,23 +503,49 @@ export function extractFilePayloadsForUpload(
 
   const fileRefs = filesInput.split(",").map((ref) => ref.trim().replace(/^file::/, ""));
   const availableKeys = Object.keys(filePayloads);
-  const files: Array<{ fileName: string; content: string; contentType?: string }> = [];
+  const files: Array<{
+    fileName: string;
+    content: string | Uint8Array;
+    contentType?: string;
+    contentLength?: number;
+  }> = [];
 
   for (const ref of fileRefs) {
-    const fileData = filePayloads[ref];
-    if (fileData === undefined) {
+    const isRawRef = ref.endsWith(".raw");
+    const isExtractedRef = ref.endsWith(".extracted");
+    let key = ref;
+    if (isRawRef) key = key.slice(0, -4);
+    else if (isExtractedRef) key = key.slice(0, -10);
+    const envelope = filePayloads[key];
+    if (envelope === undefined) {
       return {
         error:
           `File reference 'file::${ref}' could not be resolved.\n` +
           `Available file keys: ${availableKeys.length > 0 ? availableKeys.join(", ") : "(none)"}`,
       };
     }
-    const content = typeof fileData === "string" ? fileData : JSON.stringify(fileData);
-    const fileName = ref.includes(".") ? ref : `${ref}.txt`;
+
+    if (!isExtractedRef) {
+      files.push({
+        fileName: envelope.filename,
+        content: decodeBase64ToUint8Array(envelope.rawBase64),
+        contentType: envelope.contentType,
+        contentLength: envelope.size,
+      });
+      continue;
+    }
+
+    const content =
+      typeof envelope.extracted === "string"
+        ? envelope.extracted
+        : JSON.stringify(envelope.extracted);
+    const baseName = envelope.filename.replace(/\.[^/.]+$/, "") || key;
+    const fileName = `${baseName}.txt`;
     files.push({
       fileName,
       content,
-      contentType: "text/plain",
+      contentType: "text/plain; charset=utf-8",
+      contentLength: new Blob([content]).size,
     });
   }
 
@@ -402,7 +578,7 @@ export const truncateResponseData = (result: any): any => {
 
 export const resolveBodyFileReferences = (
   body: string | undefined,
-  filePayloads: Record<string, any> | undefined,
+  filePayloads: Record<string, ExecutionFileEnvelope> | undefined,
 ): { success: true; body: string | undefined } | { success: false; error: string } => {
   if (!body || !filePayloads || Object.keys(filePayloads).length === 0) {
     if (body?.includes("file::")) {
@@ -414,22 +590,15 @@ export const resolveBodyFileReferences = (
     return { success: true, body };
   }
 
-  try {
-    const parsed = JSON.parse(body);
-    const fileResult = resolvePayloadWithFiles(parsed, filePayloads, true);
-    if (fileResult.success === false) return { success: false, error: fileResult.error };
-    return { success: true, body: JSON.stringify(fileResult.resolved) };
-  } catch {
-    const fileResult = resolvePayloadWithFiles(body, filePayloads, true);
-    if (fileResult.success === false) return { success: false, error: fileResult.error };
+  const validation = validateFileReferences(body, filePayloads);
+  if (validation.valid === false) {
     return {
-      success: true,
-      body:
-        typeof fileResult.resolved === "string"
-          ? fileResult.resolved
-          : JSON.stringify(fileResult.resolved),
+      success: false,
+      error: `File references not found: ${validation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
     };
   }
+
+  return { success: true, body };
 };
 
 export function getErrorMessage(err: unknown): string {
@@ -561,7 +730,13 @@ export const resolveSensitiveCredentials = (raw: unknown): Record<string, boolea
 export const buildSystemPendingOutput = (input: any) => {
   let systemConfig = { ...input };
   const { templateId, sensitiveCredentials: rawCreds, ...rest } = systemConfig;
-  const sensitiveCredentials = resolveSensitiveCredentials(rawCreds);
+
+  if (rawCreds && typeof rawCreds === "object") {
+    rest.credentials = {
+      ...rest.credentials,
+      ...Object.fromEntries(Object.keys(rawCreds).map((k) => [k, ""])),
+    };
+  }
 
   if (templateId) {
     const template = systems[templateId];
@@ -580,10 +755,9 @@ export const buildSystemPendingOutput = (input: any) => {
         credentials: { ...oauthCreds, ...rest.credentials },
       };
     }
+  } else {
+    systemConfig = { ...rest };
   }
 
-  return {
-    systemConfig,
-    requiredSensitiveFields: sensitiveCredentials ? Object.keys(sensitiveCredentials) : [],
-  };
+  return { systemConfig };
 };

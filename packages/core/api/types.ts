@@ -1,4 +1,10 @@
-import { Pagination, ServiceMetadata, Tool, ToolStep } from "@superglue/shared";
+import {
+  ExecutionFileEnvelope,
+  Pagination,
+  ServiceMetadata,
+  Tool,
+  ToolStep,
+} from "@superglue/shared";
 import type { Role } from "@superglue/shared";
 import { FastifyReply, FastifyRequest } from "fastify";
 import type { EEDataStore } from "../datastore/ee/types.js";
@@ -64,6 +70,7 @@ export interface OpenAPIStepResult {
   success: boolean;
   data?: unknown;
   error?: string;
+  stepFileKeys?: string[];
 }
 
 export interface OpenAPIRunMetadata {
@@ -102,6 +109,7 @@ export interface RunToolRequestOptions {
 export interface RunToolRequestBody {
   runId?: string;
   inputs?: Record<string, unknown>;
+  files?: Record<string, ExecutionFileEnvelope>;
   credentials?: Record<string, unknown>;
   options?: RunToolRequestOptions;
 }
@@ -110,7 +118,13 @@ export interface CreateRunRequestBody {
   toolId: string;
   toolConfig: Tool;
   toolResult?: unknown;
-  stepResults?: Array<{ stepId: string; success: boolean; data?: unknown; error?: string }>;
+  stepResults?: Array<{
+    stepId: string;
+    success: boolean;
+    data?: unknown;
+    error?: string;
+    stepFileKeys?: string[];
+  }>;
   toolPayload?: Record<string, unknown>;
   status: "success" | "failed" | "aborted";
   error?: string;

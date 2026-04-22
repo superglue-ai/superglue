@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { TunnelConnection, System } from "@superglue/shared";
 import { queryKeys } from "./query-keys";
 import { useSuperglueClient } from "./use-client";
-import { useOrg, useOrgOptional } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg, useOrgOptional } from "@/src/app/org-context";
 import { useConfig } from "@/src/app/config-context";
 import { tokenRegistry } from "@/src/lib/token-registry";
 
@@ -27,7 +27,7 @@ function useSystemsInternal(orgId: string | undefined) {
       const { items } = await client.listSystems(100);
       return items;
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   const tunnelsQuery = useQuery({
@@ -41,7 +41,7 @@ function useSystemsInternal(orgId: string | undefined) {
       const data = await response.json();
       return (data.data || []) as TunnelConnection[];
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   const isTunnelConnected = useCallback(
@@ -67,7 +67,7 @@ export function useSystems() {
 export function useSystemsOptional() {
   const org = useOrgOptional();
   const result = useSystemsInternal(org?.orgId);
-  if (!org?.orgId) {
+  if (!org) {
     return null;
   }
   return result;
@@ -82,7 +82,7 @@ export function useSystem(systemId: string, options?: { environment?: "dev" | "p
       const client = createClient();
       return client.getSystem(systemId, options);
     },
-    enabled: !!orgId && !!systemId,
+    enabled: hasResolvedOrgId(orgId) && !!systemId,
   });
 }
 

@@ -3,7 +3,6 @@ export type ServiceMetadata = {
   orgId?: string;
   userId?: string;
   userEmail?: string;
-  isRestricted?: boolean; // true if userId is from a restricted API key
   roleIds?: string[];
 };
 
@@ -119,6 +118,7 @@ export enum SupportedFileType {
   DOCX = "DOCX",
   ZIP = "ZIP",
   GZIP = "GZIP",
+  BINARY = "BINARY",
   RAW = "RAW",
   AUTO = "AUTO",
 }
@@ -155,6 +155,7 @@ export enum FileType {
   PDF = "PDF",
   DOCX = "DOCX",
   ZIP = "ZIP",
+  BINARY = "BINARY",
   RAW = "RAW",
   AUTO = "AUTO",
 }
@@ -338,11 +339,30 @@ export interface Tool extends BaseConfig {
   responseFilters?: ResponseFilter[];
 }
 
+export interface ExecutionFileEnvelope {
+  kind: "execution_file";
+  filename: string;
+  contentType: string;
+  size: number;
+  rawBase64: string;
+  fileType?: SupportedFileType;
+  extracted?: unknown;
+  parseError?: string;
+}
+
+export interface RawFileBytes {
+  kind: "raw_file_bytes";
+  base64: string;
+  filename: string;
+  contentType: string;
+}
+
 export interface ToolStepResult {
   stepId: string;
   success: boolean;
   data?: any;
   error?: string;
+  stepFileKeys?: string[];
 }
 
 export interface ToolResult {
@@ -434,10 +454,13 @@ export interface SuggestedTool {
   reason: string;
 }
 
-export type ExtractResult = BaseResult;
+export interface ExtractResult extends BaseResult {
+  file?: ExecutionFileEnvelope;
+}
 
 export type ExtractInputRequest = {
   file: Upload;
+  envelope?: boolean;
 };
 
 export type ToolInputRequest = {
@@ -498,12 +521,14 @@ export interface ApiCallArgs {
 
 export interface ExtractArgs {
   file: Upload;
+  envelope?: boolean;
 }
 
 export interface ToolArgs {
   id?: string;
   tool?: Tool;
   payload?: Record<string, any>;
+  files?: Record<string, ExecutionFileEnvelope>;
   credentials?: Record<string, string>;
   options?: RequestOptions;
   verbose?: boolean;

@@ -1,10 +1,10 @@
 import { UploadedFileInfo } from "@/src/lib/file-utils";
-import { ToolStep, System, ResponseFilter } from "@superglue/shared";
+import { ExecutionFileEnvelope, ToolStep, System, ResponseFilter } from "@superglue/shared";
 
 export interface PayloadState {
   manualPayloadText: string;
   uploadedFiles: UploadedFileInfo[];
-  filePayloads: Record<string, any>;
+  filePayloads: Record<string, ExecutionFileEnvelope>;
   computedPayload: Record<string, any>;
   hasUserEdited: boolean;
 }
@@ -42,8 +42,11 @@ export interface ToolConfigContextValue {
 
   setPayloadText: (text: string) => void;
   setUploadedFiles: (files: UploadedFileInfo[]) => void;
-  setFilePayloads: (payloads: Record<string, any>) => void;
-  setFilesAndPayloads: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
+  setFilePayloads: (payloads: Record<string, ExecutionFileEnvelope>) => void;
+  setFilesAndPayloads: (
+    files: UploadedFileInfo[],
+    payloads: Record<string, ExecutionFileEnvelope>,
+  ) => void;
   markPayloadEdited: () => void;
   markCurrentStateAsBaseline: () => void;
   setUnsavedChangesSuppressed: (suppressed: boolean) => void;
@@ -97,7 +100,7 @@ export interface CategorizedVariables {
 
 export interface CategorizedSources {
   manualPayload: Record<string, unknown>;
-  filePayloads: Record<string, unknown>;
+  filePayloads: Record<string, ExecutionFileEnvelope>;
   previousStepResults: Record<string, unknown>;
   currentItem: unknown;
   paginationData: Record<string, unknown>;

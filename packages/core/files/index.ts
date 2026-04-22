@@ -24,6 +24,30 @@ fileStrategyRegistry.register(new XMLStrategy()); // Priority 20: STRUCTURED_TEX
 fileStrategyRegistry.register(new YAMLStrategy()); // Priority 20: STRUCTURED_TEXT
 fileStrategyRegistry.register(new CSVStrategy()); // Priority 30: HEURISTIC_TEXT
 
+export async function detectAndParseFile(buffer: Buffer): Promise<{
+  fileType: SupportedFileType;
+  extracted?: unknown;
+  parseError?: string;
+}> {
+  const fileType = await fileStrategyRegistry.detectFileType(buffer);
+
+  if (fileType === SupportedFileType.BINARY) {
+    return { fileType };
+  }
+
+  try {
+    return {
+      fileType,
+      extracted: await parseFile(buffer, fileType),
+    };
+  } catch (error) {
+    return {
+      fileType,
+      parseError: (error as Error).message,
+    };
+  }
+}
+
 export async function parseFile(
   buffer: Buffer,
   fileType: SupportedFileType = SupportedFileType.AUTO,
@@ -51,6 +75,8 @@ export async function parseFile(
       return parseGZIP(buffer);
     case SupportedFileType.ZIP:
       return parseZIP(buffer);
+    case SupportedFileType.BINARY:
+      throw new Error("Cannot parse binary file as inline data");
     case SupportedFileType.RAW:
       return buffer.toString("utf8");
     case SupportedFileType.AUTO:

@@ -2,8 +2,6 @@
 
 Superglue supports both PostgreSQL and Microsoft SQL Server (including Azure SQL).
 
----
-
 ## PostgreSQL
 
 ### Step Configuration
@@ -13,7 +11,6 @@ Superglue supports both PostgreSQL and Microsoft SQL Server (including Azure SQL
   type: "request",
   systemId: "my_postgres_db",
   url: "postgres://<<my_postgres_db_user>>:<<my_postgres_db_password>>@<<my_postgres_db_host>>:<<my_postgres_db_port>>/<<my_postgres_db_database>>",
-  method: "POST",            // ignored for Postgres but required by schema
   body: '{"query": "SELECT * FROM users WHERE id = $1", "params": [<<userId>>]}'
 }
 ```
@@ -104,7 +101,6 @@ Use a data selector returning an array to execute a query per item:
   type: "request",
   systemId: "my_azure_sql",
   url: "mssql://<<my_azure_sql_user>>:<<my_azure_sql_password>>@<<my_azure_sql_host>>:<<my_azure_sql_port>>/<<my_azure_sql_database>>",
-  method: "POST",            // ignored for MSSQL but required by schema
   body: '{"query": "SELECT * FROM users WHERE id = @param1", "params": [<<userId>>]}'
 }
 ```
@@ -214,42 +210,4 @@ Use a data selector returning an array to execute a query per item:
 ```javascript
 // dataSelector: (sourceData) => sourceData.newUsers
 // body: {"query": "INSERT INTO users (name) VALUES (@param1)", "params": ["<<(sourceData) => sourceData.currentItem.name>>"]}
-```
-
-### Common Patterns
-
-**Simple SELECT:**
-
-```json
-{
-  "query": "SELECT id, name, email FROM users WHERE status = @param1",
-  "params": ["active"]
-}
-```
-
-**INSERT with OUTPUT:**
-
-```json
-{
-  "query": "INSERT INTO users (name, email, created_at) OUTPUT INSERTED.id, INSERTED.created_at VALUES (@param1, @param2, GETUTCDATE())",
-  "params": ["John Doe", "john@example.com"]
-}
-```
-
-**UPDATE with OUTPUT:**
-
-```json
-{
-  "query": "UPDATE users SET last_login = GETUTCDATE() OUTPUT INSERTED.id, INSERTED.last_login WHERE id = @param1",
-  "params": [123]
-}
-```
-
-**Stored Procedure Call:**
-
-```json
-{
-  "query": "EXEC dbo.GetUserById @param1",
-  "params": [123]
-}
 ```

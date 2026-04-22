@@ -1,6 +1,7 @@
 export const SKILL_NAMES = [
   "superglue-concepts",
   "data-handling",
+  "file-handling",
   "http-apis",
   "databases",
   "redis",
@@ -18,6 +19,8 @@ export const SKILL_INDEX: Record<SkillName, string> = {
   "superglue-concepts": "Core mental model — tools, systems, steps, execution pipeline",
   "data-handling":
     "<<>> syntax, data selectors, result envelopes, credential injection, sourceData structure, JS sandbox constraints",
+  "file-handling":
+    "File detection, binary vs text classification, producedFiles, file:: reference syntax, aliasing rules, auto-parsing, sourceData.__files__",
   "http-apis": "HTTP step config — auth patterns, pagination, retries, error detection",
   databases:
     "PostgreSQL and MSSQL/Azure SQL step config — connections, queries, parameterization, protocol differences",

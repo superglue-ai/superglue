@@ -4,6 +4,7 @@ import { useTools, useArchiveTool } from "@/src/queries/tools";
 import { useEnvironment } from "@/src/app/environment-context";
 import { type UploadedFileInfo } from "@/src/lib/file-utils";
 import {
+  ExecutionFileEnvelope,
   ToolStep,
   generateDefaultFromSchema,
   System,
@@ -64,12 +65,15 @@ export interface ToolPlaygroundProps {
   shouldStopExecution?: boolean;
   onStopExecution?: () => void;
   uploadedFiles?: UploadedFileInfo[];
-  filePayloads?: Record<string, any>;
+  filePayloads?: Record<string, ExecutionFileEnvelope>;
   onFilesUpload?: (files: File[]) => Promise<void>;
   onFileRemove?: (key: string) => void;
   isProcessingFiles?: boolean;
   totalFileSize?: number;
-  onFilesChange?: (files: UploadedFileInfo[], payloads: Record<string, any>) => void;
+  onFilesChange?: (
+    files: UploadedFileInfo[],
+    payloads: Record<string, ExecutionFileEnvelope>,
+  ) => void;
   renderAgentInline?: boolean;
   initialError?: string;
 }
