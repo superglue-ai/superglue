@@ -224,9 +224,9 @@ export function ToolConfigProvider({
 
   const [manualPayloadText, setManualPayloadText] = useState(initialPayload);
   const [localUploadedFiles, setLocalUploadedFiles] = useState<UploadedFileInfo[]>([]);
-  const [localFilePayloads, setLocalFilePayloads] = useState<
-    Record<string, ExecutionFileEnvelope>
-  >({});
+  const [localFilePayloads, setLocalFilePayloads] = useState<Record<string, ExecutionFileEnvelope>>(
+    {},
+  );
   const [hasUserEdited, setHasUserEdited] = useState(false);
   const initialStateRef = useRef<string | null>(null);
   const [initialStateReady, setInitialStateReady] = useState(false);

@@ -111,7 +111,9 @@ export function useAgentRequest({
     const parts: string[] = ["[SESSION STATE]", `timestamp: ${timestamp.toISOString()}`];
 
     if (added.length > 0) {
-      parts.push(`changes:\n${added.map((file) => `- added file ${file.name} (file::${file.key})`).join("\n")}`);
+      parts.push(
+        `changes:\n${added.map((file) => `- added file ${file.name} (file::${file.key})`).join("\n")}`,
+      );
     }
     if (removed.length > 0) {
       const existingChanges = parts.find((part) => part.startsWith("changes:\n"));
@@ -124,9 +126,7 @@ export function useAgentRequest({
     }
 
     if (currentFiles.length > 0) {
-      const fileList = currentFiles
-        .map((f) => `- ${f.name} (file::${f.key})`)
-        .join("\n");
+      const fileList = currentFiles.map((f) => `- ${f.name} (file::${f.key})`).join("\n");
       parts.push(`available_files:\n${fileList}`);
     } else {
       parts.push("available_files: none");

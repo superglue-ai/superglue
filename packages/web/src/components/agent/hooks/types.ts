@@ -79,9 +79,7 @@ export interface UseAgentFileUploadReturn {
   pendingFiles: UploadedFile[];
   sessionFiles: UploadedFile[];
   filePayloads: Record<string, ExecutionFileEnvelope>;
-  setFilePayloads: React.Dispatch<
-    React.SetStateAction<Record<string, ExecutionFileEnvelope>>
-  >;
+  setFilePayloads: React.Dispatch<React.SetStateAction<Record<string, ExecutionFileEnvelope>>>;
   isProcessingFiles: boolean;
   isDragging: boolean;
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;

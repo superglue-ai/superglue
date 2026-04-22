@@ -49,10 +49,10 @@ Binary responses expose `stepFileKeys` and populate `sourceData.__files__`. Stru
 
 Use `file::<alias>.<suffix>` in step config `body` / `content` fields:
 
-| Suffix       | Returns                     | Use case                              |
-| ------------ | --------------------------- | ------------------------------------- |
-| `.raw`       | Original bytes (Uint8Array) | SFTP/FTP put, HTTP raw body upload    |
-| `.base64`    | Base64-encoded string       | APIs expecting base64 inside JSON/XML |
+| Suffix       | Returns                     | Use case                                |
+| ------------ | --------------------------- | --------------------------------------- |
+| `.raw`       | Original bytes (Uint8Array) | SFTP/FTP put, HTTP raw body upload      |
+| `.base64`    | Base64-encoded string       | APIs expecting base64 inside JSON/XML   |
 | `.extracted` | Parsed content              | Text fields needing parsed file content |
 
 Constraints:
