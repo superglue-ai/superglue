@@ -403,7 +403,9 @@ interface SuggestionCallbacks {
   onClose?: () => void;
 }
 
-function coerceReactRendererOptions(options: unknown): ConstructorParameters<typeof ReactRenderer>[1] {
+function coerceReactRendererOptions(
+  options: unknown,
+): ConstructorParameters<typeof ReactRenderer>[1] {
   // CI can materialize multiple physical @tiptap/core installs, so cast the full
   // constructor options object at the ReactRenderer boundary instead of any field.
   return options as ConstructorParameters<typeof ReactRenderer>[1];
