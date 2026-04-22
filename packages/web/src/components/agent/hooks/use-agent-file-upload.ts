@@ -4,9 +4,9 @@ import {
   formatBytes,
   generateUniqueKey,
   MAX_TOTAL_FILE_SIZE_CHAT,
-  processAndExtractFile,
   sanitizeFileName,
 } from "@/src/lib/file-utils";
+import { ExecutionFileEnvelope } from "@superglue/shared";
 import { useSuperglueClient } from "@/src/queries/use-client";
 import { useCallback, useRef, useState } from "react";
 import type { UploadedFile, UseAgentFileUploadReturn } from "./types";
@@ -19,7 +19,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
   const createClient = useSuperglueClient();
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
   const [sessionFiles, setSessionFiles] = useState<UploadedFile[]>([]);
-  const [filePayloads, setFilePayloads] = useState<Record<string, any>>({});
+  const [filePayloads, setFilePayloads] = useState<Record<string, ExecutionFileEnvelope>>({});
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,13 +32,12 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
 
       try {
         const currentPayloadSize = Object.values(filePayloads).reduce((sum, content) => {
-          const str = typeof content === "string" ? content : JSON.stringify(content);
-          return sum + new Blob([str]).size;
+          return sum + content.size;
         }, 0);
 
         const existingKeys = allFiles.map((f) => f.key);
         const newFiles: UploadedFile[] = [];
-        const newPayloads: Record<string, any> = {};
+        const newPayloads: Record<string, ExecutionFileEnvelope> = {};
 
         const client = createClient();
 
@@ -64,14 +63,23 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
             const fileInfo: UploadedFile = {
               name: displayName,
               size: file.size,
+              originalSize: file.size,
+              contentType: file.type || "application/octet-stream",
               key,
               status: "processing",
             };
             newFiles.push(fileInfo);
             setPendingFiles((prev) => [...prev, fileInfo]);
 
-            const parsedData = await processAndExtractFile(file, client);
-            newPayloads[key] = parsedData;
+            const extractResult = await client.extract({ file, envelope: true });
+            if (!extractResult.success) {
+              throw new Error(extractResult.error || "Failed to extract data");
+            }
+            if (!extractResult.file) {
+              throw new Error("Extract response did not include a file envelope");
+            }
+
+            newPayloads[key] = extractResult.file;
             existingKeys.push(key);
 
             setPendingFiles((prev) =>
@@ -98,8 +106,7 @@ export function useAgentFileUpload({ toast }: UseAgentFileUploadOptions): UseAge
         }
 
         const batchContentSize = Object.values(newPayloads).reduce((sum, content) => {
-          const str = typeof content === "string" ? content : JSON.stringify(content);
-          return sum + new Blob([str]).size;
+          return sum + content.size;
         }, 0);
 
         if (currentPayloadSize + batchContentSize > MAX_TOTAL_FILE_SIZE_CHAT) {

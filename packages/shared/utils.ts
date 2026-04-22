@@ -15,7 +15,7 @@ export * from "./utils/token-count.js";
 
 export type ConnectionProtocol = "http" | "postgres" | "mssql" | "redis" | "sftp" | "smb";
 
-export const getConnectionProtocol = (url: string): ConnectionProtocol => {
+export function inferProtocolFromUrl(url: string): ConnectionProtocol {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) return "postgres";
   if (url.startsWith("mssql://") || url.startsWith("sqlserver://")) return "mssql";
   if (url.startsWith("redis://") || url.startsWith("rediss://")) return "redis";
@@ -23,7 +23,10 @@ export const getConnectionProtocol = (url: string): ConnectionProtocol => {
     return "sftp";
   if (url.startsWith("smb://")) return "smb";
   return "http";
-};
+}
+
+// Backward-compatible alias while the rest of OSS catches up to hosted naming.
+export const getConnectionProtocol = inferProtocolFromUrl;
 
 export function isAbortError(error: unknown): boolean {
   if (!error) return false;
@@ -168,6 +171,185 @@ export const ALLOWED_FILE_EXTENSIONS = [
   ".md",
   ".rst",
 ] as const;
+
+type ParsedToolInputSchema = {
+  rawSchema: any | null;
+  payloadSchema: any | null;
+  filesSchema: any | null;
+  credentialsSchema: any | null;
+  hasNestedSections: boolean;
+};
+
+function tryParseSchema(schema: any): any | null {
+  if (!schema) return null;
+  if (typeof schema === "string") {
+    try {
+      return JSON.parse(schema);
+    } catch {
+      return null;
+    }
+  }
+  return schema;
+}
+
+function cloneSchema<T>(schema: T): T {
+  return structuredClone(schema);
+}
+
+function stripTopLevelReservedSchemaKeys(schema: any, reservedKeys: string[]): any | null {
+  if (!schema || typeof schema !== "object") {
+    return schema;
+  }
+
+  const cloned = cloneSchema(schema);
+  const properties =
+    cloned &&
+    typeof cloned === "object" &&
+    cloned.properties &&
+    typeof cloned.properties === "object"
+      ? cloned.properties
+      : undefined;
+
+  if (!properties) {
+    return cloned;
+  }
+
+  let removedAny = false;
+  for (const key of reservedKeys) {
+    if (key in properties) {
+      delete properties[key];
+      removedAny = true;
+    }
+  }
+
+  if (!removedAny) {
+    return cloned;
+  }
+
+  if (Array.isArray(cloned.required)) {
+    const filteredRequired = cloned.required.filter(
+      (field: string) => !reservedKeys.includes(field),
+    );
+    if (filteredRequired.length > 0) {
+      cloned.required = filteredRequired;
+    } else {
+      delete cloned.required;
+    }
+  }
+
+  if (Object.keys(properties).length === 0) {
+    delete cloned.properties;
+  }
+
+  const remainingProperties =
+    cloned.properties && typeof cloned.properties === "object"
+      ? Object.keys(cloned.properties)
+      : [];
+  const hasCompositeSchema =
+    (Array.isArray(cloned.allOf) && cloned.allOf.length > 0) ||
+    (Array.isArray(cloned.anyOf) && cloned.anyOf.length > 0) ||
+    (Array.isArray(cloned.oneOf) && cloned.oneOf.length > 0) ||
+    Boolean(cloned.patternProperties) ||
+    Boolean(cloned.additionalProperties);
+
+  if (remainingProperties.length === 0 && !hasCompositeSchema) {
+    return null;
+  }
+
+  return cloned;
+}
+
+export function getToolInputSchemaSections(schema: any): ParsedToolInputSchema {
+  const parsed = tryParseSchema(schema);
+  const parsedProperties =
+    parsed && typeof parsed === "object" && parsed.properties ? parsed.properties : undefined;
+  const topLevelKeys =
+    parsedProperties && typeof parsedProperties === "object" ? Object.keys(parsedProperties) : [];
+  const hasLegacyCredentialSections = Boolean(
+    parsedProperties?.payload &&
+    parsedProperties?.credentials &&
+    topLevelKeys.every((key) => ["payload", "credentials"].includes(key)),
+  );
+
+  if (!parsed) {
+    return {
+      rawSchema: null,
+      payloadSchema: null,
+      filesSchema: null,
+      credentialsSchema: null,
+      hasNestedSections: false,
+    };
+  }
+
+  if (hasLegacyCredentialSections) {
+    return {
+      rawSchema: parsed,
+      payloadSchema: parsedProperties?.payload || null,
+      filesSchema: null,
+      credentialsSchema: parsedProperties?.credentials || null,
+      hasNestedSections: true,
+    };
+  }
+
+  return {
+    rawSchema: parsed,
+    payloadSchema: stripTopLevelReservedSchemaKeys(parsed, ["__files"]),
+    filesSchema: parsedProperties?.__files || null,
+    credentialsSchema: null,
+    hasNestedSections: false,
+  };
+}
+
+function schemaSectionHasRequiredFields(sectionSchema: any): boolean {
+  return Boolean(
+    sectionSchema &&
+    typeof sectionSchema === "object" &&
+    Array.isArray(sectionSchema.required) &&
+    sectionSchema.required.length > 0,
+  );
+}
+
+export function buildToolInputSchemaSections({
+  payloadSchema,
+  filesSchema,
+}: {
+  payloadSchema?: any | null;
+  filesSchema?: any | null;
+}): any | undefined {
+  const hasFiles = Boolean(filesSchema);
+
+  if (!hasFiles) {
+    return payloadSchema || undefined;
+  }
+
+  const baseSchema =
+    payloadSchema && typeof payloadSchema === "object"
+      ? cloneSchema(payloadSchema)
+      : { type: "object", properties: {} };
+  const baseProperties =
+    baseSchema.properties && typeof baseSchema.properties === "object"
+      ? { ...baseSchema.properties }
+      : {};
+
+  baseProperties.__files = filesSchema;
+  baseSchema.type = baseSchema.type || "object";
+  baseSchema.properties = baseProperties;
+
+  const required = Array.isArray(baseSchema.required)
+    ? baseSchema.required.filter((field: string) => field !== "__files")
+    : [];
+  if (schemaSectionHasRequiredFields(filesSchema)) {
+    required.push("__files");
+  }
+
+  if (required.length > 0) {
+    baseSchema.required = Array.from(new Set(required));
+  } else {
+    delete baseSchema.required;
+  }
+
+  return baseSchema;
+}
 
 // ---- Schema inference configuration (tunable) ----
 const SMALL_ARRAY_THRESHOLD = 100; // Arrays smaller than this analyze all items
@@ -492,16 +674,12 @@ export const isSensitiveCredentialKey = (key: string): boolean => {
   return !NON_SENSITIVE_CREDENTIAL_KEYS.has(key.toLowerCase().trim());
 };
 
-export const maskSystemCredentials = (
-  credentials: Record<string, any> | undefined,
-): Record<string, any> | undefined => {
-  if (!credentials) return undefined;
-  return Object.fromEntries(
-    Object.entries(credentials).map(([key, value]) => [
-      key,
-      isSensitiveCredentialKey(key) ? `<<masked_${key}>>` : value,
-    ]),
-  );
+export const maskCredentialValue = (key: string, value: any): string => {
+  if (value == null || value === "") return "";
+  const strValue = String(value);
+  if (!isSensitiveCredentialKey(key)) return strValue;
+  if (strValue.length <= 4) return "****";
+  return strValue.slice(0, 4) + "****";
 };
 
 export function isMaskedValue(value: any): boolean {
@@ -773,7 +951,7 @@ export function composeUrl(host: string, path: string) {
 // System Auth Status
 // ============================================================================
 
-export type SystemAuthType = "none" | "oauth" | "apikey";
+export type SystemAuthType = "none" | "oauth" | "apikey" | "connection_string";
 
 export interface SystemAuthStatus {
   authType: SystemAuthType;
@@ -781,11 +959,21 @@ export interface SystemAuthStatus {
   label: string;
 }
 
+export interface ConnectionFieldDef {
+  key: string;
+  label: string;
+  placeholder?: string;
+  type?: "text" | "password" | "number";
+  required?: boolean;
+  defaultValue?: string;
+}
+
 /**
  * Detect the authentication type from system credentials
  */
 export const detectSystemAuthType = (
   credentials: Record<string, any> | undefined,
+  options?: { url?: string; templateName?: string },
 ): SystemAuthType => {
   if (!credentials || Object.keys(credentials).length === 0) return "none";
 
@@ -800,6 +988,19 @@ export const detectSystemAuthType = (
   const hasOAuthFields = oauthFields.some((field) => field in credentials);
 
   if (hasOAuthFields) return "oauth";
+
+  if (options?.url || options?.templateName) {
+    const isConnectionStringProtocol =
+      options.url?.match(/^(postgres|postgresql|redis|rediss|sftp|ftp|ftps|sqlserver):\/\//) ||
+      options.templateName?.match(/^(postgres|redis_direct|azure_sql)$/);
+    if (isConnectionStringProtocol) return "connection_string";
+  }
+
+  const connectionStringKeys = ["host", "hostname", "port", "database", "username"];
+  const matchingKeys = connectionStringKeys.filter((k) => k in credentials);
+  if (matchingKeys.length >= 2 && ("host" in credentials || "hostname" in credentials))
+    return "connection_string";
+
   return "apikey";
 };
 
@@ -810,17 +1011,39 @@ export const detectSystemAuthType = (
 export const getSystemAuthStatus = (system: {
   credentials?: Record<string, any>;
   multiTenancyMode?: string;
+  url?: string;
+  templateName?: string;
 }): SystemAuthStatus => {
   const creds = system.credentials || {};
-  const authType = detectSystemAuthType(creds);
+  const authType = detectSystemAuthType(creds, {
+    url: system.url,
+    templateName: system.templateName,
+  });
   const isMultiTenancy = system.multiTenancyMode === "enabled";
 
   if (authType === "none") {
     return { authType: "none", isComplete: true, label: "No auth" };
   }
 
+  if (authType === "connection_string") {
+    const hasHost = Boolean(creds.host || creds.hostname);
+    const hasAuth = Boolean(creds.username || creds.password);
+    const isComplete = hasHost && hasAuth;
+    if (isMultiTenancy) {
+      return {
+        authType: "connection_string",
+        isComplete: hasHost,
+        label: hasHost ? "Ready for end users" : "Connection fields incomplete",
+      };
+    }
+    return {
+      authType: "connection_string",
+      isComplete,
+      label: isComplete ? "Connected" : "Connection incomplete",
+    };
+  }
+
   if (authType === "oauth") {
-    // In multi-tenancy mode, check for OAuth template fields (not tokens)
     if (isMultiTenancy) {
       const hasAuthUrl = Boolean(creds.auth_url);
       const hasTokenUrl = Boolean(creds.token_url);
@@ -833,7 +1056,6 @@ export const getSystemAuthStatus = (system: {
       };
     }
 
-    // Normal mode: check for access token
     const grantType = creds.grant_type || "authorization_code";
     const hasAccessToken = Boolean(creds.access_token);
     const hasRefreshToken = Boolean(creds.refresh_token);

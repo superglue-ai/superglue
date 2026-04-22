@@ -2,36 +2,26 @@
 
 Systems are reusable building blocks for superglue tools that store system configuration details and credentials.
 
-## Credential Model
+### Tool use
 
-Two fields in system creation and editing tools, split by purpose:
+Use `create_system` with credentials input as key,value pairs for system auth configuration. Leave sensitive credentials or auth config values you want the user to add blank, e.g. `credentials: { api_key: "" }`. The `edit_system` tool works the same way. If users want to add or replace credentials or update the system config in some way, use `edit_system`. Do NOT tell users to navigate to some other UI to make the changes there.
 
-### `credentials` — OAuth flow metadata and completely insensitive credentials (no secrets, no identifiers)
+IMPORTANT: If `find_system` returns `connectionFields` in `matchingSystemKnowledge`, use those field keys as the credential keys in your `credentials` object.
 
-```
-auth_url, token_url, scopes, grant_type, redirect_uri
-```
+`storedCredentials` in `find_system` output shows what's actually stored, with sensitive values prefix-masked (e.g., `sk_proj****`).
 
-### `sensitiveCredentials` — ALL credential values (client ids, client secrets, api keys, usernames, passwords etc.)
+### Credential use in superglue tool configurations
 
-```json
-{ "client_id": true, "client_secret": true, "api_key": true }
-```
-
-Setting a field to `true` triggers a **secure UI** where the user enters the actual value(s) The agent never sees the raw secrets — only masked placeholders like `<<masked_api_key>>`.
-
-### Credential Use in Tools
-
-For every systemId referenced in a tool, credentials are namespaced as `<<systemId_credentialKey>>` and can be referenced in configs. They are NOT injected automatically but must explicitly be referenced in headers.
+For every systemId referenced in a tool, credentials are namespaced as `<<systemId_credentialKey>>` and must be explicitly placed in the step config. For HTTP: in headers. For databases/Redis/file servers: in the connection URL. Nothing is injected automatically.
 
 ```
-System id="stripe", sensitiveCredentials stored: api_key
+System id="stripe", storedCredentials: api_key → "sk_proj****"
 → Available as: <<stripe_api_key>>
 ```
 
 OAuth tokens (`access_token`, `refresh_token`) are auto-refreshed before each step execution. Access tokens must also be explicitly referenced in step headers to authenticate requests.
 
-### System URL in Tools
+### System URLs in superglue tool configurations
 
 System URLs are available as `<<systemId_url>>` and should be used in step configs instead of hardcoding base URLs:
 
@@ -46,19 +36,11 @@ Using system URL variables enables the same tool to work across environments wit
 
 ## System Knowledge
 
-System knowledge auto-populates system endpoints, documentation URLs, and (for some) OAuth configuration. User-provided values always override system knowledge defaults.
+System knowledge auto-populates system endpoints, documentation URLs, and sometimes non-secret OAuth metadata such as `auth_url`, `token_url`, or `scopes`. User-provided values always override system knowledge defaults.
 
 IMPORTANT: Never mention templates, system knowledge, or internal system configuration sources to users. Use available system knowledge silently to set up systems correctly. If information is missing, ask the user directly.
 
-### Systems with Template-Provided OAuth Configuration
-
-Some templates may already include non-sensitive OAuth configuration such as URLs, scopes, or a public `client_id`.
-
-If the template does not already provide the OAuth client configuration you need, ask the user to provide `client_id` and `client_secret`.
-
-### Other Systems
-
-Many services have system knowledge that contains the API URL and docs URL but require user-provided credentials.
+Many services have system knowledge that contains the API URL, docs URL, and OAuth metadata, but in OSS users still need to provide their own OAuth app credentials when the provider requires them.
 
 ### System Knowledge Resolution
 
@@ -76,32 +58,28 @@ When looking up which system knowledge applies to a system, resolution order is:
 create_system({ id: "slack", templateId: "slack" })
 ```
 
-`templateId` auto-populates: URL, name, OAuth settings, documentation references. Some systems also include `systemSpecificInstructions` (e.g., Jira has instructions about cloud ID requirements and deprecated endpoints). Read and follow them when building tools / creating systems.
+`templateId` auto-populates: URL, name, OAuth metadata, and documentation references. Some systems also include `systemSpecificInstructions` (e.g., Jira has instructions about cloud ID requirements and deprecated endpoints). Read and follow them when building tools / creating systems.
 
 ## OAuth Setup Flow
 
-### For Systems with Template-Provided OAuth Configuration
+### For OAuth Systems
 
-1. `create_system` with `templateId`
-2. `authenticate_oauth` with `systemId` and `scopes`
-3. User completes OAuth in browser popup
-4. Tokens auto-saved to system
+Tell users the required steps to retrieve OAuth credentials for the system they are trying to set up if you know them.
 
-### For Custom OAuth
-
-1. `create_system` with `sensitiveCredentials: { client_id: true, client_secret: true }`
-2. User enters `client_id` and `client_secret` in secure UI
+1. `create_system` with `credentials: { client_id: "", client_secret: "" }`
+2. User enters `client_id` and `client_secret` in the credential prompt
 3. `authenticate_oauth` with `systemId`, `scopes`, and optionally `auth_url`, `token_url`
 4. User completes OAuth flow
 
+In OSS, `client_id` and `client_secret` must come from the user's own OAuth app setup.
+
+Note: NEVER ask the user for OAuth access tokens or refresh tokens directly. These are obtained automatically through the OAuth authentication flow via `authenticate_oauth`.
+
 ### OAuth Credential Resolution
 
-`authenticate_oauth` resolves credentials in order:
+`authenticate_oauth` resolves credentials from the system's stored OAuth configuration. Template metadata may still provide non-secret defaults like `auth_url`, `token_url`, or `scopes`, but OSS does not supply `client_id` or `client_secret`.
 
-1. System credentials (`system.credentials.client_id` / `client_secret`)
-2. Template-provided OAuth client configuration, if present
-
-If missing, use `edit_system` to store them first.
+If client credentials are missing, use `edit_system` to store them first.
 
 ### OAuth Configuration Options
 
@@ -174,7 +152,7 @@ create_system({
   id: "salesforce",
   environment: "dev",
   url: "https://sandbox.salesforce.com",
-  sensitiveCredentials: { client_secret: true, api_key: true }
+  credentials: { client_secret: "", api_key: "" }
 })
 ```
 
@@ -184,7 +162,7 @@ create_system({
 
 Tools reference systems by ID only. Execution mode determines which environment is used (dev mode falls back to prod if no dev system exists).
 
-## call_system and Credential Injection
+## Call_system behavior
 
 `call_system` uses the `systemId` parameter to:
 
@@ -193,28 +171,4 @@ Tools reference systems by ID only. Execution mode determines which environment 
 3. Auto-refresh OAuth tokens before the request
 4. Route to the correct protocol strategy (HTTP, Postgres, MSSQL, Redis, FTP/SFTP, SMB)
 
-Credential placeholders (`<<systemId_credKey>>`) must exactly match the keys stored in `system.credentials`. URL placeholders (`<<systemId_url>>`) reference the system's `url` field. Both must be referenced explicitly and are NOT auto-injected.
-
-### SMB Credential Injection
-
-For SMB systems (Windows file shares), credentials must be embedded in the URL:
-
-```json
-{
-  "systemId": "my_smb_system",
-  "url": "smb://<<my_smb_system_username>>:<<my_smb_system_password>>@fileserver.example.com/ShareName",
-  "body": "{\"operation\": \"list\", \"path\": \"/\"}"
-}
-```
-
-Key points:
-
-- Username and password placeholders go **before the `@`** in the URL
-- The first path segment after the host is the **share name** (e.g., `ShareName`)
-- Additional path segments become the base path for operations
-
-Before making SMB calls, verify with the user:
-
-1. The system credentials have access to the specified share
-2. The share name is correct (case-sensitive on some servers)
-3. For domain authentication, the username should be stored as `DOMAIN\username`
+Credential placeholders (`<<systemId_credKey>>`) must exactly match the keys stored in `system.credentials`. URL placeholders (`<<systemId_url>>`) reference the system's `url` field. Both must be placed explicitly in the step config — nothing is used automatically.

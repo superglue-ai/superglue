@@ -26,7 +26,7 @@
     "d3-time": "^3.1.0",
     "dotenv": "^16.4.7",
     "dotenv-cli": "^8.0.0",
-    "posthog-js": "^1.354.0",
+    "posthog-js": "^1.370.0",
     "superglue": "github:superglue-ai/superglue#main",
     "typescript": "^5.0.0"
   },

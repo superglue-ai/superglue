@@ -1,4 +1,5 @@
 import {
+  ExecutionFileEnvelope,
   ToolStep,
   System,
   ResponseFilter,
@@ -44,6 +45,8 @@ export interface StepExecutionResult {
   error?: string;
   updatedStep?: any;
   runId?: string;
+  stepFileKeys?: string[];
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
 }
 
 export interface FinalTransformExecutionResult {
@@ -86,6 +89,7 @@ export async function executeSingleStep({
   client,
   step,
   payload,
+  files,
   previousResults,
   onRunIdGenerated,
   mode,
@@ -94,6 +98,7 @@ export async function executeSingleStep({
   client: SuperglueClient;
   step: ToolStep;
   payload: any;
+  files?: Record<string, ExecutionFileEnvelope>;
   previousResults: Record<string, any>;
   onRunIdGenerated?: (runId: string) => void;
   mode?: "dev" | "prod";
@@ -110,6 +115,7 @@ export async function executeSingleStep({
     const result = await client.executeStep({
       step,
       payload,
+      files,
       previousResults,
       runId: stepRunId,
       mode,
@@ -123,6 +129,8 @@ export async function executeSingleStep({
       error: result.error,
       updatedStep: result.updatedStep,
       runId: stepRunId,
+      stepFileKeys: result.stepFileKeys,
+      producedFiles: result.producedFiles,
     };
   } catch (error: any) {
     return {
@@ -138,6 +146,7 @@ export async function executeToolStepByStep({
   client,
   tool,
   payload,
+  files,
   onStepComplete,
   onBeforeStep,
   onStepRunIdChange,
@@ -147,6 +156,7 @@ export async function executeToolStepByStep({
   client: SuperglueClient;
   tool: Tool;
   payload: any;
+  files?: Record<string, ExecutionFileEnvelope>;
   onStepComplete?: (stepIndex: number, result: StepExecutionResult) => void;
   onBeforeStep?: (stepIndex: number, step: any) => Promise<boolean>;
   onStepRunIdChange?: (stepRunId: string) => void;
@@ -166,6 +176,7 @@ export async function executeToolStepByStep({
   };
 
   const previousResults: Record<string, any> = {};
+  let currentFiles: Record<string, ExecutionFileEnvelope> = { ...(files || {}) };
 
   for (let i = 0; i < tool.steps.length; i++) {
     state.currentStepIndex = i;
@@ -186,6 +197,7 @@ export async function executeToolStepByStep({
       client,
       step,
       payload,
+      files: currentFiles,
       previousResults,
       onRunIdGenerated: onStepRunIdChange,
       mode,
@@ -197,6 +209,9 @@ export async function executeToolStepByStep({
     if (result.success) {
       state.completedSteps.push(step.id);
       previousResults[step.id] = result.data;
+      if (result.producedFiles && Object.keys(result.producedFiles).length > 0) {
+        currentFiles = { ...currentFiles, ...result.producedFiles };
+      }
 
       // Update the tool with any returned step configuration (normalization, etc.)
       if (result.updatedStep) {
@@ -231,6 +246,7 @@ export async function executeToolStepByStep({
       outputSchema: tool.outputSchema,
       inputSchema: tool.inputSchema,
       payload,
+      files: currentFiles,
       previousResults,
       responseFilters: tool.responseFilters,
       onRunIdGenerated: onStepRunIdChange,
@@ -264,6 +280,7 @@ export async function executeOutputTransform({
   outputSchema,
   inputSchema,
   payload,
+  files,
   previousResults,
   onRunIdGenerated,
   responseFilters,
@@ -273,6 +290,7 @@ export async function executeOutputTransform({
   outputSchema: any;
   inputSchema: any;
   payload: any;
+  files?: Record<string, ExecutionFileEnvelope>;
   previousResults: Record<string, any>;
   onRunIdGenerated?: (runId: string) => void;
   responseFilters?: ResponseFilter[];
@@ -290,6 +308,7 @@ export async function executeOutputTransform({
       outputSchema,
       inputSchema,
       payload,
+      files,
       stepResults: previousResults,
       responseFilters,
       runId: transformRunId,

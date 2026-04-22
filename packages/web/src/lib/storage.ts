@@ -148,10 +148,58 @@ function ensureMigration(): Promise<void> {
 function getOrgScopedKey(toolId: string): string {
   const orgScope = getCacheScopeIdentifier();
   // If no org scope (e.g., not logged in), use toolId directly
-  if (!orgScope) {
+  if (orgScope === null) {
     return toolId;
   }
   return `${orgScope}:${toolId}`;
+}
+
+async function getPayloadWithLegacyFallback(
+  db: IDBPDatabase<SuperglueDB>,
+  scopedKey: string,
+  legacyKey: string,
+): Promise<string | null> {
+  const scopedValue = await db.get("payloads", scopedKey);
+  if (scopedValue !== undefined && scopedValue !== null) {
+    return scopedValue;
+  }
+
+  if (scopedKey === legacyKey) {
+    return null;
+  }
+
+  const legacyValue = await db.get("payloads", legacyKey);
+  if (legacyValue !== undefined && legacyValue !== null) {
+    await db.put("payloads", legacyValue, scopedKey);
+    await db.delete("payloads", legacyKey);
+    return legacyValue;
+  }
+
+  return null;
+}
+
+async function getDraftWithLegacyFallback(
+  db: IDBPDatabase<SuperglueDB>,
+  scopedKey: string,
+  legacyKey: string,
+): Promise<ToolDraft | null> {
+  const scopedValue = await db.get("drafts", scopedKey);
+  if (scopedValue !== undefined && scopedValue !== null) {
+    return scopedValue;
+  }
+
+  if (scopedKey === legacyKey) {
+    return null;
+  }
+
+  const legacyValue = await db.get("drafts", legacyKey);
+  if (legacyValue !== undefined && legacyValue !== null) {
+    await db.put("drafts", legacyValue, scopedKey);
+    await db.delete("drafts", legacyKey);
+    return legacyValue;
+  }
+
+  return null;
 }
 
 export async function getPayload(toolId: string): Promise<string | null> {
@@ -159,7 +207,7 @@ export async function getPayload(toolId: string): Promise<string | null> {
   await ensureMigration();
   const db = await getDB();
   const scopedKey = getOrgScopedKey(toolId);
-  return db.get("payloads", scopedKey) ?? null;
+  return getPayloadWithLegacyFallback(db, scopedKey, toolId);
 }
 
 export async function setPayload(toolId: string, payload: string): Promise<void> {
@@ -169,8 +217,14 @@ export async function setPayload(toolId: string, payload: string): Promise<void>
   const scopedKey = getOrgScopedKey(toolId);
   if (payload.trim() === "") {
     await db.delete("payloads", scopedKey);
+    if (scopedKey !== toolId) {
+      await db.delete("payloads", toolId);
+    }
   } else {
     await db.put("payloads", payload, scopedKey);
+    if (scopedKey !== toolId) {
+      await db.delete("payloads", toolId);
+    }
   }
 }
 
@@ -193,7 +247,7 @@ export async function getLatestDraft(toolId: string): Promise<ToolDraft | null> 
   await ensureMigration();
   const db = await getDB();
   const scopedKey = getOrgScopedKey(toolId);
-  return db.get("drafts", scopedKey) ?? null;
+  return getDraftWithLegacyFallback(db, scopedKey, toolId);
 }
 
 // Normalize draft content for comparison (exclude id, createdAt, toolId)
@@ -218,7 +272,7 @@ export async function addDraft(
   const scopedKey = getOrgScopedKey(toolId);
 
   // Check if content differs from existing draft
-  const existingDraft = await db.get("drafts", scopedKey);
+  const existingDraft = await getDraftWithLegacyFallback(db, scopedKey, toolId);
   if (existingDraft) {
     const existingContent = getDraftContent(existingDraft);
     const newContent = getDraftContent(draft);
@@ -235,6 +289,9 @@ export async function addDraft(
 
   // Simply replace the draft for this tool
   await db.put("drafts", fullDraft, scopedKey);
+  if (scopedKey !== toolId) {
+    await db.delete("drafts", toolId);
+  }
 
   // Notify listeners
   notifyDraftChange(toolId);
@@ -247,6 +304,9 @@ export async function deleteAllDrafts(toolId: string): Promise<void> {
   const scopedKey = getOrgScopedKey(toolId);
 
   await db.delete("drafts", scopedKey);
+  if (scopedKey !== toolId) {
+    await db.delete("drafts", toolId);
+  }
 
   // Notify listeners
   notifyDraftChange(toolId);

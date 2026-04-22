@@ -3,9 +3,11 @@ import { resolveOAuthConfig } from "@/src/lib/oauth-utils";
 import { applyDiffsToConfig } from "@/src/lib/config-diff-utils";
 import {
   ConfirmationAction,
+  buildToolInputSchemaSections,
+  ExecutionFileEnvelope,
   ToolResult,
+  getToolInputSchemaSections,
   getToolSystemIds,
-  getConnectionProtocol,
   isRequestConfig,
   mergeCredentials,
   normalizeToolSchemas,
@@ -17,6 +19,7 @@ import {
   RequestSource,
   SystemAccessLevel,
   validateToolStructure,
+  inferProtocolFromUrl,
 } from "@superglue/shared";
 import { systems, findTemplateForSystem } from "@superglue/shared/templates";
 import * as jsonpatch from "fast-json-patch";
@@ -36,7 +39,10 @@ import {
   tryTriggerScrapeJob,
   validateDraftOrToolId,
   validatePatches,
+  validateFileReferences,
+  validateRequiredFileInputs,
   validateRequiredFields,
+  resolveFileInputBindings,
   resolveOriginalConfig,
   formatSystemKnowledgeForOutput,
 } from "../agent-helpers";
@@ -55,11 +61,34 @@ import {
   shouldDefaultSaveOnAccept,
 } from "../agent-tools/tool-persistence";
 
+function buildFileInputSchema(files: Record<string, unknown> | undefined): any | undefined {
+  if (!files || Object.keys(files).length === 0) {
+    return undefined;
+  }
+
+  const aliases = Object.keys(files);
+  return {
+    type: "object",
+    properties: Object.fromEntries(
+      aliases.map((alias) => [
+        alias,
+        {
+          type: "object",
+          properties: {},
+          additionalProperties: true,
+          description: `File input '${alias}'`,
+          "x-superglue-inputType": "file",
+        },
+      ]),
+    ),
+    required: aliases,
+  };
+}
+
 const buildToolDefinition = (): ToolDefinition => ({
   name: "build_tool",
   description: `Builds a new superglue tool by accepting the full tool configuration JSON.
-    Load the tool-building skill via load_skill first — it contains the exact config structure and build recipe.
-    In the main agent, successful builds are auto-saved. In the tool playground, builds remain draft-only until explicitly saved.`,
+    Successful builds are auto-saved — use the returned toolId for all subsequent operations. In the tool playground, builds remain draft-only until explicitly saved.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -85,8 +114,10 @@ const buildToolDefinition = (): ToolDefinition => ({
             modify: { type: "boolean", description: "true if step writes/updates/deletes data" },
             config: {
               type: "object",
+              properties: {},
+              additionalProperties: true,
               description:
-                "RequestStepConfig (type: 'request', systemId, url, method, headers?, queryParams?, body?, pagination?) or TransformStepConfig (type: 'transform', transformCode)",
+                "HTTP step: { type: 'request', systemId?, url (endpoint URL), method, headers?, queryParams?, body?, pagination? }. Database/Redis/File server step: { type: 'request', systemId?, url (connection string with credential placeholders), body }. Transform step: { type: 'transform', transformCode }.",
             },
           },
           required: ["id", "instruction", "config", "modify"],
@@ -98,20 +129,46 @@ const buildToolDefinition = (): ToolDefinition => ({
       },
       outputSchema: {
         type: "object",
-        description: "Optional JSONSchema for enforcing output shape",
+        properties: {},
+        additionalProperties: true,
+        description: "JSONSchema for enforcing output shape",
       },
       payload: {
         type: "object",
+        properties: {},
+        additionalProperties: true,
+        description: "Sample JSON payload for inputSchema generation and testing.",
+      },
+      files: {
+        type: "object",
+        properties: {},
+        additionalProperties: true,
         description:
-          "Sample payload for inputSchema generation and testing. Use file::<key> for file references.",
+          "Sample file inputs for inputSchema generation. Keys are stable file aliases (e.g. invoicePdf). Values are bare file::<uploaded_key> references.",
       },
     },
     required: ["id", "instruction", "steps"],
   },
 });
 
+function patchMutatesToolId(patch: jsonpatch.Operation): boolean {
+  if (patch.op === "test") {
+    return false;
+  }
+
+  if (patch.path === "/id") {
+    return true;
+  }
+
+  if ((patch.op === "move" || patch.op === "copy") && "from" in patch && patch.from === "/id") {
+    return true;
+  }
+
+  return false;
+}
+
 const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
-  const { id, instruction, steps, outputTransform, outputSchema, payload } = input;
+  const { id, instruction, steps, outputTransform, outputSchema, payload, files } = input;
 
   if (!instruction || typeof instruction !== "string" || instruction.trim().length === 0) {
     return {
@@ -122,24 +179,40 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
 
   const toolConfig = { id, instruction, steps, outputTransform, outputSchema };
 
-  const validation = validateToolStructure(toolConfig);
-  if (validation.valid === false) {
+  const toolValidation = validateToolStructure(toolConfig);
+  if (toolValidation.valid === false) {
     return {
       success: false,
-      error: validation.error,
+      error: toolValidation.error,
     };
   }
 
-  const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
-  if (!fileResult.success) {
-    return { success: false, ...fileResult };
+  const resolvedFiles = resolveFileInputBindings(files, ctx.filePayloads);
+  if (resolvedFiles.success === false) {
+    return {
+      success: false,
+      error: resolvedFiles.error,
+      availableFiles: resolvedFiles.availableFiles,
+    };
   }
-  const resolvedPayload = fileResult.resolved;
+  const availableExecutionFiles = {
+    ...(ctx.filePayloads || {}),
+    ...(resolvedFiles.resolved as Record<string, ExecutionFileEnvelope>),
+  };
+  const fileReferenceValidation = validateFileReferences(payload, availableExecutionFiles);
+  if (fileReferenceValidation.valid === false) {
+    return {
+      success: false,
+      error: `File references not found: ${fileReferenceValidation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
+      availableFiles: fileReferenceValidation.availableKeys.map((k) => `file::${k}`),
+    };
+  }
+  const resolvedPayload = payload || {};
 
-  let inputSchema: any;
+  let payloadSchema: any;
   if (resolvedPayload && Object.keys(resolvedPayload).length > 0) {
     try {
-      inputSchema = convertRequiredToArray(
+      payloadSchema = convertRequiredToArray(
         toJsonSchema(resolvedPayload, {
           arrays: { mode: "all" },
           required: true,
@@ -147,9 +220,15 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
         }),
       );
     } catch {
-      inputSchema = undefined;
+      payloadSchema = undefined;
     }
   }
+
+  const filesSchema = buildFileInputSchema(resolvedFiles.resolved);
+  const inputSchema = buildToolInputSchemaSections({
+    payloadSchema,
+    filesSchema,
+  });
 
   const builtConfig = stripLegacyToolFields({
     ...toolConfig,
@@ -179,21 +258,10 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
       config: stripLegacyToolFields(savedTool),
     };
   } catch (error: any) {
-    if (error?.message?.includes("already exists")) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    const draftId = `draft_${crypto.randomUUID()}`;
     return {
-      success: true,
-      draftId,
+      success: false,
+      error: error?.message || "Failed to save tool",
       toolId: builtConfig.id,
-      persistence: "draft_only",
-      saveError: error?.message || "Failed to save tool",
-      config: builtConfig,
     };
   }
 };
@@ -201,7 +269,7 @@ const runBuildTool = async (input: any, ctx: ToolExecutionContext) => {
 const runToolDefinition = (): ToolDefinition => ({
   name: "run_tool",
   description:
-    "Executes a tool — either a draft (by draftId) or a saved tool (by toolId), not both. Use file::<key> syntax in payload for file references. Set includeStepResults: true only when debugging wrong/empty output. Set returnFullConfig: true only when you need the full config.",
+    "Executes a tool — either a draft (by draftId) or a saved tool (by toolId), not both. Keep JSON payload data in payload and bind uploaded files separately in files. Set includeStepResults: true only when debugging wrong/empty output. Set returnFullConfig: true only when you need the full config.",
   inputSchema: {
     type: "object",
     properties: {
@@ -209,8 +277,16 @@ const runToolDefinition = (): ToolDefinition => ({
       toolId: { type: "string", description: "ID of a saved tool" },
       payload: {
         type: "object",
+        properties: {},
+        additionalProperties: true,
+        description: "JSON payload to pass to the tool.",
+      },
+      files: {
+        type: "object",
+        properties: {},
+        additionalProperties: true,
         description:
-          "JSON payload to pass to the tool. Use file::<key> syntax for file references.",
+          "File input bindings. Keys are the tool's file aliases. Values are bare file::<uploaded_key> references.",
       },
       returnFullConfig: {
         type: "boolean",
@@ -227,18 +303,41 @@ const runToolDefinition = (): ToolDefinition => ({
 });
 
 const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
-  const { draftId, toolId, payload, returnFullConfig = false, includeStepResults = false } = input;
+  const {
+    draftId,
+    toolId,
+    payload,
+    files,
+    returnFullConfig = false,
+    includeStepResults = false,
+  } = input;
 
   const idValidation = validateDraftOrToolId(draftId, toolId);
   if (idValidation.valid === false) {
     return { success: false, error: idValidation.error };
   }
 
-  const fileResult = resolvePayloadWithFiles(payload, ctx.filePayloads);
-  if (!fileResult.success) {
-    return { success: false, ...fileResult };
+  const resolvedFiles = resolveFileInputBindings(files, ctx.filePayloads);
+  if (resolvedFiles.success === false) {
+    return {
+      success: false,
+      error: resolvedFiles.error,
+      availableFiles: resolvedFiles.availableFiles,
+    };
   }
-  const resolvedPayload = fileResult.resolved;
+  const availableExecutionFiles = {
+    ...(ctx.filePayloads || {}),
+    ...(resolvedFiles.resolved as Record<string, ExecutionFileEnvelope>),
+  };
+  const fileReferenceValidation = validateFileReferences(payload, availableExecutionFiles);
+  if (fileReferenceValidation.valid === false) {
+    return {
+      success: false,
+      error: `File references not found: ${fileReferenceValidation.missingFiles.map((f) => `file::${f}`).join(", ")}`,
+      availableFiles: fileReferenceValidation.availableKeys.map((k) => `file::${k}`),
+    };
+  }
+  const resolvedPayload = payload || {};
 
   let toolConfig: any;
   let inputSchema: any;
@@ -259,7 +358,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
         error: `Tool '${toolId}' not found`,
       };
     }
-    inputSchema = toolConfig.inputSchema?.properties?.payload || toolConfig.inputSchema;
+    inputSchema = toolConfig.inputSchema;
   } else {
     const draft =
       draftId === "playground-draft" && ctx.playgroundDraft
@@ -276,6 +375,12 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
     isDraft = true;
   }
 
+  const inputSchemaSections = getToolInputSchemaSections(inputSchema);
+  const executionFiles = {
+    ...ctx.filePayloads,
+    ...resolvedFiles.resolved,
+  };
+
   const maybeConfig = returnFullConfig ? { config: stripLegacyToolFields(toolConfig) } : {};
 
   const toolSummary = {
@@ -288,9 +393,12 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
     })),
   };
 
-  const validation = validateRequiredFields(inputSchema, resolvedPayload);
-  if (validation.valid === false) {
-    const { missingFields, schema } = validation;
+  const requiredFieldsValidation = validateRequiredFields(
+    inputSchemaSections.payloadSchema,
+    resolvedPayload,
+  );
+  if (requiredFieldsValidation.valid === false) {
+    const { missingFields, schema } = requiredFieldsValidation;
     return {
       success: false,
       ...(isDraft ? { draftId } : {}),
@@ -299,6 +407,24 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       ...maybeConfig,
       inputSchema: schema,
       providedPayload: resolvedPayload,
+    };
+  }
+
+  const requiredFileValidation = validateRequiredFileInputs(
+    inputSchemaSections.filesSchema,
+    resolvedFiles.resolved,
+  );
+  if (requiredFileValidation.valid === false) {
+    const { missingFiles, schema } = requiredFileValidation;
+    return {
+      success: false,
+      ...(isDraft ? { draftId } : {}),
+      error: `Missing required file inputs: ${missingFiles.join(", ")}`,
+      toolSummary,
+      ...maybeConfig,
+      inputSchema: schema,
+      providedPayload: resolvedPayload,
+      providedFiles: Object.keys(resolvedFiles.resolved),
     };
   }
 
@@ -312,11 +438,13 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
       ? await ctx.superglueClient.runToolConfig({
           tool: toolConfig,
           payload: resolvedPayload,
+          files: executionFiles,
           traceId,
         })
       : await ctx.superglueClient.runTool({
           toolId: toolId!,
           payload: resolvedPayload,
+          files: executionFiles,
           options: { requestSource: RequestSource.FRONTEND },
         });
 
@@ -359,7 +487,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
 const editToolDefinition = (): ToolDefinition => ({
   name: "edit_tool",
   description:
-    "Modifies a tool using JSON Patch operations. Load the tool-editing skill first. Provide either draftId (from build_tool) OR toolId, not both. You MUST include payload with the same test data from build_tool. Confirmation results explicitly state whether changes were saved or kept draft-only.",
+    "Modifies a tool using JSON Patch operations. Provide either draftId (for playground drafts) or toolId (for saved tools), not both. You MUST include payload with the same test data from build_tool. Check the returned persistence/toolId/draftId/saveError fields instead of assuming accepted edits auto-save.",
   inputSchema: {
     type: "object",
     properties: {
@@ -394,8 +522,17 @@ const editToolDefinition = (): ToolDefinition => ({
       },
       payload: {
         type: "object",
+        properties: {},
+        additionalProperties: true,
         description:
           "The test payload used when users click the 'Test with N changes' button in the UI to test the fixed tool",
+      },
+      files: {
+        type: "object",
+        properties: {},
+        additionalProperties: true,
+        description:
+          "File input bindings for testing. Keys are tool file aliases, values are bare file::<uploaded_key> references.",
       },
     },
     required: ["patches", "payload"],
@@ -412,28 +549,39 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
 
   let draft: DraftLookup | null = null;
   let workingDraftId = draftId;
+  const currentPlaygroundToolId = ctx.playgroundDraft?.config?.id;
+  const shouldUseCurrentPlaygroundDraft =
+    typeof toolId === "string" &&
+    !!ctx.playgroundDraft &&
+    !!currentPlaygroundToolId &&
+    toolId === currentPlaygroundToolId;
 
   if (toolId) {
-    try {
-      const savedTool = await ctx.superglueClient.getWorkflow(toolId);
-      if (!savedTool) {
+    if (shouldUseCurrentPlaygroundDraft) {
+      draft = ctx.playgroundDraft;
+      workingDraftId = "playground-draft";
+    } else {
+      try {
+        const savedTool = await ctx.superglueClient.getWorkflow(toolId);
+        if (!savedTool) {
+          return {
+            success: false,
+            error: `Tool not found: ${toolId}`,
+          };
+        }
+        const systemIds = getToolSystemIds(savedTool);
+        workingDraftId = `fix-${toolId}-${Date.now()}`;
+        draft = {
+          config: savedTool,
+          systemIds,
+          instruction: savedTool.instruction || "",
+        };
+      } catch (error: any) {
         return {
           success: false,
-          error: `Tool not found: ${toolId}`,
+          error: `Failed to fetch tool: ${error.message}`,
         };
       }
-      const systemIds = getToolSystemIds(savedTool);
-      workingDraftId = `fix-${toolId}-${Date.now()}`;
-      draft = {
-        config: savedTool,
-        systemIds,
-        instruction: savedTool.instruction || "",
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: `Failed to fetch tool: ${error.message}`,
-      };
     }
   } else {
     if (draftId === "playground-draft" && ctx.playgroundDraft) {
@@ -469,6 +617,16 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
     };
   }
 
+  const idMutationIndex = patches.findIndex(patchMutatesToolId);
+  if (idMutationIndex !== -1) {
+    return {
+      success: false,
+      error:
+        `Patch ${idMutationIndex + 1} attempts to modify /id. ` +
+        "edit_tool cannot change a tool's id. Keep the original id when editing an existing tool.",
+    };
+  }
+
   try {
     const toolCopy = normalizeToolSchemas(JSON.parse(JSON.stringify(draft.config)));
     const result = jsonpatch.applyPatch(toolCopy, patches, true, true);
@@ -492,6 +650,8 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
     };
 
     const isPlayground = workingDraftId === "playground-draft";
+    const isCrossToolPlaygroundEdit =
+      ctx.agentId === "playground" && Boolean(toolId) && !isPlayground;
 
     const diffs: ToolDiff[] = patches.map((p) => {
       const diff: ToolDiff = {
@@ -508,7 +668,7 @@ const runEditTool = async (input: any, ctx: ToolExecutionContext) => {
       draftId: workingDraftId,
       toolId: fixedTool.id,
       defaultSaveOnAccept: shouldDefaultSaveOnAccept(ctx),
-      allowDraftOnlyAccept: canKeepDraftOnlyOnAccept(ctx),
+      allowDraftOnlyAccept: isCrossToolPlaygroundEdit ? false : canKeepDraftOnlyOnAccept(ctx),
       ...(isPlayground ? {} : { originalConfig: stripLegacyToolFields(draft.config as Tool) }),
       diffs,
     };
@@ -653,16 +813,8 @@ const processEditToolConfirmation = async (
 
 const saveToolDefinition = (): ToolDefinition => ({
   name: "save_tool",
-  description: `
-    <use_case>
-      Persists a draft tool to the database, making it available for future use.
-    </use_case>
-
-    <important_notes>
-      - Requires a draftId from build_tool.
-      - After saving, the tool can be executed by ID using run_tool with toolId.
-    </important_notes>
-    `,
+  description:
+    "Persists a draft tool to the database. Requires a draftId from build_tool. After saving, the tool can be executed by ID using run_tool with toolId.",
   inputSchema: {
     type: "object",
     properties: {
@@ -670,7 +822,7 @@ const saveToolDefinition = (): ToolDefinition => ({
       id: {
         type: "string",
         description:
-          "Optional custom ID for the saved tool (overrides the auto-generated ID). Use only lowercase letters, numbers, and underscores - no hyphens.",
+          "Custom ID for the saved tool (overrides auto-generated). Lowercase letters, numbers, underscores only.",
       },
     },
     required: ["draftId"],
@@ -701,10 +853,12 @@ const runSaveTool = async (input: any, ctx: ToolExecutionContext) => {
 
     const savedTool = await ctx.superglueClient.upsertWorkflow(toolId, toolToSave);
 
+    const apiEndpoint = ctx.superglueClient.apiEndpoint || "https://api.superglue.cloud";
     return {
       success: true,
       toolId: savedTool.id,
       persistence: "saved",
+      webhookUrl: `${apiEndpoint}/v1/hooks/${savedTool.id}?token=YOUR_API_KEY`,
     };
   } catch (error: any) {
     return {
@@ -717,14 +871,14 @@ const runSaveTool = async (input: any, ctx: ToolExecutionContext) => {
 const createSystemDefinition = (): ToolDefinition => ({
   name: "create_system",
   description:
-    "Creates and saves a new system. Load the systems-handling skill first. Provide templateId to auto-populate from known services. Use find_system first to check existence and get template info.",
+    "Creates and saves a new system. If credentials are provided, a confirmation UI appears that lets users review credentials you have provided and enter missing values. Leave empty for auth-free systems.",
   inputSchema: {
     type: "object",
     properties: {
       id: {
         type: "string",
         description:
-          "Optional unique identifier for the system (e.g., 'slack', 'github_api', 'stripe'). Use only lowercase letters, numbers, and underscores — no hyphens. If not provided, will be derived from the name. If a system with this ID already exists, a suffix like '_1' will be appended.",
+          "System identifier (e.g. 'slack', 'github_api'). Lowercase letters, numbers, underscores only. Derived from name if omitted. Suffix '_1' appended if ID exists.",
       },
       name: {
         type: "string",
@@ -737,7 +891,8 @@ const createSystemDefinition = (): ToolDefinition => ({
       },
       url: {
         type: "string",
-        description: "Full URL for the API including protocol (auto-populated if using templateId)",
+        description:
+          "Base URL (for HTTP APIs, e.g. https://api.stripe.com) or connection string template (for databases/file servers, e.g. postgres://host:5432/mydb, sftp://fileserver.example.com/uploads)",
       },
       documentationUrl: {
         type: "string",
@@ -747,12 +902,12 @@ const createSystemDefinition = (): ToolDefinition => ({
       openApiUrl: {
         type: "string",
         description:
-          "Direct URL to an OpenAPI/Swagger spec (JSON or YAML). Validated and stored as a file reference.",
+          "Direct URL to an OpenAPI/Swagger spec (JSON or YAML). Validated and stored on the system as a searchable file reference.",
       },
       files: {
         type: "string",
         description:
-          "Upload documentation files using file::filename syntax. Multiple files: file::doc1.pdf,file::doc2.pdf",
+          "Upload documentation files using file::filename syntax. Bare file::key uploads the original file bytes and filename; use file::key.extracted to upload parsed text instead. file::key.base64 gives the raw bytes as a base64 string. Multiple files: file::doc1.pdf,file::doc2.pdf",
       },
       specificInstructions: {
         type: "string",
@@ -760,13 +915,9 @@ const createSystemDefinition = (): ToolDefinition => ({
       },
       credentials: {
         type: "object",
-        description:
-          "Non-sensitive credentials only: e.g. auth_url, token_url, scopes, grant_type, redirect_uri.",
-      },
-      sensitiveCredentials: {
-        type: "object",
-        description:
-          "Do not use for preconfigured OAuth systems. Sensitive credentials requiring secure user input via UI. Set field(s) to true to request it. Example: { client_id: true, client_secret: true, api_key: true }.",
+        properties: {},
+        additionalProperties: true,
+        description: "Key-value pairs of all credential fields.",
       },
       environment: {
         type: "string",
@@ -790,18 +941,17 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
     ...systemInput
   } = input;
 
-  // Validate credentials and sensitiveCredentials are objects, not JSON strings
+  if (sensitiveCredentials && typeof sensitiveCredentials === "object") {
+    systemInput.credentials = {
+      ...systemInput.credentials,
+      ...Object.fromEntries(Object.keys(sensitiveCredentials).map((k) => [k, ""])),
+    };
+  }
+
   if (systemInput.credentials && typeof systemInput.credentials === "string") {
     return {
       success: false,
       error: "credentials must be an object, not a JSON string",
-    };
-  }
-
-  if (sensitiveCredentials && typeof sensitiveCredentials === "string") {
-    return {
-      success: false,
-      error: "sensitiveCredentials must be an object, not a JSON string",
     };
   }
 
@@ -878,7 +1028,7 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
       }
     }
 
-    if (documentationUrl && !sensitiveCredentials) {
+    if (documentationUrl) {
       try {
         await ctx.superglueClient.triggerSystemDocumentationScrapeJob(result.id, {
           url: documentationUrl,
@@ -892,12 +1042,10 @@ const runCreateSystem = async (input: any, ctx: ToolExecutionContext) => {
       }
     }
 
-    if (openApiUrl && !sensitiveCredentials) {
+    if (openApiUrl) {
       try {
         await ctx.superglueClient.fetchOpenApiSpec(result.id, openApiUrl);
-      } catch {
-        // non-fatal — spec fetch failure doesn't block system creation
-      }
+      } catch {}
     }
 
     return {
@@ -1041,7 +1189,7 @@ const processCreateSystemConfirmation = async (
 const editSystemDefinition = (): ToolDefinition => ({
   name: "edit_system",
   description:
-    "Edits an existing system. Load the systems-handling skill first. Provide only the fields to change — omitted fields are preserved. Cannot remove existing documentation, only append via files field.",
+    "Edits an existing system. Provide only the fields to change — omitted fields are preserved. Cannot remove existing documentation, only append via files field.",
   inputSchema: {
     type: "object",
     properties: {
@@ -1053,10 +1201,14 @@ const editSystemDefinition = (): ToolDefinition => ({
           "Which environment's system to edit. Defaults to 'prod'. Use 'dev' for sandbox/development systems.",
       },
       name: { type: "string", description: "Human-readable name for the system" },
-      url: { type: "string", description: "Full URL for the API including protocol" },
+      url: {
+        type: "string",
+        description: "Base URL (for HTTP APIs) or connection string (for databases/file servers)",
+      },
       files: {
         type: "string",
-        description: "Upload documentation files using file::filename syntax.",
+        description:
+          "Upload documentation files using file::filename syntax. Bare file::key uploads the original file bytes and filename; use file::key.extracted to upload parsed text instead. file::key.base64 gives the raw bytes as a base64 string.",
       },
       specificInstructions: {
         type: "string",
@@ -1064,23 +1216,15 @@ const editSystemDefinition = (): ToolDefinition => ({
       },
       credentials: {
         type: "object",
+        properties: {},
+        additionalProperties: true,
         description:
-          "OAuth flow metadata ONLY: auth_url, token_url, scopes, grant_type, redirect_uri. Do NOT put credential values like client_id, client_secret, or api_key here — use sensitiveCredentials instead.",
-      },
-      sensitiveCredentials: {
-        type: "object",
-        description:
-          "ALL credential values the user must provide. Set field(s) to true to request via secure UI. Example: { client_id: true, client_secret: true } or { api_key: true }. NEVER ask users to paste credential values in chat — always use this field.",
+          'All credential fields for this system. Provide values you know directly (e.g. auth_url, token_url, scopes, grant_type). Leave sensitive fields blank ("") for values the user must provide (e.g. api_key, client_secret, password) — the user will be prompted securely in the UI. NEVER delay calling edit_system to ask for credentials in chat.',
       },
       scrapeUrl: {
         type: "string",
         description:
-          "Optional: URL to scrape for documentation. Triggers a background scrape job. This URL is not stored on the system.",
-      },
-      scrapeKeywords: {
-        type: "string",
-        description:
-          "Optional: Space-separated keywords to scope the scrape (e.g., 'authentication pagination rate-limits').",
+          "URL to scrape for documentation. Triggers a background scrape job. Not stored on the system.",
       },
     },
     required: ["id"],
@@ -1091,18 +1235,17 @@ const runEditSystem = async (input: any, ctx: ToolExecutionContext) => {
   let { sensitiveCredentials, files, scrapeUrl, scrapeKeywords, environment, ...systemInput } =
     input;
 
-  // Validate credentials and sensitiveCredentials are objects, not JSON strings
+  if (sensitiveCredentials && typeof sensitiveCredentials === "object") {
+    systemInput.credentials = {
+      ...systemInput.credentials,
+      ...Object.fromEntries(Object.keys(sensitiveCredentials).map((k) => [k, ""])),
+    };
+  }
+
   if (systemInput.credentials && typeof systemInput.credentials === "string") {
     return {
       success: false,
       error: "credentials must be an object, not a JSON string",
-    };
-  }
-
-  if (sensitiveCredentials && typeof sensitiveCredentials === "string") {
-    return {
-      success: false,
-      error: "sensitiveCredentials must be an object, not a JSON string",
     };
   }
 
@@ -1399,26 +1542,15 @@ const processEditSystemConfirmation = async (
 
 const callSystemDefinition = (): ToolDefinition => ({
   name: "call_system",
-  description: `
-    <use_case>
-      Load the relevant protocol skill via load_skill (databases for PostgreSQL/MSSQL, file-servers for FTP/SFTP/SMB, redis) before calling call_system for detailed usage patterns and URL formats.
-      Use this to explore APIs, databases, and file servers, verify authentication, test endpoints, and examine response formats BEFORE building tools.
-    </use_case>
-
-    <important_notes>
-      - Only call ONE AT A TIME - NEVER multiple call_system in parallel in the same turn.
-      - Do not forget auth headers when required
-      - Supports credential injection using placeholders: <<system_id_credential_key>>
-      - Use file::<key> in body values to reference uploaded files (e.g., {"data": "file::my_csv"})
-    </important_notes>
-    `,
+  description:
+    "Explore APIs, databases, and file servers, verify authentication, test endpoints, and examine response formats. Load the relevant protocol skill first. Only call ONE AT A TIME. Auth is always explicit — include headers for HTTP or embed credentials in the connection URL for databases/Redis/file servers. Supports <<systemId_credKey>> placeholders. In bodies, use file::<key>.raw/.extracted/.base64. Multipart/form-data auto-builds FormData from JSON objects.",
   inputSchema: {
     type: "object",
     properties: {
       systemId: {
         type: "string",
         description:
-          "Optional system ID for credential injection and automatic OAuth token refresh. Required if using credential placeholders.",
+          "System ID. Enables <<systemId_credKey>> placeholders and auto OAuth refresh. Required if using credential placeholders.",
       },
       environment: {
         type: "string",
@@ -1426,25 +1558,33 @@ const callSystemDefinition = (): ToolDefinition => ({
         description:
           "Which environment's system credentials to use. Defaults to 'prod'. Use 'dev' for sandbox/development systems.",
       },
+      protocol: {
+        type: "string",
+        enum: ["http", "postgres", "mssql", "redis", "sftp", "smb"],
+        description: "Auto-detected from URL scheme. Only provide to override.",
+      },
       url: {
         type: "string",
         description:
-          "Full URL including protocol. Supports http(s)://, postgres://, postgresql://, mssql://, sqlserver://, redis://, rediss://, sftp://, ftp://, ftps://, smb://. Can use <<system_id_credential_key>> for credential injection.",
+          "Endpoint URL (for HTTP) or connection string (for databases/Redis/file servers). Supports <<systemId_credentialKey>> placeholders.",
       },
       method: {
         type: "string",
-        description: "HTTP method (only used for HTTP/HTTPS URLs)",
+        description:
+          "HTTP method. Only relevant for HTTP/HTTPS URLs, defaults to GET. Ignored for database/Redis/file server protocols.",
         enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
       },
       headers: {
         type: "object",
+        properties: {},
+        additionalProperties: true,
         description:
-          'HTTP headers (only used for HTTP/HTTPS URLs). REQUIRED for authenticated APIs — include the system\'s credential placeholders (e.g., { "Authorization": "Bearer <<systemId_access_token>>" }). Check find_system output for available credentialPlaceholders.',
+          'HTTP headers. Include credential placeholders for auth (e.g. { "Authorization": "Bearer <<systemId_access_token>>" }). Not used for database/Redis/file server protocols.',
       },
       body: {
         type: "string",
         description:
-          "Request body. For HTTP: JSON string for POST/PUT/PATCH. For Postgres: JSON with query and params. For SFTP/SMB: JSON with operation and path, or array of operations for batch. Can use <<system_id_credential_key>> for credential injection. Use file::<key> in values to reference uploaded files, they are auto parsed to JSON and replaced in the body.",
+          "Request body. HTTP: JSON string for POST/PUT/PATCH. PostgreSQL/MSSQL: JSON with query and params. Redis: JSON with command and args. SFTP/FTP/SMB: JSON with operation and path.",
       },
     },
     required: ["url"],
@@ -1456,7 +1596,7 @@ const runCallSystem = async (
   ctx: ToolExecutionContext,
 ): Promise<CallSystemResult> => {
   const { systemId, environment, url, method, headers, body } = request;
-  const protocol = getConnectionProtocol(url);
+  const protocol = request.protocol || inferProtocolFromUrl(url);
 
   const mode: "dev" | "prod" = environment === "dev" ? "dev" : "prod";
 
@@ -1480,6 +1620,7 @@ const runCallSystem = async (
     const result = await ctx.superglueClient.executeStep({
       step,
       payload: {},
+      files: ctx.filePayloads,
       mode,
     });
 
@@ -1523,7 +1664,7 @@ const processCallSystemConfirmation = async (
     } catch (error: any) {
       const errorResult = {
         success: false,
-        protocol: getConnectionProtocol(input.url),
+        protocol: input.protocol || inferProtocolFromUrl(input.url || ""),
         error: error.message || "Request failed",
       };
       return { output: JSON.stringify(errorResult), status: "completed" };
@@ -1542,11 +1683,8 @@ const processCallSystemConfirmation = async (
 
 const searchDocumentationDefinition = (): ToolDefinition => ({
   name: "search_documentation",
-  description: `
-    <use_case>
-      Searches a system's provided documentation and OpenAPI specs (if available) for specific information using keywords. 
-    </use_case>
-    `,
+  description:
+    "Searches a system's documentation and OpenAPI specs for specific information using keywords.",
   inputSchema: {
     type: "object",
     properties: {
@@ -1607,7 +1745,7 @@ const runSearchDocumentation = async (input: any, ctx: ToolExecutionContext) => 
 const authenticateOAuthDefinition = (): ToolDefinition => ({
   name: "authenticate_oauth",
   description:
-    "Initiates OAuth flow for a system. Load the systems-handling skill first. Credentials (client_id/secret) must already be stored on the system or provided by a preconfigured template. On success, tokens are auto-saved.",
+    "Initiates OAuth flow for a system. Credentials (client_id/secret) must already be stored on the system. On success, tokens are auto-saved.",
   inputSchema: {
     type: "object",
     properties: {
@@ -1626,12 +1764,12 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       auth_url: {
         type: "string",
         description:
-          "OAuth authorization URL - only needed if not already stored in system credentials or template",
+          "OAuth authorization URL - only needed if not already stored in system credentials or template metadata",
       },
       token_url: {
         type: "string",
         description:
-          "OAuth token URL - only needed if not already stored in system credentials or template",
+          "OAuth token URL - only needed if not already stored in system credentials or template metadata",
       },
       grant_type: {
         type: "string",
@@ -1656,6 +1794,8 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       },
       extraHeaders: {
         type: "object",
+        properties: {},
+        additionalProperties: true,
         description:
           "Additional headers for token requests, e.g., {'Notion-Version': '2022-06-28'}",
       },
@@ -1682,8 +1822,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     if (!oauthConfig.client_id) {
       return {
         success: false,
-        error:
-          "Missing client_id. The system does not have a client_id in its credentials and no matching template provides one.",
+        error: "Missing client_id. The system does not have a client_id stored in its credentials.",
       };
     }
 
@@ -1829,14 +1968,176 @@ const processAuthenticateOAuthConfirmation = async (
   return { output: JSON.stringify(parsedOutput), status: "completed" };
 };
 
+const getRunsDefinition = (): ToolDefinition => ({
+  name: "get_runs",
+  description:
+    "Fetches recent run history for saved tools. Draft executions (build_tool, run_tool with draftId) do NOT create runs — errors are in the tool result directly. Set fetchResults=true only when investigating, not when listing runs.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      toolId: {
+        type: "string",
+        description: "Filter to a specific tool",
+      },
+      limit: {
+        type: "number",
+        description: "Maximum number of runs to return (default: 10, max: 50)",
+      },
+      offset: {
+        type: "number",
+        description: "Runs to skip for pagination (default: 0)",
+      },
+      status: {
+        type: "string",
+        enum: ["running", "success", "failed", "aborted"],
+        description: "Filter by status",
+      },
+      fetchResults: {
+        type: "boolean",
+        description:
+          "If true, fetch full stored results (stepResults, toolResult). Default: false.",
+      },
+      requestSources: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: ["api", "frontend", "scheduler", "mcp", "tool-chain", "webhook", "cli"],
+        },
+        description: "Filter by trigger source (can specify multiple)",
+      },
+      userId: {
+        type: "string",
+        description: "Filter by user ID",
+      },
+      systemId: {
+        type: "string",
+        description: "Filter by system ID",
+      },
+      search: {
+        type: "string",
+        description:
+          "Full-text search across run results (payload, API responses). Fetches S3 results to search. Find runs containing specific text like issue IDs, email addresses, etc.",
+      },
+    },
+    required: [],
+  },
+});
+
+const runGetRuns = async (
+  input: {
+    toolId?: string;
+    limit?: number;
+    offset?: number;
+    status?: string;
+    requestSources?: string[];
+    fetchResults?: boolean;
+    userId?: string;
+    systemId?: string;
+    search?: string;
+  },
+  ctx: ToolExecutionContext,
+) => {
+  const {
+    toolId,
+    limit = 10,
+    offset = 0,
+    status,
+    requestSources,
+    fetchResults = false,
+    userId,
+    systemId,
+    search,
+  } = input;
+
+  const fetchLimit = search ? Math.min(limit * 5, 200) : Math.min(limit, 50);
+  const page = Math.floor(offset / fetchLimit) + 1;
+  const skipWithinPage = offset % fetchLimit;
+
+  try {
+    const result = await ctx.superglueClient.listRuns({
+      toolId,
+      limit: fetchLimit,
+      page,
+      status: status as "running" | "success" | "failed" | "aborted" | undefined,
+      requestSources: requestSources as RequestSource[] | undefined,
+      userId,
+      systemId,
+    });
+
+    const searchTerm = search?.toLowerCase();
+    const shouldFetchResults = fetchResults || !!search;
+
+    // Strip large fields from runs to avoid JSON serialization issues
+    const stripRun = (run: any) => {
+      const { tool, data, stepResults, ...rest } = run;
+      return rest;
+    };
+
+    let runs = result.items.slice(skipWithinPage);
+
+    if (shouldFetchResults) {
+      const enrichedRuns = [];
+      for (const run of runs) {
+        if (run.resultStorageUri) {
+          try {
+            const fullResults = await ctx.superglueClient.getRunResults(run.runId);
+            if (fullResults) {
+              if (searchTerm) {
+                const fullResultsStr = JSON.stringify(fullResults).toLowerCase();
+                if (!fullResultsStr.includes(searchTerm)) {
+                  continue;
+                }
+              }
+              enrichedRuns.push({
+                ...stripRun(run),
+                data: fullResults.data,
+                stepResults: fullResults.stepResults,
+                toolPayload: fullResults.toolPayload || run.toolPayload,
+              });
+            } else {
+              enrichedRuns.push(stripRun(run));
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch results for run ${run.runId}:`, err);
+            enrichedRuns.push(stripRun(run));
+          }
+        } else if (searchTerm) {
+          continue;
+        } else {
+          enrichedRuns.push(stripRun(run));
+        }
+
+        if (enrichedRuns.length >= limit) break;
+      }
+      runs = enrichedRuns;
+    } else {
+      runs = runs.slice(0, limit).map(stripRun);
+    }
+
+    return {
+      success: true,
+      toolId: toolId || "all",
+      total: search ? runs.length : result.total,
+      runs,
+      note:
+        runs.length > 0
+          ? `Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches.${search ? ` Searched through ${result.items.length} runs for "${search}".` : ""}`
+          : search
+            ? `No runs found containing "${search}".`
+            : "No runs found matching the filters.",
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
 const findToolDefinition = (): ToolDefinition => ({
   name: "find_tool",
-  description: `Look up an existing tool by ID or search for tools by query.
-<use_case>Use when you need to see the full configuration of an existing tool, or find tools matching a description.</use_case>
-<important_notes>
-  - Use query "*" or omit both id and query to list all tools.
-  - Search matches against tool ID, instruction, step instructions, and system IDs.
-</important_notes>`,
+  description:
+    'Look up an existing tool by ID or search for tools by query. Use "*" or omit both id and query to list all. Matches against tool ID, instruction, step instructions, and system IDs.',
   inputSchema: {
     type: "object",
     properties: {
@@ -1936,15 +2237,8 @@ const runFindTool = async (
 
 const findSystemDefinition = (): ToolDefinition => ({
   name: "find_system",
-  description: `Look up an existing system by ID or search for systems by query. Also returns system knowledge (OAuth config, documentation URL, etc.) if available for systems not yet created.
-<use_case>Use before call_system, create_system, or edit_system to get full system configuration.</use_case>
-<important_notes>
-  - Use query "*" or omit both id and query to list all systems.
-  - Search matches against system ID and URL.
-  - Systems can have dev/prod environments. By default, returns ALL environments for matching systems.
-  - Only specify environment parameter if you specifically need just one environment. When unsure, omit it to see all environments.
-  - Credentials are MASKED — you cannot see actual API keys/secrets. When comparing dev vs prod, if configs look identical, the difference is in the credential VALUES (which are hidden). Don't tell users systems are "identical" when credentials are likely different.
-</important_notes>`,
+  description:
+    'Look up an existing system by ID or search by query. Also returns system knowledge (OAuth config, documentation URL) for systems not yet created. Use "*" or omit both id and query to list all. Matches against system ID and URL. Returns ALL environments by default. Credentials are MASKED — don\'t tell users dev/prod systems are "identical" when credential values differ.',
   inputSchema: {
     type: "object",
     properties: {
@@ -1957,8 +2251,7 @@ const findSystemDefinition = (): ToolDefinition => ({
       environment: {
         type: "string",
         enum: ["dev", "prod"],
-        description:
-          "Optional: Filter to a specific environment. If omitted, returns both dev and prod systems.",
+        description: "Filter to a specific environment. If omitted, returns both.",
       },
     },
   },
@@ -2181,7 +2474,15 @@ const runInspectTool = async (
           result.outputTransform = draft.config.outputTransform || null;
           break;
         case "payload":
-          result.payload = Object.keys(ctx.filePayloads).length > 0 ? ctx.filePayloads : null;
+          result.payload =
+            Object.keys(ctx.filePayloads).length > 0
+              ? Object.fromEntries(
+                  Object.entries(ctx.filePayloads).map(([key, env]) => [
+                    key,
+                    { filename: env.filename, contentType: env.contentType, size: env.size },
+                  ]),
+                )
+              : null;
           break;
         case "response_filters":
           result.responseFilters = (draft.config as any).responseFilters || [];
@@ -2711,8 +3012,8 @@ const testRoleAccessDefinition = (): ToolDefinition => ({
         properties: {
           url: { type: "string" },
           method: { type: "string" },
-          headers: { type: "object" },
-          queryParams: { type: "object" },
+          headers: { type: "object", properties: {}, additionalProperties: true },
+          queryParams: { type: "object", properties: {}, additionalProperties: true },
           body: { type: "string" },
           systemId: { type: "string" },
         },
@@ -2884,6 +3185,11 @@ export const TOOL_REGISTRY: Record<string, ToolRegistryEntry> = {
       processConfirmation: processAuthenticateOAuthConfirmation,
     },
   },
+  get_runs: {
+    name: "get_runs",
+    definition: getRunsDefinition,
+    execute: runGetRuns,
+  },
   find_tool: {
     name: "find_tool",
     definition: findToolDefinition,
@@ -2942,6 +3248,7 @@ export const BASE_TOOLS = [
   "find_system",
   "search_documentation",
   "call_system",
+  "get_runs",
   "run_tool",
 ];
 
@@ -2964,6 +3271,7 @@ export const SYSTEM_PLAYGROUND_TOOL_SET = [
   "find_system",
   "search_documentation",
   "call_system",
+  "get_runs",
   ...SYSTEMS_HANDLING_TOOLS,
   "inspect_system",
 ];

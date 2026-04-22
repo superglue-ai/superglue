@@ -7,13 +7,28 @@
 import type {
   RequestStepConfig,
   RequestOptions,
+  RuntimeExecutionFile,
   ServiceMetadata,
   StepExecutionResult,
 } from "../types.ts";
 import { DENO_DEFAULTS } from "../types.ts";
 import { replaceVariables } from "../utils/transform.ts";
-import { parseFile, parseJSON } from "../utils/files.ts";
+import {
+  buildRuntimeFile,
+  detectFileType,
+  parseFile,
+  parseJSON,
+  resolveFileTokens,
+} from "../utils/files.ts";
 import { debug, maskCredentials } from "../utils/logging.ts";
+import {
+  convertBasicAuthToBase64,
+  deriveResponseFilename,
+  getValueByPath,
+  readResponseBytes,
+  resolveBodyForFetch,
+  shouldTreatHttpResponseAsFile,
+} from "../utils/http-utils.ts";
 
 /**
  * Execute an HTTP step
@@ -21,37 +36,26 @@ import { debug, maskCredentials } from "../utils/logging.ts";
 export async function executeHttpStep(
   config: RequestStepConfig,
   payload: Record<string, unknown>,
+  fileLookup: Record<string, RuntimeExecutionFile>,
   credentials: Record<string, unknown>,
   options: RequestOptions,
   metadata: ServiceMetadata,
+  stepId?: string,
 ): Promise<StepExecutionResult> {
   try {
     const result = await callHttp({
       config,
       payload,
+      fileLookup,
       credentials,
       options,
       metadata,
+      stepId,
     });
-    return { success: true, data: result.data };
+    return { success: true, data: result.data, producedFiles: result.producedFiles };
   } catch (error) {
     return { success: false, error: (error as Error).message };
   }
-}
-
-/**
- * Convert Basic Auth credentials to Base64 if needed
- */
-function convertBasicAuthToBase64(headerValue: string): string {
-  if (!headerValue) return headerValue;
-  const credentials = headerValue.substring("Basic ".length).trim();
-  const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
-
-  if (!seemsEncoded) {
-    const base64Credentials = btoa(credentials);
-    return `Basic ${base64Credentials}`;
-  }
-  return headerValue;
 }
 
 /**
@@ -133,35 +137,11 @@ async function evaluateStopCondition(
   }
 }
 
-/**
- * Get value from object using JSONPath-like syntax
- */
-function getValueByPath(obj: unknown, path: string): unknown {
-  if (!obj || typeof obj !== "object") return undefined;
-
-  // Handle direct property access first
-  const record = obj as Record<string, unknown>;
-  if (path in record) {
-    return record[path];
-  }
-
-  // Handle dot notation
-  const parts = path.replace(/^\$\.?/, "").split(".");
-  let current: unknown = obj;
-
-  for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
-    if (typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-
-  return current;
-}
-
 interface CallHttpResult {
   data: unknown;
   statusCode: number;
   headers: Headers;
+  producedFiles?: Record<string, RuntimeExecutionFile>;
 }
 
 /**
@@ -170,15 +150,19 @@ interface CallHttpResult {
 async function callHttp({
   config,
   payload,
+  fileLookup,
   credentials,
   options,
   metadata,
+  stepId,
 }: {
   config: RequestStepConfig;
   payload: Record<string, unknown>;
+  fileLookup: Record<string, RuntimeExecutionFile>;
   credentials: Record<string, unknown>;
   options: RequestOptions;
   metadata: ServiceMetadata;
+  stepId?: string;
 }): Promise<CallHttpResult> {
   const allVariables = { ...payload, ...credentials };
   let allResults: unknown[] = [];
@@ -208,7 +192,6 @@ async function callHttp({
 
     const requestVars = { ...paginationVars, ...allVariables };
 
-    // Process headers
     let headersToProcess = config.headers || {};
     if (typeof headersToProcess === "string") {
       const replacedString = await replaceVariables(headersToProcess, requestVars, metadata);
@@ -223,7 +206,6 @@ async function callHttp({
     for (const [key, value] of Object.entries(headersToProcess as Record<string, unknown>)) {
       let processedValue = await replaceVariables(String(value), requestVars, metadata);
 
-      // Handle Authorization header - dedupe double scheme prefixes
       if (key.toLowerCase() === "authorization") {
         processedValue = processedValue.replace(/^(Basic|Bearer)\s+\1\s+/i, "$1 ");
         if (processedValue.startsWith("Basic ")) {
@@ -236,7 +218,6 @@ async function callHttp({
       }
     }
 
-    // Process query params
     let queryParamsToProcess = config.queryParams || {};
     if (typeof queryParamsToProcess === "string") {
       const replacedString = await replaceVariables(queryParamsToProcess, requestVars, metadata);
@@ -255,15 +236,16 @@ async function callHttp({
       }
     }
 
-    // Process body
     const processedBody = config.body
       ? await replaceVariables(config.body, requestVars, metadata)
       : undefined;
+    const resolvedBody =
+      processedBody === undefined
+        ? undefined
+        : resolveFileTokens(parseJSON(processedBody), fileLookup, { stepId });
 
-    // Process URL
     let processedUrl = await replaceVariables(config.url || "", requestVars, metadata);
 
-    // Add query params to URL
     if (Object.keys(processedQueryParams).length > 0) {
       const url = new URL(processedUrl);
       for (const [key, value] of Object.entries(processedQueryParams)) {
@@ -287,7 +269,6 @@ async function callHttp({
       metadata,
     );
 
-    // Make the request with retries
     const timeout = options?.timeout ?? DENO_DEFAULTS.HTTP.DEFAULT_TIMEOUT;
     const maxRetries = options?.retries ?? DENO_DEFAULTS.MAX_CALL_RETRIES;
     const retryDelay = options?.retryDelay ?? DENO_DEFAULTS.HTTP.DEFAULT_RETRY_DELAY_MS;
@@ -310,17 +291,20 @@ async function callHttp({
           signal: controller.signal,
         };
 
-        // Don't send body for GET, HEAD, DELETE, OPTIONS
-        if (!["GET", "HEAD", "DELETE", "OPTIONS"].includes(method) && processedBody) {
-          fetchOptions.body = processedBody;
+        if (!["GET", "HEAD", "DELETE", "OPTIONS"].includes(method) && resolvedBody !== undefined) {
+          resolveBodyForFetch({
+            resolvedBody,
+            processedHeaders,
+            fileLookup,
+            fetchOptions,
+          });
         }
 
         response = await fetch(processedUrl, fetchOptions);
         clearTimeout(timeoutId);
 
-        // Handle rate limiting
         if (response.status === 429) {
-          retryCount++; // Count 429 retries to prevent infinite loop
+          retryCount++;
           if (retryCount > maxRetries) {
             throw new Error(`Rate limit exceeded after ${maxRetries} retries`);
           }
@@ -345,19 +329,16 @@ async function callHttp({
           continue;
         }
 
-        // Success or non-retryable error
         if (response.status >= 200 && response.status < 300) {
           break;
         }
 
-        // Retry on server errors
         if (response.status >= 500 && retryCount < maxRetries) {
           retryCount++;
           await new Promise((resolve) => setTimeout(resolve, retryDelay));
           continue;
         }
 
-        // Non-retryable error
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 500)}`);
       } catch (error) {
@@ -378,12 +359,36 @@ async function callHttp({
 
     lastResponse = response;
 
-    // Parse response
-    const responseBuffer = await response.arrayBuffer();
-    const parsedResponseData = await parseFile(new Uint8Array(responseBuffer), "AUTO");
+    const responseBytes = await readResponseBytes(response);
+    const detectedType = await detectFileType(responseBytes);
+    const treatAsFile = shouldTreatHttpResponseAsFile({
+      response,
+      detectedType,
+      responseBytes,
+    });
+    let parsedResponseData: unknown;
+
+    if (treatAsFile) {
+      const filename = deriveResponseFilename(response, processedUrl);
+      const contentType = response.headers.get("content-type") || "application/octet-stream";
+      const file = await buildRuntimeFile(responseBytes, filename, contentType);
+      parsedResponseData = file.extracted;
+      lastParsedData = parsedResponseData;
+      lastResponse = response;
+      hasMore = false;
+      return {
+        data: parsedResponseData,
+        statusCode: response.status,
+        headers: response.headers,
+        producedFiles: {
+          [filename]: file,
+        },
+      };
+    }
+
+    parsedResponseData = await parseFile(responseBytes, detectedType);
     lastParsedData = parsedResponseData;
 
-    // Handle pagination
     if (hasStopCondition) {
       const currentResponseHash = JSON.stringify(parsedResponseData);
       const currentHasData = Array.isArray(parsedResponseData)
@@ -411,12 +416,10 @@ async function callHttp({
       if (loopCounter > 1 && currentResponseHash === previousResponseHash) {
         hasMore = false;
       } else {
-        // Calculate totalFetched - handle both array and object responses
         let totalFetched = 0;
         if (Array.isArray(allResults)) {
           totalFetched = allResults.length;
         } else if (allResults && typeof allResults === "object") {
-          // For object responses, try to find an array property to count
           const obj = allResults as Record<string, unknown>;
           for (const key of ["results", "data", "items", "records", "entries"]) {
             if (Array.isArray(obj[key])) {
@@ -424,7 +427,6 @@ async function callHttp({
               break;
             }
           }
-          // If no array found, count based on loop iterations
           if (totalFetched === 0) {
             totalFetched = loopCounter + 1;
           }
@@ -473,7 +475,6 @@ async function callHttp({
       }
     }
 
-    // Increment pagination variables
     page++;
     offset += parseInt(config.pagination?.pageSize || "50");
 

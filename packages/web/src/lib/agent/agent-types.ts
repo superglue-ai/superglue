@@ -1,4 +1,10 @@
-import { ConfirmationAction, Message, ConnectionProtocol, Tool } from "@superglue/shared";
+import {
+  ConfirmationAction,
+  ExecutionFileEnvelope,
+  Message,
+  ConnectionProtocol,
+  Tool,
+} from "@superglue/shared";
 import { SSESubscriptionClient } from "../sse-subscriptions";
 import { AgentType } from "./registries/agent-registry";
 import { EESuperglueClient } from "../ee-superglue-client";
@@ -36,7 +42,7 @@ export interface SystemPlaygroundContext {
   systemId: string;
   url: string;
   templateName?: string;
-  authType: "none" | "oauth" | "apikey";
+  authType: "none" | "oauth" | "apikey" | "connection_string";
   credentialKeys: string[];
   specificInstructions: string;
   isNewSystem: boolean;
@@ -115,7 +121,7 @@ export interface ToolDefinition {
 export interface ToolExecutionContext {
   agentId: AgentType;
   superglueClient: EESuperglueClient;
-  filePayloads: Record<string, any>;
+  filePayloads: Record<string, ExecutionFileEnvelope>;
   messages: Message[];
   logCallback?: (message: string) => void;
   subscriptionClient?: SSESubscriptionClient;
@@ -160,7 +166,7 @@ export interface AgentRequest {
   userMessage?: string;
   visibleUserMessageId?: string;
   resumeToolCallId?: string;
-  filePayloads?: Record<string, { name: string; content: any }>;
+  filePayloads?: Record<string, ExecutionFileEnvelope>;
   toolExecutionPolicies?: ToolExecutionPolicies;
   conversationId?: string;
   loadedSkills?: string[];
@@ -175,7 +181,7 @@ export interface ValidatedAgentRequest {
   userMessage?: string;
   visibleUserMessageId?: string;
   resumeToolCallId?: string;
-  filePayloads?: Record<string, { name: string; content: any }>;
+  filePayloads?: Record<string, ExecutionFileEnvelope>;
   toolExecutionPolicies?: ToolExecutionPolicies;
   conversationId?: string;
   loadedSkills?: string[];
@@ -193,6 +199,7 @@ export interface PrepareMessagesResult {
 export interface CallSystemArgs {
   systemId?: string;
   environment?: "dev" | "prod";
+  protocol?: ConnectionProtocol;
   url: string;
   method?: string;
   headers?: Record<string, string>;

@@ -1,4 +1,5 @@
 import {
+  ExecutionFileEnvelope,
   ToolStep,
   ResponseFilter,
   Tool,
@@ -6,7 +7,10 @@ import {
   ServiceMetadata,
   isTransformConfig,
 } from "@superglue/shared";
-import { flattenAndNamespaceCredentials } from "@superglue/shared/utils";
+import {
+  flattenAndNamespaceCredentials,
+  flattenAndNamespaceSystemUrls,
+} from "@superglue/shared/utils";
 import { executeTool, ToolExecutionContext } from "../tools/tool-execution-service.js";
 import { SystemManager } from "../systems/system-manager.js";
 import { logMessage } from "../utils/logs.js";
@@ -23,12 +27,13 @@ interface RunStepRequestOptions {
 interface RunStepRequestBody {
   step: Record<string, unknown>; // ToolStep
   payload?: Record<string, unknown>;
+  files?: Record<string, ExecutionFileEnvelope>;
   previousResults?: Record<string, unknown>;
   credentials?: Record<string, unknown>;
   options?: RunStepRequestOptions;
   runId?: string; // Client-provided runId for abort tracking
   mode?: "dev" | "prod"; // Execution mode for system resolution
-  systemIds?: string[]; // System IDs to load credentials from (for transform steps)
+  systemIds?: string[]; // System IDs to load namespaced template vars from (for transform steps)
 }
 
 interface RunStepResponse {
@@ -37,6 +42,8 @@ interface RunStepResponse {
   data?: unknown;
   error?: string;
   updatedStep?: Record<string, unknown>; // ToolStep if self-healed
+  stepFileKeys?: string[];
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
 }
 
 // Transform execution types (internal only, not in OpenAPI spec)
@@ -45,6 +52,7 @@ interface RunTransformRequestBody {
   outputSchema?: Record<string, unknown>;
   inputSchema?: Record<string, unknown>;
   payload?: Record<string, unknown>;
+  files?: Record<string, ExecutionFileEnvelope>;
   stepResults?: Record<string, unknown>;
   responseFilters?: Array<Record<string, unknown>>;
   options?: RunStepRequestOptions;
@@ -57,6 +65,32 @@ interface RunTransformResponse {
   error?: string;
   updatedTransform?: string;
   updatedOutputSchema?: Record<string, unknown>;
+}
+
+export function buildRunStepResponse({
+  stepId,
+  success,
+  error,
+  updatedStep,
+  stepResult,
+  producedFiles,
+}: {
+  stepId: string;
+  success: boolean;
+  error?: string;
+  updatedStep?: Record<string, unknown>;
+  stepResult?: { data?: unknown; stepFileKeys?: string[] };
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
+}): RunStepResponse {
+  return {
+    stepId,
+    success,
+    ...(error ? { error } : {}),
+    ...(updatedStep ? { updatedStep } : {}),
+    ...(success && stepResult?.data !== undefined ? { data: stepResult.data } : {}),
+    ...(success && stepResult?.stepFileKeys ? { stepFileKeys: stepResult.stepFileKeys } : {}),
+    ...(success && producedFiles ? { producedFiles } : {}),
+  };
 }
 
 // POST /tools/step/run - Execute a single step without creating a run
@@ -100,7 +134,7 @@ const runStep: RouteHandler = async (request, reply) => {
     requestSource: RequestSource.FRONTEND,
   };
 
-  // Load system credentials if systemIds provided (needed for transform steps)
+  // Load system template vars if systemIds provided (needed for transform steps)
   let systemCredentials: Record<string, string> = {};
   if (body.systemIds && body.systemIds.length > 0 && isTransformConfig(step.config)) {
     const mode = body.mode || "prod";
@@ -143,7 +177,10 @@ const runStep: RouteHandler = async (request, reply) => {
       const validSystems = refreshedSystems.filter((s) => s !== null);
 
       if (validSystems.length > 0) {
-        systemCredentials = flattenAndNamespaceCredentials(validSystems);
+        systemCredentials = {
+          ...flattenAndNamespaceCredentials(validSystems),
+          ...flattenAndNamespaceSystemUrls(validSystems),
+        };
       }
     } catch (error) {
       logMessage("warn", `Failed to load system credentials: ${error}`, metadata);
@@ -173,6 +210,10 @@ const runStep: RouteHandler = async (request, reply) => {
     const result = await executeTool(ctx, {
       tool: tempTool,
       payload: executionPayload,
+      files: body.files,
+      // Internal step testing needs produced files for chaining in the playground. This stays
+      // off for normal full workflow runs to avoid serializing large file envelopes inline.
+      returnProducedFiles: true,
       credentials: mergedCredentials,
       requestOptions: { timeout: body.options?.timeout },
       createRun: false,
@@ -182,13 +223,14 @@ const runStep: RouteHandler = async (request, reply) => {
 
     const stepResult = result.stepResults?.[0];
 
-    const response: RunStepResponse = {
+    const response = buildRunStepResponse({
       stepId: step.id,
       success: result.success,
-      data: stepResult?.data,
       error: result.error,
       updatedStep: result.tool?.steps?.[0] as unknown as Record<string, unknown> | undefined,
-    };
+      stepResult,
+      producedFiles: result.producedFiles,
+    });
 
     return addTraceHeader(reply, traceId).code(200).send(response);
   } catch (error: any) {
@@ -263,6 +305,7 @@ const runTransform: RouteHandler = async (request, reply) => {
     const result = await executeTool(ctx, {
       tool: tempTool,
       payload: executionPayload,
+      files: body.files,
       requestOptions: { timeout: body.options?.timeout },
       createRun: false,
       runId: internalRunId,

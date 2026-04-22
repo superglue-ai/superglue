@@ -16,12 +16,24 @@ import JSZip from "npm:jszip@3.10.1";
 import Papa from "npm:papaparse@5.4.1";
 import sax from "npm:sax@1.4.1";
 import * as htmlparser2 from "npm:htmlparser2@9.1.0";
+import { extractText, getDocumentProxy } from "npm:unpdf@1.4.0";
+// @ts-ignore - npm imports for Deno
+import mammoth from "npm:mammoth@1.12.0";
+import { NodeHtmlMarkdown } from "npm:node-html-markdown@2.0.0";
 // @ts-ignore - npm imports for Deno
 import StreamJson from "npm:stream-json@1.8.0";
 // @ts-ignore - npm imports for Deno
 import StreamArray from "npm:stream-json@1.8.0/streamers/StreamArray.js";
 // @ts-ignore - npm imports for Deno
 import StreamObject from "npm:stream-json@1.8.0/streamers/StreamObject.js";
+import type {
+  ExecutionFileEnvelope,
+  RawFileBytes,
+  RuntimeExecutionFile,
+  RuntimeFilePointer,
+  SupportedFileType,
+  TransformRuntimeFileInput,
+} from "../types.ts";
 
 const gunzipAsync = promisify(gunzip);
 // @ts-ignore - npm package types
@@ -33,23 +45,8 @@ const { streamObject } = StreamObject;
 
 // V8 string limit is ~536MB, use 400MB as safe threshold
 const LARGE_BUFFER_THRESHOLD = 400 * 1024 * 1024;
-
-/**
- * Supported file types for parsing
- */
-export type SupportedFileType =
-  | "JSON"
-  | "CSV"
-  | "XML"
-  | "HTML"
-  | "YAML"
-  | "EXCEL"
-  | "PDF"
-  | "DOCX"
-  | "ZIP"
-  | "GZIP"
-  | "RAW"
-  | "AUTO";
+const TEXT_SAMPLE_SIZE = 8192;
+const textDecoder = new TextDecoder();
 
 /**
  * Detection priority for file type detection
@@ -62,6 +59,37 @@ enum DetectionPriority {
   STRUCTURED_TEXT_SPECIFIC = 12,
   STRUCTURED_TEXT = 20,
   HEURISTIC_TEXT = 30,
+}
+
+function isAllowedTextControlByte(byte: number): boolean {
+  return byte === 0x09 || byte === 0x0a || byte === 0x0d;
+}
+
+function isLikelyTextBuffer(buffer: Uint8Array): boolean {
+  if (buffer.length === 0) {
+    return true;
+  }
+
+  const sample = buffer.slice(0, Math.min(buffer.length, TEXT_SAMPLE_SIZE));
+  let suspiciousControlBytes = 0;
+
+  for (const byte of sample) {
+    if (byte === 0x00) {
+      return false;
+    }
+
+    if ((byte < 0x20 || byte === 0x7f) && !isAllowedTextControlByte(byte)) {
+      suspiciousControlBytes++;
+    }
+  }
+
+  if (suspiciousControlBytes / sample.length > 0.1) {
+    return false;
+  }
+
+  const decodedSample = textDecoder.decode(sample);
+  const replacementChars = decodedSample.match(/\uFFFD/g);
+  return !replacementChars || replacementChars.length === 0;
 }
 
 /**
@@ -164,6 +192,453 @@ export function parseJSON(input: string | unknown): unknown {
       return trimmed;
     }
   }
+}
+
+export async function detectAndParseFile(content: Uint8Array | Buffer): Promise<{
+  fileType: SupportedFileType;
+  extracted?: unknown;
+  parseError?: string;
+}> {
+  const buffer = content instanceof Buffer ? new Uint8Array(content) : content;
+  const fileType = await detectFileType(buffer);
+
+  if (fileType === "BINARY") {
+    return { fileType };
+  }
+
+  try {
+    return {
+      fileType,
+      extracted: await parseFile(buffer, fileType),
+    };
+  } catch (error) {
+    return {
+      fileType,
+      parseError: (error as Error).message,
+    };
+  }
+}
+
+export async function buildRuntimeFile(
+  raw: Uint8Array,
+  filename: string,
+  contentType: string,
+): Promise<RuntimeExecutionFile> {
+  const parsedFile = await detectAndParseFile(raw);
+
+  return {
+    filename,
+    contentType,
+    size: raw.length,
+    raw,
+    fileType: parsedFile.fileType,
+    ...(parsedFile.extracted !== undefined ? { extracted: parsedFile.extracted } : {}),
+    ...(parsedFile.parseError ? { parseError: parsedFile.parseError } : {}),
+  };
+}
+
+export const MAX_INLINE_FILE_BASE64_BYTES = 500 * 1024 * 1024;
+
+function formatInlineFileLimit(limitBytes = MAX_INLINE_FILE_BASE64_BYTES): string {
+  return `${Math.round(limitBytes / (1024 * 1024))} MB`;
+}
+
+export function assertFileSupportsBase64Access(
+  file: Pick<RuntimeExecutionFile, "size" | "filename">,
+  options?: { ref?: string; limitBytes?: number },
+): void {
+  const limitBytes = options?.limitBytes ?? MAX_INLINE_FILE_BASE64_BYTES;
+  if (file.size <= limitBytes) {
+    return;
+  }
+
+  const fileLabel = options?.ref ? `${file.filename} (${options.ref})` : file.filename;
+  throw new Error(
+    `File '${fileLabel}' is too large for base64 access. Limit is ${formatInlineFileLimit(limitBytes)}. Use .raw instead.`,
+  );
+}
+
+export function assertFileSupportsInlineStepResponse(
+  file: Pick<RuntimeExecutionFile, "size" | "filename">,
+  options?: { ref?: string; limitBytes?: number },
+): void {
+  const limitBytes = options?.limitBytes ?? MAX_INLINE_FILE_BASE64_BYTES;
+  if (file.size <= limitBytes) {
+    return;
+  }
+
+  const fileLabel = options?.ref ? `${file.filename} (${options.ref})` : file.filename;
+  throw new Error(
+    `Produced file '${fileLabel}' is too large for inline step responses (${file.size} bytes). Limit is ${formatInlineFileLimit(limitBytes)}. Run the full tool instead of step-by-step testing, or reference the file via .raw in a later workflow step.`,
+  );
+}
+
+export function decodeExecutionFileEnvelope(envelope: ExecutionFileEnvelope): RuntimeExecutionFile {
+  return {
+    filename: envelope.filename,
+    contentType: envelope.contentType,
+    size: envelope.size,
+    raw: new Uint8Array(Buffer.from(envelope.rawBase64, "base64")),
+    ...(envelope.fileType ? { fileType: envelope.fileType } : {}),
+    ...(envelope.extracted !== undefined ? { extracted: envelope.extracted } : {}),
+    ...(envelope.parseError ? { parseError: envelope.parseError } : {}),
+  };
+}
+
+function cloneExtractedValue<T>(value: T): T {
+  return structuredClone(value);
+}
+
+export function cloneRuntimeExecutionFile(file: RuntimeExecutionFile): RuntimeExecutionFile {
+  return {
+    filename: file.filename,
+    contentType: file.contentType,
+    size: file.size,
+    raw: file.raw.slice(),
+    ...(file.fileType ? { fileType: file.fileType } : {}),
+    ...(file.extracted !== undefined ? { extracted: cloneExtractedValue(file.extracted) } : {}),
+    ...(file.parseError ? { parseError: file.parseError } : {}),
+  };
+}
+
+export function cloneRuntimeExecutionFileMap(
+  files: Record<string, RuntimeExecutionFile>,
+): Record<string, RuntimeExecutionFile> {
+  return Object.fromEntries(
+    Object.entries(files).map(([key, file]) => [key, cloneRuntimeExecutionFile(file)]),
+  );
+}
+
+export function createRuntimeExecutionFileViewMap(
+  files: Record<string, RuntimeExecutionFile>,
+): Record<string, RuntimeExecutionFile> {
+  return Object.fromEntries(
+    Object.entries(files).map(([key, file]) => {
+      const view: RuntimeExecutionFile = {
+        filename: file.filename,
+        contentType: file.contentType,
+        size: file.size,
+        raw: file.raw,
+        ...(file.fileType ? { fileType: file.fileType } : {}),
+        ...(file.extracted !== undefined ? { extracted: file.extracted } : {}),
+        ...(file.parseError ? { parseError: file.parseError } : {}),
+      };
+
+      Object.defineProperty(view, "base64", {
+        enumerable: false,
+        configurable: true,
+        get() {
+          assertFileSupportsBase64Access(file, { ref: key });
+          const value = Buffer.from(file.raw).toString("base64");
+          Object.defineProperty(view, "base64", {
+            value,
+            enumerable: false,
+            configurable: true,
+            writable: false,
+          });
+          return value;
+        },
+      });
+
+      return [key, view];
+    }),
+  );
+}
+
+export function encodeExecutionFileEnvelope(file: RuntimeExecutionFile): ExecutionFileEnvelope {
+  return {
+    kind: "execution_file",
+    filename: file.filename,
+    contentType: file.contentType,
+    size: file.size,
+    rawBase64: Buffer.from(file.raw).toString("base64"),
+    ...(file.fileType ? { fileType: file.fileType } : {}),
+    ...(file.extracted !== undefined ? { extracted: file.extracted } : {}),
+    ...(file.parseError ? { parseError: file.parseError } : {}),
+  };
+}
+
+function normalizeRawBytes(raw: TransformRuntimeFileInput["raw"]): Uint8Array {
+  if (raw == null) {
+    return new Uint8Array(0);
+  }
+
+  if (raw instanceof Uint8Array) {
+    return raw.slice();
+  }
+
+  if (raw instanceof ArrayBuffer) {
+    return new Uint8Array(raw.slice(0));
+  }
+
+  if (ArrayBuffer.isView(raw)) {
+    return new Uint8Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
+  }
+
+  if (Array.isArray(raw)) {
+    return new Uint8Array(raw);
+  }
+
+  if (typeof raw === "string") {
+    return new TextEncoder().encode(raw);
+  }
+
+  if (typeof raw === "object") {
+    return new TextEncoder().encode(JSON.stringify(raw));
+  }
+
+  throw new Error(
+    "Unsupported transform file raw value. Use Uint8Array, ArrayBuffer, number[], or string.",
+  );
+}
+
+export async function normalizeRuntimeExecutionFile(
+  input: TransformRuntimeFileInput | RuntimeExecutionFile | ExecutionFileEnvelope,
+): Promise<RuntimeExecutionFile> {
+  if (isExecutionFileEnvelope(input)) {
+    return decodeExecutionFileEnvelope(input);
+  }
+
+  if (
+    typeof input === "object" &&
+    input !== null &&
+    "raw" in input &&
+    "filename" in input &&
+    "contentType" in input &&
+    "size" in input &&
+    input.raw instanceof Uint8Array &&
+    typeof input.filename === "string" &&
+    typeof input.contentType === "string" &&
+    typeof input.size === "number"
+  ) {
+    const runtimeFile = input as RuntimeExecutionFile;
+    return cloneRuntimeExecutionFile(runtimeFile);
+  }
+
+  if (
+    typeof input === "object" &&
+    input !== null &&
+    "raw" in input &&
+    "filename" in input &&
+    "contentType" in input &&
+    typeof input.filename === "string" &&
+    typeof input.contentType === "string"
+  ) {
+    const transformFile = input as TransformRuntimeFileInput;
+    const raw = normalizeRawBytes(transformFile.raw);
+
+    if (transformFile.extracted === undefined && !transformFile.parseError) {
+      return buildRuntimeFile(raw, transformFile.filename, transformFile.contentType);
+    }
+
+    return {
+      filename: transformFile.filename,
+      contentType: transformFile.contentType,
+      size: transformFile.size ?? raw.length,
+      raw,
+      ...(transformFile.fileType ? { fileType: transformFile.fileType } : {}),
+      ...(transformFile.extracted !== undefined
+        ? { extracted: cloneExtractedValue(transformFile.extracted) }
+        : {}),
+      ...(transformFile.parseError ? { parseError: transformFile.parseError } : {}),
+    };
+  }
+
+  throw new Error(
+    "Invalid transform file output. Expected an execution file envelope or an object with filename, contentType, and raw bytes.",
+  );
+}
+
+type FileRefProjection = "raw" | "extracted" | "base64";
+
+type ParsedFileRef = {
+  root: string;
+  segments: Array<string | number>;
+  projection?: FileRefProjection;
+};
+
+const FILE_REF_BASE_PATTERN = /^([A-Za-z0-9_.-]+)((?:\[(?:\d+|"[^"]+"|'[^']+')\])*)$/;
+const FILE_REF_EMBEDDED_PATTERN =
+  /file::([A-Za-z0-9_.-]+)((?:\[(?:\d+|"[^"]+"|'[^']+')\])*)\.(raw|extracted|base64)/g;
+
+function parseBracketSegments(input: string): Array<string | number> {
+  const segments: Array<string | number> = [];
+  const bracketPattern = /\[(\d+|"[^"]+"|'[^']+')\]/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = bracketPattern.exec(input)) !== null) {
+    const rawValue = match[1];
+    if (/^\d+$/.test(rawValue)) {
+      segments.push(Number(rawValue));
+      continue;
+    }
+
+    segments.push(rawValue.slice(1, -1));
+  }
+
+  return segments;
+}
+
+function parseFileRefToken(token: string): ParsedFileRef | null {
+  if (!token.startsWith("file::")) {
+    return null;
+  }
+
+  let projection: FileRefProjection | undefined;
+  let refWithoutPrefix = token.slice("file::".length);
+
+  if (refWithoutPrefix.endsWith(".raw")) {
+    projection = "raw";
+    refWithoutPrefix = refWithoutPrefix.slice(0, -4);
+  } else if (refWithoutPrefix.endsWith(".base64")) {
+    projection = "base64";
+    refWithoutPrefix = refWithoutPrefix.slice(0, -7);
+  } else if (refWithoutPrefix.endsWith(".extracted")) {
+    projection = "extracted";
+    refWithoutPrefix = refWithoutPrefix.slice(0, -10);
+  }
+
+  const match = refWithoutPrefix.match(FILE_REF_BASE_PATTERN);
+  if (!match) return null;
+
+  const [, root, bracketPart] = match;
+  return {
+    root,
+    segments: parseBracketSegments(bracketPart || ""),
+    projection,
+  };
+}
+
+export function isRawFileBytes(value: unknown): value is RawFileBytes {
+  return (
+    typeof value === "object" && value !== null && (value as RawFileBytes).kind === "raw_file_bytes"
+  );
+}
+
+export function isExecutionFileEnvelope(value: unknown): value is ExecutionFileEnvelope {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as ExecutionFileEnvelope).kind === "execution_file"
+  );
+}
+
+export function isRuntimeFilePointer(value: unknown): value is RuntimeFilePointer {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as RuntimeFilePointer).kind === "runtime_file_pointer"
+  );
+}
+
+function stringifyExtracted(value: unknown): string {
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+function resolveEnvelopeFromSegments(
+  lookup: Record<string, RuntimeExecutionFile>,
+  fileRef: ParsedFileRef,
+): RuntimeExecutionFile | undefined {
+  const { root, segments } = fileRef;
+  if (segments.length === 0) {
+    return lookup[root];
+  }
+
+  const alias = `${root}${segments
+    .map((segment) => (typeof segment === "number" ? `[${segment}]` : `["${segment}"]`))
+    .join("")}`;
+  return lookup[alias];
+}
+
+function invalidWorkflowFileRefMessage(token: string, stepId?: string): string {
+  const stepContext = stepId ? ` in workflow step ${stepId}` : "";
+  return `Invalid file reference ${token}${stepContext}. Use ${token}.raw for exact bytes, ${token}.base64 for base64 text, or ${token}.extracted for parsed content.`;
+}
+
+export function resolveFileTokens(
+  value: unknown,
+  fileLookup: Record<string, RuntimeExecutionFile>,
+  options?: { stepId?: string },
+): unknown {
+  if (typeof value === "string") {
+    const parsedToken = parseFileRefToken(value);
+    if (parsedToken) {
+      if (!parsedToken.projection) {
+        throw new Error(invalidWorkflowFileRefMessage(value, options?.stepId));
+      }
+
+      const envelope = resolveEnvelopeFromSegments(fileLookup, parsedToken);
+      if (!envelope) {
+        throw new Error(`File reference ${value} could not be resolved.`);
+      }
+
+      if (parsedToken.projection === "raw") {
+        return {
+          kind: "runtime_file_pointer",
+          key: `${parsedToken.root}${parsedToken.segments
+            .map((segment) => (typeof segment === "number" ? `[${segment}]` : `["${segment}"]`))
+            .join("")}`,
+        } as RuntimeFilePointer;
+      }
+      if (parsedToken.projection === "base64") {
+        assertFileSupportsBase64Access(envelope, {
+          ref: `file::${parsedToken.root}${parsedToken.segments
+            .map((segment) => (typeof segment === "number" ? `[${segment}]` : `["${segment}"]`))
+            .join("")}.base64`,
+        });
+        return Buffer.from(envelope.raw).toString("base64");
+      }
+      return envelope.extracted;
+    }
+
+    if (!value.includes("file::")) {
+      return value;
+    }
+
+    return value.replace(FILE_REF_EMBEDDED_PATTERN, (_match, root, bracketPart, projection) => {
+      const parsedEmbedded: ParsedFileRef = {
+        root,
+        segments: parseBracketSegments(bracketPart || ""),
+        projection,
+      };
+      const envelope = resolveEnvelopeFromSegments(fileLookup, parsedEmbedded);
+      if (!envelope) {
+        throw new Error(
+          `File reference file::${root}${bracketPart}.${projection} could not be resolved.`,
+        );
+      }
+      if (projection === "raw") {
+        throw new Error("Cannot embed raw file bytes inside a string value.");
+      }
+      if (projection === "base64") {
+        assertFileSupportsBase64Access(envelope, {
+          ref: `file::${root}${bracketPart}.${projection}`,
+        });
+        return Buffer.from(envelope.raw).toString("base64");
+      }
+      return stringifyExtracted(envelope.extracted);
+    });
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveFileTokens(item, fileLookup, options));
+  }
+
+  if (value !== null && typeof value === "object") {
+    if (isExecutionFileEnvelope(value) || isRawFileBytes(value)) {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [
+        key,
+        resolveFileTokens(entryValue, fileLookup, options),
+      ]),
+    );
+  }
+
+  return value;
 }
 
 /**
@@ -679,48 +1154,48 @@ async function parseZIP(buffer: Uint8Array): Promise<Record<string, unknown>> {
 }
 
 /**
- * Parse PDF content
- * Note: Full PDF parsing requires pdf-parse which has complex dependencies.
- * For now, we return a placeholder. If PDF parsing is critical, consider
- * doing it in the Node.js main thread before sending to Deno.
+ * Parse PDF content using unpdf (pure-JS, Deno-compatible).
  */
-async function parsePDF(_buffer: Uint8Array): Promise<{ textContent: string; note: string }> {
-  return {
-    textContent: "",
-    note: "PDF parsing in Deno subprocess is limited. For full PDF support, parse in Node.js before sending to Deno.",
-  };
-}
-
-/**
- * Parse DOCX content
- * Note: Full DOCX parsing requires mammoth which has complex dependencies.
- * For now, we extract raw XML text. If DOCX parsing is critical, consider
- * doing it in the Node.js main thread before sending to Deno.
- */
-async function parseDOCX(buffer: Uint8Array): Promise<string> {
+async function parsePDF(
+  buffer: Uint8Array,
+): Promise<{ textContent: string; structuredContent: unknown[] }> {
+  // Some PDF libraries take ownership of the passed buffer. Parse from a copy so
+  // produced files can preserve the original raw bytes.
+  const pdf = await getDocumentProxy(buffer.slice());
   try {
-    const zip = new JSZip();
-    const loadedZip = await zip.loadAsync(buffer);
-    const documentXml = loadedZip.file("word/document.xml");
-    if (documentXml) {
-      const xmlContent = await documentXml.async("string");
-      // Extract text from XML (basic extraction)
-      const textContent = xmlContent
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      return textContent;
-    }
-    return "";
-  } catch {
-    return "";
+    const { text } = await extractText(pdf, { mergePages: false });
+    const mergedText = text.join("\n\n---\n\n");
+    return {
+      textContent: mergedText,
+      structuredContent: text.map((pageText, i) => ({ page: i + 1, text: pageText })),
+    };
+  } finally {
+    pdf.destroy();
   }
 }
 
-/**
- * Detect file type from content
- */
-async function detectFileType(buffer: Uint8Array): Promise<SupportedFileType> {
+async function parseDOCX(buffer: Uint8Array): Promise<string> {
+  const result = await mammoth.convertToHtml(
+    { buffer: Buffer.from(buffer) },
+    { convertImage: mammoth.images.imgElement(() => Promise.resolve({ src: "" })) },
+  );
+  return NodeHtmlMarkdown.translate(result.value);
+}
+
+const BINARY_FILE_TYPES: ReadonlySet<SupportedFileType> = new Set([
+  "PDF",
+  "EXCEL",
+  "DOCX",
+  "ZIP",
+  "GZIP",
+  "BINARY",
+]);
+
+export function isBinaryFileType(fileType: SupportedFileType): boolean {
+  return BINARY_FILE_TYPES.has(fileType);
+}
+
+export async function detectFileType(buffer: Uint8Array): Promise<SupportedFileType> {
   // Binary format detection (highest priority)
   if (isGzip(buffer)) return "GZIP";
   if (isPdf(buffer)) return "PDF";
@@ -732,9 +1207,13 @@ async function detectFileType(buffer: Uint8Array): Promise<SupportedFileType> {
     return "ZIP";
   }
 
+  if (!isLikelyTextBuffer(buffer)) {
+    return "BINARY";
+  }
+
   // Text-based detection
-  const sampleSize = Math.min(buffer.length, 8192);
-  const sample = new TextDecoder().decode(buffer.slice(0, sampleSize)).trim();
+  const sampleSize = Math.min(buffer.length, TEXT_SAMPLE_SIZE);
+  const sample = textDecoder.decode(buffer.slice(0, sampleSize)).trim();
 
   // JSON detection
   if (sample.startsWith("{") || sample.startsWith("[")) {
@@ -747,7 +1226,7 @@ async function detectFileType(buffer: Uint8Array): Promise<SupportedFileType> {
 
     // For smaller buffers, validate it's actually valid JSON
     try {
-      JSON.parse(new TextDecoder().decode(buffer));
+      JSON.parse(textDecoder.decode(buffer));
       return "JSON";
     } catch {
       // Not valid JSON - might be malformed
@@ -779,10 +1258,15 @@ export async function parseFile(
 ): Promise<unknown> {
   const buffer = content instanceof Buffer ? new Uint8Array(content) : content;
 
-  // Auto-detect if needed
-  const actualType = fileType === "AUTO" ? await detectFileType(buffer) : fileType;
+  if (fileType === "AUTO") {
+    const detectedType = await detectFileType(buffer);
+    if (detectedType === "BINARY") {
+      return parseFile(buffer, "RAW");
+    }
+    return parseFile(buffer, detectedType);
+  }
 
-  switch (actualType) {
+  switch (fileType) {
     case "JSON":
       // Use streaming parser for large buffers to avoid V8 string limits
       if (isLargeBuffer(buffer)) {
@@ -790,19 +1274,19 @@ export async function parseFile(
       }
 
       // For smaller buffers, use standard parsing
-      return parseJSON(new TextDecoder().decode(buffer));
+      return parseJSON(textDecoder.decode(buffer));
 
     case "CSV":
-      return parseCSV(new TextDecoder().decode(buffer));
+      return parseCSV(textDecoder.decode(buffer));
 
     case "XML":
-      return parseXML(new TextDecoder().decode(buffer));
+      return parseXML(textDecoder.decode(buffer));
 
     case "HTML":
-      return parseHTML(new TextDecoder().decode(buffer));
+      return parseHTML(textDecoder.decode(buffer));
 
     case "YAML":
-      return parseYAML(new TextDecoder().decode(buffer));
+      return parseYAML(textDecoder.decode(buffer));
 
     case "EXCEL":
       return parseExcel(buffer);
@@ -818,6 +1302,9 @@ export async function parseFile(
 
     case "ZIP":
       return parseZIP(buffer);
+
+    case "BINARY":
+      throw new Error("Cannot parse binary file as inline data");
 
     case "RAW":
     default:
@@ -835,9 +1322,56 @@ export async function parseFile(
 
       // For smaller buffers, try JSON first, then return as string
       try {
-        return JSON.parse(new TextDecoder().decode(buffer));
+        return JSON.parse(textDecoder.decode(buffer));
       } catch {
-        return new TextDecoder().decode(buffer);
+        return textDecoder.decode(buffer);
       }
   }
+}
+
+export function guessContentType(filePath: string): string {
+  const lastDot = filePath.lastIndexOf(".");
+  const ext = lastDot === -1 ? "" : filePath.slice(lastDot).toLowerCase();
+  switch (ext) {
+    case ".pdf":
+      return "application/pdf";
+    case ".csv":
+      return "text/csv";
+    case ".xml":
+      return "application/xml";
+    case ".json":
+      return "application/json";
+    case ".txt":
+      return "text/plain";
+    case ".zip":
+      return "application/zip";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+export function contentToBuffer(
+  content: string | Uint8Array | unknown,
+  fileLookup: Record<string, RuntimeExecutionFile>,
+): Uint8Array {
+  if (content instanceof Uint8Array) {
+    return content;
+  }
+  if (isRawFileBytes(content)) {
+    return new Uint8Array(Buffer.from(content.base64, "base64"));
+  }
+  if (isRuntimeFilePointer(content)) {
+    const file = fileLookup[content.key];
+    if (!file) {
+      throw new Error(`File reference file::${content.key}.raw could not be resolved.`);
+    }
+    return file.raw;
+  }
+  if (isExecutionFileEnvelope(content)) {
+    return new Uint8Array(Buffer.from(content.rawBase64, "base64"));
+  }
+  if (typeof content === "string") {
+    return new TextEncoder().encode(content);
+  }
+  return new TextEncoder().encode(JSON.stringify(content, null, 2));
 }

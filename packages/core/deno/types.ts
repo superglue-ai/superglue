@@ -3,6 +3,7 @@
  */
 
 import type {
+  ExecutionFileEnvelope,
   Tool,
   RequestOptions,
   ToolStepResult,
@@ -19,6 +20,9 @@ export interface DenoWorkflowPayload {
   runId: string;
   workflow: Tool;
   payload?: Record<string, any>;
+  files?: Record<string, ExecutionFileEnvelope>;
+  /** Internal-only: return produced file envelopes inline for step-by-step execution */
+  returnProducedFiles?: boolean;
   credentials?: Record<string, string>;
   options?: RequestOptions;
   systems: System[];
@@ -39,6 +43,7 @@ export interface DenoWorkflowResult {
   data?: any;
   error?: string;
   stepResults: ToolStepResult[];
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
   tool?: Tool;
   startedAt: string;
   completedAt: string;

@@ -2,8 +2,7 @@
 
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { AgentRequest, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
-import { truncateFileContent } from "@/src/lib/file-utils";
-import { Message } from "@superglue/shared";
+import { ExecutionFileEnvelope, Message } from "@superglue/shared";
 import { useCallback, useRef } from "react";
 import type { AgentConfig, UploadedFile, UseAgentRequestReturn } from "./types";
 import type { StreamState } from "./use-agent-streaming";
@@ -27,11 +26,32 @@ interface UseAgentRequestOptions {
   uploadedFiles: UploadedFile[];
   pendingFiles: UploadedFile[];
   sessionFiles: UploadedFile[];
-  filePayloads: Record<string, any>;
+  filePayloads: Record<string, ExecutionFileEnvelope>;
   toolExecutionPolicies: ToolExecutionPolicies;
   loadedSkills: string[];
   conversationIdRef: React.MutableRefObject<string | null>;
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void;
+}
+
+interface FileStateSnapshot {
+  files: Array<{ key: string; name: string }>;
+  loadedSkills: string[];
+}
+
+function parseFileStateSnapshot(raw: string): FileStateSnapshot {
+  if (!raw) {
+    return { files: [], loadedSkills: [] };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<FileStateSnapshot>;
+    return {
+      files: Array.isArray(parsed.files) ? parsed.files : [],
+      loadedSkills: Array.isArray(parsed.loadedSkills) ? parsed.loadedSkills : [],
+    };
+  } catch {
+    return { files: [], loadedSkills: [] };
+  }
 }
 
 export function useAgentRequest({
@@ -72,91 +92,76 @@ export function useAgentRequest({
     };
   }, []);
 
-  const buildFilePayloads = useCallback(():
-    | Record<string, { name: string; content: any }>
-    | undefined => {
+  const buildFilePayloads = useCallback((): Record<string, ExecutionFileEnvelope> | undefined => {
     if (Object.keys(filePayloads).length === 0) return undefined;
-
-    const result: Record<string, { name: string; content: any }> = {};
-    for (const [key, content] of Object.entries(filePayloads)) {
-      const file = uploadedFiles.find((f) => f.key === key);
-      const fileName = file?.name || key;
-      result[key] = { name: fileName, content };
-    }
-    return Object.keys(result).length > 0 ? result : undefined;
-  }, [uploadedFiles, filePayloads]);
-
-  const FILE_PREVIEW_MAX_CHARS = 4000;
+    return filePayloads;
+  }, [filePayloads]);
 
   const buildFileStateMessage = useCallback((): Message | null => {
     const readyPending = pendingFiles.filter((f) => f.status === "ready");
-    const currentFiles = [...sessionFiles, ...readyPending];
-    const currentKeys = currentFiles
-      .map((f) => f.key)
-      .sort()
-      .join(",");
+    const currentFiles = [...sessionFiles, ...readyPending]
+      .map((file) => ({ key: file.key, name: file.name }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+    const currentSnapshot: FileStateSnapshot = {
+      files: currentFiles,
+      loadedSkills: [...loadedSkills].sort(),
+    };
+    const currentStateKey = JSON.stringify(currentSnapshot);
 
-    if (currentKeys === prevFileKeysRef.current) return null;
+    if (currentStateKey === prevFileKeysRef.current) return null;
 
-    const prevKeys = new Set(prevFileKeysRef.current.split(",").filter(Boolean));
-    const currKeys = new Set(currentKeys.split(",").filter(Boolean));
-    prevFileKeysRef.current = currentKeys;
+    const prevEntries = new Map(
+      parseFileStateSnapshot(prevFileKeysRef.current).files.map(
+        (file) => [file.key, file.name] as const,
+      ),
+    );
+    const currKeys = new Set(currentFiles.map((file) => file.key));
+    prevFileKeysRef.current = currentStateKey;
 
-    const added = currentFiles.filter((f) => !prevKeys.has(f.key));
-    const removedKeys = [...prevKeys].filter((k) => !currKeys.has(k));
+    const added = currentFiles.filter((file) => !prevEntries.has(file.key));
+    const removed = [...prevEntries.entries()]
+      .filter(([key]) => !currKeys.has(key))
+      .map(([, name]) => name);
 
-    const parts: string[] = ["[FILE STATE]"];
-
-    if (added.length > 0) {
-      parts.push(`Files added: ${added.map((f) => f.name).join(", ")}`);
-    }
-    if (removedKeys.length > 0) {
-      parts.push(`Files removed: ${removedKeys.join(", ")}`);
-    }
-
-    if (currentFiles.length > 0) {
-      const addedKeys = new Set(added.map((f) => f.key));
-      const fileList = currentFiles
-        .map((f) => {
-          const tag = addedKeys.has(f.key) ? "[new]" : "[previously uploaded]";
-          return `- ${f.name} (file::${f.key}) ${tag}`;
-        })
-        .join("\n");
-      parts.push(`\nCurrent session files:\n${fileList}`);
-    } else {
-      parts.push("\nNo files are currently available in this session.");
-    }
+    const timestamp = new Date();
+    const parts: string[] = ["[SESSION STATE]", `timestamp: ${timestamp.toISOString()}`];
 
     if (added.length > 0) {
-      const previews = added
-        .map((file) => {
-          const content = filePayloads[file.key];
-          if (content === undefined || content === null) return null;
-          let contentStr: string;
-          try {
-            contentStr = typeof content === "string" ? content : JSON.stringify(content, null, 2);
-          } catch {
-            contentStr = "[Unable to serialize]";
-          }
-          const truncated = truncateFileContent(contentStr, FILE_PREVIEW_MAX_CHARS).truncated;
-          return `### ${file.name} (file::${file.key})\n\`\`\`\n${truncated}\n\`\`\``;
-        })
-        .filter(Boolean)
-        .join("\n\n");
-
-      if (previews) {
-        parts.push(`\nFile content previews:\n${previews}`);
+      parts.push(
+        `changes:\n${added.map((file) => `- added file ${file.name} (file::${file.key})`).join("\n")}`,
+      );
+    }
+    if (removed.length > 0) {
+      const existingChanges = parts.find((part) => part.startsWith("changes:\n"));
+      const removedLines = removed.map((name) => `- removed file ${name}`);
+      if (existingChanges) {
+        parts[parts.indexOf(existingChanges)] = `${existingChanges}\n${removedLines.join("\n")}`;
+      } else {
+        parts.push(`changes:\n${removedLines.join("\n")}`);
       }
     }
 
+    if (currentFiles.length > 0) {
+      const fileList = currentFiles.map((f) => `- ${f.name} (file::${f.key})`).join("\n");
+      parts.push(`available_files:\n${fileList}`);
+    } else {
+      parts.push("available_files: none");
+    }
+
+    if (loadedSkills.length > 0) {
+      parts.push(`loaded_skills:\n${loadedSkills.map((skill) => `- ${skill}`).join("\n")}`);
+    } else {
+      parts.push("loaded_skills: none");
+    }
+
     return {
-      id: `file-state-${Date.now()}`,
+      id: `file-state-${timestamp.getTime()}`,
       role: "user",
       content: parts.join("\n"),
-      timestamp: new Date(),
+      timestamp,
       isHidden: true,
     } as Message;
-  }, [sessionFiles, pendingFiles, filePayloads]);
+  }, [sessionFiles, pendingFiles, loadedSkills]);
 
   const sendAgentRequest = useCallback(
     async (

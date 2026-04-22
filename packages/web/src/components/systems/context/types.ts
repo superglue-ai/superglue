@@ -30,10 +30,11 @@ export interface SystemDefinition {
 }
 
 export interface AuthState {
-  authType: "none" | "oauth" | "apikey";
+  authType: "none" | "oauth" | "apikey" | "connection_string";
   credentials: Record<string, any>;
   oauthFields: OAuthFields;
   apiKeyCredentials: string;
+  connectionStringCredentials: Record<string, string>;
   isOAuthConfigured: boolean;
   useSuperglueOAuth: boolean;
   multiTenancyMode: "disabled" | "enabled";
@@ -84,10 +85,11 @@ export interface SystemConfigContextValue {
   setTemplateName: (name: string) => void;
   setIcon: (icon: string) => void;
 
-  setAuthType: (type: "none" | "oauth" | "apikey") => void;
+  setAuthType: (type: "none" | "oauth" | "apikey" | "connection_string") => void;
   setCredentials: (credentials: Record<string, any>) => void;
   setOAuthFields: (fields: Partial<OAuthFields>) => void;
   setApiKeyCredentials: (credentials: string) => void;
+  setConnectionStringCredentials: (credentials: Record<string, string>) => void;
   setUseSuperglueOAuth: (use: boolean) => void;
   setMultiTenancyMode: (mode: "disabled" | "enabled") => void;
 
@@ -107,7 +109,7 @@ export interface SystemContextForAgent {
   systemId: string;
   url: string;
   templateName?: string;
-  authType: "none" | "oauth" | "apikey";
+  authType: "none" | "oauth" | "apikey" | "connection_string";
   credentialKeys: string[];
   specificInstructions: string;
   isNewSystem: boolean;

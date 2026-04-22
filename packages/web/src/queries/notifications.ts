@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { queryKeys } from "./query-keys";
 import { useEESuperglueClient } from "./use-client";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 import type { NotificationSettingsResponse } from "@/src/lib/ee-superglue-client";
 import type { SlackAuthType, NotificationRule } from "@superglue/shared";
 
@@ -15,7 +15,7 @@ export function useNotificationSettings() {
       const client = createClient();
       return client.getNotificationSettings();
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 }
 

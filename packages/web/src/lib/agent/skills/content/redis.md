@@ -7,7 +7,6 @@
   type: "request",
   systemId: "my_redis",
   url: "redis://<<my_redis_username>>:<<my_redis_password>>@<<my_redis_host>>:<<my_redis_port>>/<<my_redis_database>>",
-  method: "POST",            // ignored for Redis but required by schema
   body: '{"command": "GET", "args": ["<<keyName>>"]}'
 }
 ```
@@ -120,7 +119,7 @@ Multiple commands:
 ## Connection Management
 
 - A fresh connection is created per execution and closed after completion
-- TLS auto-configured for `rediss://` URLs (certificate verification enabled by default; set `REDIS_TLS_REJECT_UNAUTHORIZED=false` to disable)
+- TLS auto-configured for `rediss://` URLs using the runtime's default certificate verification behavior
 - 5-second connection timeout, 30-second command timeout
 - Array commands (pipeline) run on a single connection for efficiency
 

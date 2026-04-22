@@ -13,6 +13,16 @@ export interface TemplateExtensionStorage {
   stepId: string;
 }
 
+type TemplateStorageShape = {
+  template?: TemplateExtensionStorage;
+};
+
+function coerceNodeViewRenderer(renderer: unknown): any {
+  // In CI, @tiptap/react can be typed against a different physical @tiptap/core
+  // install than the Node.create() call below. Cast at this boundary only.
+  return renderer as any;
+}
+
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     template: {
@@ -27,7 +37,8 @@ declare module "@tiptap/core" {
 
 function TemplateNodeView(props: NodeViewProps) {
   const { node, deleteNode, updateAttributes, selected, editor } = props;
-  const stepId = editor.storage.template?.stepId ?? "";
+  const templateStorage = editor.storage as TemplateStorageShape;
+  const stepId = templateStorage.template?.stepId ?? "";
   const { getStepTemplateData, sourceDataVersion } = useExecution();
   const { sourceData, dataSelectorOutput, canExecute, categorizedVariables } =
     getStepTemplateData(stepId);
@@ -151,8 +162,9 @@ export const TemplateExtension = Node.create<TemplateExtensionOptions, TemplateE
       setStepId:
         (stepId: string) =>
         ({ editor }) => {
-          if (editor.storage.template) {
-            editor.storage.template.stepId = stepId;
+          const templateStorage = editor.storage as TemplateStorageShape;
+          if (templateStorage.template) {
+            templateStorage.template.stepId = stepId;
           }
           return true;
         },
@@ -178,7 +190,7 @@ export const TemplateExtension = Node.create<TemplateExtensionOptions, TemplateE
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(TemplateNodeView);
+    return coerceNodeViewRenderer(ReactNodeViewRenderer(TemplateNodeView));
   },
 
   addInputRules() {

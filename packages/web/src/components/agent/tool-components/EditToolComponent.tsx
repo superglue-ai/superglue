@@ -3,6 +3,7 @@
 import { useUpsertTool } from "@/src/queries/tools";
 import { Button } from "@/src/components/ui/button";
 import { ErrorMessage } from "@/src/components/ui/error-message";
+import { FileChip } from "@/src/components/ui/file-chip";
 import { enrichDiffsWithTargets, applyDiffsToConfig } from "@/src/lib/config-diff-utils";
 import { findDraftInMessages } from "@/src/lib/agent/agent-context";
 import { useSuperglueClient } from "@/src/queries/use-client";
@@ -12,7 +13,7 @@ import {
 } from "@/src/lib/agent/agent-tools/tool-call-state";
 import type { EditToolSaveResult } from "@/src/lib/agent/agent-types";
 import { deleteAllDrafts } from "@/src/lib/storage";
-import { Tool, ToolCall, ToolDiff } from "@superglue/shared";
+import { getToolInputSchemaSections, Tool, ToolCall, ToolDiff } from "@superglue/shared";
 import { CheckCircle, Pencil, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DiffApprovalComponent } from "./DiffApprovalComponent";
@@ -28,14 +29,6 @@ interface EditToolComponentProps {
   tool: ToolCall;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
   onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
-  sendAgentRequest?: (
-    userMessage?: string,
-    options?: {
-      hiddenStarterMessage?: string;
-      hideUserMessage?: boolean;
-      resumeToolCallId?: string;
-    },
-  ) => Promise<void>;
   onAbortStream?: () => void;
   onApplyChanges?: (config: Tool, diffs?: ToolDiff[]) => void;
   isPlayground?: boolean;
@@ -46,13 +39,12 @@ export function EditToolComponent({
   tool,
   onToolUpdate,
   onToolMutation,
-  sendAgentRequest,
   onApplyChanges,
   isPlayground,
   filePayloads,
 }: EditToolComponentProps) {
   const toolConfigCtx = useToolConfigOptional();
-  const { messages } = useAgentContext();
+  const { messages, sendAgentRequest } = useAgentContext();
   const createClient = useSuperglueClient();
   const upsertTool = useUpsertTool();
 
@@ -84,30 +76,6 @@ export function EditToolComponent({
     toolConfigCtx?.outputSchema,
   ]);
 
-  const resolveOriginalConfigSync = useCallback((): Tool | undefined => {
-    if (playgroundDraftConfig) return playgroundDraftConfig;
-    const draftId = parsedOutputRef.current?.draftId || tool.input?.draftId;
-    if (draftId) {
-      const draft = findDraftInMessages(messages, draftId);
-      if (draft?.config) return draft.config as Tool;
-    }
-    return undefined;
-  }, [playgroundDraftConfig, messages, tool.input?.draftId]);
-
-  const resolveOriginalConfigAsync = useCallback(async (): Promise<Tool | undefined> => {
-    const sync = resolveOriginalConfigSync();
-    if (sync) return sync;
-    const toolId = parsedOutputRef.current?.toolId || tool.input?.toolId;
-    if (toolId) {
-      try {
-        const client = createClient();
-        const fetched = await client.getWorkflow(toolId);
-        if (fetched) return fetched;
-      } catch {}
-    }
-    return undefined;
-  }, [resolveOriginalConfigSync, createClient, tool.input?.toolId]);
-
   const [currentConfig, setCurrentConfig] = useState<Tool | null>(null);
   const [hasActedOnDiffs, setHasActedOnDiffs] = useState(false);
   const [editablePayload, setEditablePayload] = useState<string>("");
@@ -136,6 +104,45 @@ export function EditToolComponent({
   const parsedOutputRef = useRef(parsedOutput);
   parsedOutputRef.current = parsedOutput;
 
+  const targetDraftId = parsedOutput?.draftId || tool.input?.draftId;
+  const targetToolId = parsedOutput?.toolId || tool.input?.toolId;
+  const targetsCurrentPlaygroundTool = Boolean(
+    playgroundDraftConfig &&
+    (targetDraftId === "playground-draft" || targetToolId === playgroundDraftConfig.id),
+  );
+
+  const resolveOriginalConfigSync = useCallback((): Tool | undefined => {
+    if (targetsCurrentPlaygroundTool && playgroundDraftConfig) {
+      return playgroundDraftConfig;
+    }
+
+    if (targetDraftId && targetDraftId !== "playground-draft") {
+      const draft = findDraftInMessages(messages, targetDraftId);
+      if (draft?.config) return draft.config as Tool;
+    }
+
+    if (parsedOutput?.originalConfig) {
+      return parsedOutput.originalConfig as Tool;
+    }
+
+    return undefined;
+  }, [messages, playgroundDraftConfig, targetDraftId, targetsCurrentPlaygroundTool, parsedOutput]);
+
+  const resolveOriginalConfigAsync = useCallback(async (): Promise<Tool | undefined> => {
+    const sync = resolveOriginalConfigSync();
+    if (sync) return sync;
+
+    if (targetToolId) {
+      try {
+        const client = createClient();
+        const fetched = await client.getWorkflow(targetToolId);
+        if (fetched) return fetched;
+      } catch {}
+    }
+
+    return undefined;
+  }, [resolveOriginalConfigSync, createClient, targetToolId]);
+
   const isSuccess = parsedOutput?.success === true;
   const isSavingAcceptedChanges = approvalAction === "accept_and_save";
   const isAwaitingConfirmation = tool.status === "awaiting_confirmation";
@@ -143,7 +150,38 @@ export function EditToolComponent({
   const isToolRunning = tool.status === "running" || isSavingAcceptedChanges;
   const isToolPending = tool.status === "pending";
   const defaultSaveOnAccept = parsedOutput?.defaultSaveOnAccept ?? isPlayground;
-  const allowDraftOnlyAccept = parsedOutput?.allowDraftOnlyAccept ?? isPlayground;
+  const allowDraftOnlyAccept =
+    parsedOutput?.allowDraftOnlyAccept ?? (isPlayground && targetsCurrentPlaygroundTool);
+  const requiredInputs = useMemo(() => {
+    const sections = getToolInputSchemaSections(parsedOutput?.inputSchema);
+    return {
+      payload: Array.isArray(sections.payloadSchema?.required)
+        ? sections.payloadSchema.required
+        : [],
+      files: Array.isArray(sections.filesSchema?.required) ? sections.filesSchema.required : [],
+      payloadProperties: sections.payloadSchema?.properties || {},
+      fileProperties: sections.filesSchema?.properties || {},
+    };
+  }, [parsedOutput?.inputSchema]);
+  const inputFileChips = useMemo(() => {
+    const files = tool.input?.files;
+    if (!files || typeof files !== "object") {
+      return [];
+    }
+    return Object.entries(files).map(([alias, value]) => ({
+      name:
+        typeof value === "object" &&
+        value !== null &&
+        "filename" in value &&
+        typeof (value as { filename: string }).filename === "string"
+          ? (value as { filename: string }).filename
+          : typeof value === "string"
+            ? value
+            : alias,
+      key: alias,
+      status: "ready" as const,
+    }));
+  }, [tool.input?.files]);
 
   const awaitingConfirmationDiffs = useMemo(() => {
     if (showDiffApproval && parsedOutput?.success === false && parsedOutput?.error) {
@@ -192,7 +230,7 @@ export function EditToolComponent({
   }, [tool.status, tool.input?.payload]);
 
   const syncSavedToolState = useCallback(
-    async (savedTool: Tool) => {
+    async (savedTool: Tool, options?: { syncToPlayground?: boolean }) => {
       setCurrentConfig(savedTool);
       setSavedToolId(savedTool.id);
 
@@ -202,7 +240,7 @@ export function EditToolComponent({
         console.warn("Failed to delete drafts after accept & save:", draftCleanupResult[0].reason);
       }
 
-      if (!toolConfigCtx) {
+      if (!options?.syncToPlayground || !toolConfigCtx) {
         return;
       }
 
@@ -219,7 +257,7 @@ export function EditToolComponent({
   );
 
   const persistToolConfig = useCallback(
-    async (toolToSave: Tool) => {
+    async (toolToSave: Tool, options?: { syncToPlayground?: boolean }) => {
       const savedTool = await upsertTool.mutateAsync({
         id: toolToSave.id,
         input: toolToSave,
@@ -228,7 +266,7 @@ export function EditToolComponent({
         throw new Error("Failed to save tool");
       }
 
-      await syncSavedToolState(savedTool);
+      await syncSavedToolState(savedTool, options);
       return savedTool;
     },
     [upsertTool, syncSavedToolState],
@@ -248,8 +286,9 @@ export function EditToolComponent({
         (result.approved || result.partial) &&
         result.approvedDiffs.length > 0 &&
         (result.saveAfterAccept === true || !allowDraftOnlyAccept);
+      const syncToPlayground = targetsCurrentPlaygroundTool;
 
-      if (saveAfterAccept && toolConfigCtx) {
+      if (saveAfterAccept && syncToPlayground && toolConfigCtx) {
         toolConfigCtx.setUnsavedChangesSuppressed(true);
       }
 
@@ -268,7 +307,9 @@ export function EditToolComponent({
           if (originalConfig) {
             nextConfig = applyDiffsToConfig(originalConfig, result.approvedDiffs);
             setCurrentConfig(nextConfig);
-            onApplyChanges?.(nextConfig, result.approvedDiffs);
+            if (syncToPlayground) {
+              onApplyChanges?.(nextConfig, result.approvedDiffs);
+            }
           }
         }
 
@@ -279,10 +320,12 @@ export function EditToolComponent({
               error: "Could not resolve the edited tool configuration to save.",
             };
             setSaveError(effectiveSaveResult.error);
-            toolConfigCtx?.setUnsavedChangesSuppressed(false);
+            if (syncToPlayground) {
+              toolConfigCtx?.setUnsavedChangesSuppressed(false);
+            }
           } else {
             try {
-              const savedTool = await persistToolConfig(nextConfig);
+              const savedTool = await persistToolConfig(nextConfig, { syncToPlayground });
               effectiveSaveResult = {
                 success: true,
                 toolId: savedTool.id,
@@ -293,7 +336,9 @@ export function EditToolComponent({
                 error: error?.message || "Failed to save tool",
               };
               setSaveError(effectiveSaveResult.error);
-              toolConfigCtx?.setUnsavedChangesSuppressed(false);
+              if (syncToPlayground) {
+                toolConfigCtx?.setUnsavedChangesSuppressed(false);
+              }
             }
           }
         }
@@ -339,7 +384,7 @@ export function EditToolComponent({
           resumeToolCallId: tool.id,
         });
       } finally {
-        if (!saveAfterAccept || !effectiveSaveResult?.success) {
+        if (syncToPlayground && (!saveAfterAccept || !effectiveSaveResult?.success)) {
           toolConfigCtx?.setUnsavedChangesSuppressed(false);
         }
         setApprovalAction(null);
@@ -352,6 +397,7 @@ export function EditToolComponent({
       sendAgentRequest,
       onApplyChanges,
       resolveOriginalConfigAsync,
+      targetsCurrentPlaygroundTool,
       tool.id,
       onToolMutation,
       onToolUpdate,
@@ -447,6 +493,21 @@ export function EditToolComponent({
 
         {showDiffApproval && (
           <div className="space-y-3">
+            {inputFileChips.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">File Inputs</div>
+                {inputFileChips.map((file) => (
+                  <FileChip
+                    key={file.key}
+                    file={file}
+                    size="default"
+                    rounded="md"
+                    showOriginalName={true}
+                    showKey={true}
+                  />
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span className="text-sm font-medium">Review Changes</span>
@@ -568,19 +629,30 @@ export function EditToolComponent({
               message={parsedOutput?.error || tool.error || "Unknown error"}
               truncateAt={300}
             />
-            {parsedOutput?.inputSchema?.required && (
+            {(requiredInputs.payload.length > 0 || requiredInputs.files.length > 0) && (
               <div className="p-3 bg-muted/50 rounded border border-border/50">
                 <div className="text-xs font-medium text-muted-foreground mb-2">
                   Required Inputs:
                 </div>
                 <div className="space-y-1">
-                  {parsedOutput.inputSchema.required.map((field: string) => (
+                  {requiredInputs.payload.map((field: string) => (
                     <div key={field} className="text-xs text-muted-foreground">
-                      • <span className="font-mono">{field}</span>
-                      {parsedOutput.inputSchema.properties?.[field]?.description && (
+                      • <span className="font-mono">payload.{field}</span>
+                      {requiredInputs.payloadProperties?.[field]?.description && (
                         <span className="text-muted-foreground/70">
                           {" — "}
-                          {parsedOutput.inputSchema.properties[field].description}
+                          {requiredInputs.payloadProperties[field].description}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  {requiredInputs.files.map((field: string) => (
+                    <div key={field} className="text-xs text-muted-foreground">
+                      • <span className="font-mono">files.{field}</span>
+                      {requiredInputs.fileProperties?.[field]?.description && (
+                        <span className="text-muted-foreground/70">
+                          {" — "}
+                          {requiredInputs.fileProperties[field].description}
                         </span>
                       )}
                     </div>

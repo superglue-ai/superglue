@@ -1,4 +1,5 @@
 import { System } from "./types";
+import { ConnectionFieldDef } from "./utils";
 
 export interface SystemConfig {
   name: string;
@@ -8,12 +9,13 @@ export interface SystemConfig {
   docsUrl: string;
   openApiUrl?: string;
   openApiSchema?: string;
-  preferredAuthType?: "oauth" | "apikey" | "none";
+  preferredAuthType?: "oauth" | "apikey" | "basic" | "none" | "connection_string";
+  connectionFields?: ConnectionFieldDef[];
   oauth?: {
     authUrl?: string;
     tokenUrl?: string;
     scopes?: string;
-    client_id?: string; // Public client ID (non-sensitive, can be in template)
+    client_id?: string;
     grant_type?: "authorization_code" | "client_credentials";
     tokenAuthMethod?: "body" | "basic_auth";
     tokenContentType?: "form" | "json";
@@ -32,7 +34,14 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*(postgres|postgresql).*$",
     icon: "postgresql",
     docsUrl: "",
-    preferredAuthType: "apikey",
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "db.example.com", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: "5432", placeholder: "5432" },
+      { key: "database", label: "Database", placeholder: "mydb", required: true },
+      { key: "username", label: "Username", placeholder: "postgres", required: true },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
     keywords: ["database", "sql", "postgres", "postgresql", "api key", "tables"],
   },
   redis_direct: {
@@ -41,8 +50,15 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*(rediss?://).*$",
     icon: "redis",
     docsUrl: "https://redis.io/docs/latest/commands/",
-    preferredAuthType: "apikey",
-    keywords: ["database", "cache", "redis", "key-value", "nosql", "api key"],
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "redis.example.com", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: "6379", placeholder: "6379" },
+      { key: "database", label: "Database Index", placeholder: "0" },
+      { key: "username", label: "Username", placeholder: "default" },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
+    keywords: ["database", "cache", "redis", "key-value", "nosql"],
   },
   azure_sql: {
     name: "azure_sql",
@@ -50,7 +66,13 @@ export const systems: Record<string, SystemConfig> = {
     regex: "^.*(azure.*sql|sql.*azure|database\\.windows\\.net).*$",
     icon: "default",
     docsUrl: "https://learn.microsoft.com/en-us/azure/azure-sql/",
-    preferredAuthType: "apikey",
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "myserver.database.windows.net", required: true },
+      { key: "database", label: "Database", placeholder: "mydb", required: true },
+      { key: "username", label: "Username", required: true },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
     keywords: [
       "database",
       "sql",
@@ -62,6 +84,22 @@ export const systems: Record<string, SystemConfig> = {
       "mssql",
       "sqlserver",
     ],
+  },
+  sftp: {
+    name: "sftp",
+    apiUrl: "sftp://<<username>>:<<password>>@<<host>>:<<port>><<path>>",
+    regex: "^.*(sftp|ftp):\\/\\/.*$",
+    icon: "default",
+    docsUrl: "",
+    preferredAuthType: "connection_string",
+    connectionFields: [
+      { key: "host", label: "Host", placeholder: "sftp.example.com", required: true },
+      { key: "port", label: "Port", type: "number", defaultValue: "22", placeholder: "22" },
+      { key: "path", label: "Base Path", placeholder: "/uploads" },
+      { key: "username", label: "Username", required: true },
+      { key: "password", label: "Password", type: "password", required: true },
+    ],
+    keywords: ["sftp", "ftp", "file", "transfer", "upload", "download"],
   },
   stripe: {
     name: "stripe",
@@ -676,7 +714,7 @@ export const systems: Record<string, SystemConfig> = {
 OPTION 1: OAuth App (Recommended)
 If the user has or creates an OAuth app in their Google Cloud project:
 1. Create OAuth credentials in Google Cloud Console → APIs & Services → Credentials → Create Credentials → OAuth client ID
-2. Set application type to "Web application" and add the superglue callback URL as authorized redirect URI
+2. Set application type to "Web application" and add your Superglue instance callback URL as an authorized redirect URI (for OSS: https://<your-superglue-host>/api/auth/callback)
 3. Use create_system with credentials: { client_id: "..." } and sensitiveCredentials: { client_secret: true }
 4. After system creation, use authenticate_oauth - user completes Google sign-in in popup
 5. Superglue auto-refreshes tokens - no manual token management needed
@@ -2010,7 +2048,7 @@ IMPORTANT — Scopes:
 
 OAuth App Setup in Creatio:
 1. System Designer → "OAuth 2.0 integrated applications" → create app with grant type "On behalf of a user (authorization code)"
-2. Set redirect URI to the superglue callback URL
+2. Set redirect URI to your Superglue instance callback URL (https://<your-superglue-host>/api/auth/callback)
 3. Under the app's permitted resources, add the ApplicationAccess resource
 4. Note the Client ID and Client Secret
 
@@ -2561,7 +2599,7 @@ API Base URLs:
       "graph",
       "oauth",
     ],
-    systemSpecificInstructions: `Azure App Registration Required: Create an app in Azure Portal → App registrations with redirect URI: https://app.superglue.cloud/api/auth/callback
+    systemSpecificInstructions: `Azure App Registration Required: Create an app in Azure Portal → App registrations with redirect URI: your Superglue instance callback URL (for OSS: https://<your-superglue-host>/api/auth/callback)
     Tenant-Specific Endpoints: Multi-tenant apps need tenant ID in OAuth URLs (/04a63d67.../oauth2/v2.0/authorize) instead of /common endpoint
     Credentials Needed: Application (client) ID + Client Secret (generated under Certificates & secrets - copy the Value immediately, not the Secret ID)
     API Permissions: Add Microsoft Graph permissions (e.g., Sites.ReadWrite.All) under API permissions, then grant admin consent if you have admin rights
@@ -3265,7 +3303,7 @@ AVAILABLE DATA: meetings, transcripts, action items, calendar events, emails, pe
       tokenUrl: "https://login.procore.com/oauth/token",
       scopes: "",
     },
-    systemSpecificInstructions: `Setup: 1) Create app at developers.procore.com → My Apps → Create New App. 2) Add a "Data Connector Component" with User-level Authentication, then create a version. 3) Under OAuth Credentials, set the Redirect URI to the superglue callback URL (e.g. https://app.superglue.cloud/api/auth/callback). 4) Copy the Client ID and Client Secret — these are the only credentials superglue needs. For sandbox testing, use login-sandbox.procore.com for auth and sandbox.procore.com for API calls instead of the production URLs. The app must be installed on the target company before API calls will work (via the Developer Portal for sandbox, or the App Marketplace for production). Procore does not use granular OAuth scopes — access is controlled by the app's component permissions in the Developer Portal.
+    systemSpecificInstructions: `Setup: 1) Create app at developers.procore.com → My Apps → Create New App. 2) Add a "Data Connector Component" with User-level Authentication, then create a version. 3) Under OAuth Credentials, set the Redirect URI to your Superglue instance callback URL (for OSS: https://<your-superglue-host>/api/auth/callback). 4) Copy the Client ID and Client Secret. For sandbox testing, use login-sandbox.procore.com for auth and sandbox.procore.com for API calls instead of the production URLs. The app must be installed on the target company before API calls will work (via the Developer Portal for sandbox, or the App Marketplace for production). Procore does not use granular OAuth scopes — access is controlled by the app's component permissions in the Developer Portal.
 
 IMPORTANT: Sandbox and production use completely separate credentials and base URLs — never mix them. Sandbox: login-sandbox.procore.com (auth) + sandbox.procore.com (API). Production: login.procore.com (auth) + api.procore.com (API). OAuth scopes must be left empty — Procore does not accept standard OAuth scope strings and will return an "invalid scope" error. All API requests require a Procore-Company-Id header with the numeric company ID (visible in the browser URL when logged into Procore, e.g. {domain}/{company_id}/...), and the app must be explicitly installed/connected to that company before any API calls will succeed. The REST API base path is /rest/v1.0/ and most resources are nested under /companies/{company_id}/ or /projects/{project_id}/. Procore has both v1.0 (/rest/v1.0/) and v2.0 (/rest/v2.0/) APIs. Most resources exist in both, but new resources (e.g. RFIs) are v2-only. Check the API reference for which version applies to each endpoint. To get started, call /rest/v1.0/me to verify authentication and /rest/v1.0/companies/{company_id}/projects to list available projects.`,
     keywords: [

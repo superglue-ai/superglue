@@ -61,7 +61,6 @@ export function ToolCallComponent({
           tool={tool}
           onToolUpdate={onToolUpdate}
           onToolMutation={onToolMutation}
-          sendAgentRequest={sendAgentRequest}
           onAbortStream={onAbortStream}
           onApplyChanges={onApplyChanges}
           isPlayground={isPlayground}
@@ -79,7 +78,6 @@ export function ToolCallComponent({
           onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}
           onToolMutation={onToolMutation}
-          sendAgentRequest={sendAgentRequest}
           onAbortStream={onAbortStream}
         />
       );
@@ -90,7 +88,6 @@ export function ToolCallComponent({
           onInputChange={onInputChange}
           onToolUpdate={onToolUpdate}
           onToolMutation={onToolMutation}
-          sendAgentRequest={sendAgentRequest}
           onAbortStream={onAbortStream}
         />
       );

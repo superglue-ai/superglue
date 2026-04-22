@@ -12,7 +12,7 @@
     "mssql": "npm:mssql@^12.2.1",
     "ioredis": "npm:ioredis@5.3.2",
     "ssh2-sftp-client": "npm:ssh2-sftp-client@9.1.0",
-    "basic-ftp": "npm:basic-ftp@5.0.4",
+    "basic-ftp": "npm:basic-ftp@5.3.0",
     "@awo00/smb2": "npm:@awo00/smb2@1.0.5",
     "xlsx": "npm:xlsx@0.18.5",
     "js-yaml": "npm:js-yaml@4.1.0",

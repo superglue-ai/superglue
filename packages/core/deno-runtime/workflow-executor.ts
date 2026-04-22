@@ -7,6 +7,8 @@
  */
 
 import type {
+  ExecutionFileEnvelope,
+  RuntimeExecutionFile,
   WorkflowPayload,
   WorkflowResult,
   ToolStep,
@@ -31,6 +33,12 @@ import {
   RemoveScope,
 } from "./utils/response-filters.ts";
 import { validateSchema } from "./utils/schema-validation.ts";
+import {
+  assertFileSupportsInlineStepResponse,
+  createRuntimeExecutionFileViewMap,
+  decodeExecutionFileEnvelope,
+  encodeExecutionFileEnvelope,
+} from "./utils/files.ts";
 
 // Strategy imports
 import { executeHttpStep } from "./strategies/http.ts";
@@ -40,6 +48,70 @@ import { executeFtpStep } from "./strategies/ftp.ts";
 import { executeSmbStep } from "./strategies/smb.ts";
 import { executeMssqlStep, closeAllPools as closeMssqlPools } from "./strategies/mssql.ts";
 import { executeTransformStep } from "./strategies/transform.ts";
+
+type StepEnvelopeData = {
+  currentItem: unknown;
+  data: unknown;
+  stepFileKeys?: string[];
+  success: boolean;
+  error?: string;
+};
+
+function serializeProducedFiles(
+  files: Record<string, RuntimeExecutionFile>,
+  options?: { enforceInlineSizeLimit?: boolean },
+): Record<string, ExecutionFileEnvelope> | undefined {
+  if (Object.keys(files).length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(files).map(([key, file]) => {
+      if (options?.enforceInlineSizeLimit) {
+        assertFileSupportsInlineStepResponse(file, { ref: key });
+      }
+      return [key, encodeExecutionFileEnvelope(file)];
+    }),
+  );
+}
+
+function formatFileNameSegment(fileName: string): string {
+  return `[${JSON.stringify(fileName)}]`;
+}
+
+function aliasProducedFiles(params: {
+  stepId: string;
+  producedFiles?: Record<string, RuntimeExecutionFile>;
+  iterationIndex?: number;
+}): {
+  stepFileKeys: string[];
+  aliasedFiles: Record<string, RuntimeExecutionFile>;
+} {
+  const { stepId, producedFiles, iterationIndex } = params;
+  if (!producedFiles || Object.keys(producedFiles).length === 0) {
+    return { stepFileKeys: [], aliasedFiles: {} };
+  }
+
+  const entries = Object.entries(producedFiles);
+  const root = iterationIndex === undefined ? stepId : `${stepId}[${iterationIndex}]`;
+
+  if (entries.length === 1) {
+    const [, file] = entries[0];
+    return {
+      stepFileKeys: [root],
+      aliasedFiles: { [root]: file },
+    };
+  }
+
+  const aliasedFiles = Object.fromEntries(
+    entries.map(([fileName, file]) => [`${root}${formatFileNameSegment(fileName)}`, file]),
+  );
+
+  return {
+    stepFileKeys: Object.keys(aliasedFiles),
+    aliasedFiles,
+  };
+}
 
 /**
  * Determine which strategy to use based on the resolved URL
@@ -183,6 +255,7 @@ function getCredentialsForStep(
 async function executeStepWithTimeout(
   step: ToolStep,
   inputData: Record<string, unknown>,
+  fileStore: Record<string, RuntimeExecutionFile>,
   credentials: Record<string, unknown>,
   options: { timeout?: number; retries?: number; retryDelay?: number },
   metadata: ServiceMetadata,
@@ -193,7 +266,7 @@ async function executeStepWithTimeout(
 
   try {
     const result = await Promise.race([
-      executeStep(step, inputData, credentials, options, metadata, tunnelMappings),
+      executeStep(step, inputData, fileStore, credentials, options, metadata, tunnelMappings),
       new Promise<StepExecutionResult>((_, reject) => {
         controller.signal.addEventListener("abort", () => {
           reject(
@@ -216,6 +289,7 @@ async function executeStepWithTimeout(
 async function executeStep(
   step: ToolStep,
   inputData: Record<string, unknown>,
+  fileStore: Record<string, RuntimeExecutionFile>,
   credentials: Record<string, unknown>,
   options: { timeout?: number; retries?: number; retryDelay?: number },
   metadata: ServiceMetadata,
@@ -257,7 +331,15 @@ async function executeStep(
 
   switch (strategy) {
     case "http":
-      return executeHttpStep(resolvedConfig, inputData, credentials, options, metadata);
+      return executeHttpStep(
+        resolvedConfig,
+        inputData,
+        fileStore,
+        credentials,
+        options,
+        metadata,
+        step.id,
+      );
     case "postgres":
       return executePostgresStep(resolvedConfig, inputData, credentials, options, metadata);
     case "mssql":
@@ -265,9 +347,25 @@ async function executeStep(
     case "redis":
       return executeRedisStep(resolvedConfig, inputData, credentials, options, metadata);
     case "ftp":
-      return executeFtpStep(resolvedConfig, inputData, credentials, options, metadata);
+      return executeFtpStep(
+        resolvedConfig,
+        inputData,
+        fileStore,
+        credentials,
+        options,
+        metadata,
+        step.id,
+      );
     case "smb":
-      return executeSmbStep(resolvedConfig, inputData, credentials, options, metadata);
+      return executeSmbStep(
+        resolvedConfig,
+        inputData,
+        fileStore,
+        credentials,
+        options,
+        metadata,
+        step.id,
+      );
     default:
       return { success: false, error: `Unknown strategy: ${strategy}` };
   }
@@ -279,6 +377,7 @@ async function executeStep(
 async function executeStepWithLoop(
   step: ToolStep,
   inputData: Record<string, unknown>,
+  fileStore: Record<string, RuntimeExecutionFile>,
   credentials: Record<string, unknown>,
   options: { timeout?: number; retries?: number; retryDelay?: number },
   metadata: ServiceMetadata,
@@ -289,14 +388,28 @@ async function executeStepWithLoop(
     const result = await executeStepWithTimeout(
       step,
       inputData,
+      fileStore,
       credentials,
       options,
       metadata,
       tunnelMappings,
     );
+    const aliasedFiles = aliasProducedFiles({
+      stepId: step.id,
+      producedFiles: result.producedFiles,
+    });
     return {
       ...result,
-      data: { currentItem: {}, data: result.data, success: result.success },
+      data: {
+        currentItem: {},
+        data: result.data,
+        ...(aliasedFiles.stepFileKeys.length > 0
+          ? { stepFileKeys: aliasedFiles.stepFileKeys }
+          : {}),
+        success: result.success,
+      },
+      producedFiles: aliasedFiles.aliasedFiles,
+      stepFileKeys: aliasedFiles.stepFileKeys,
     };
   }
 
@@ -312,19 +425,34 @@ async function executeStepWithLoop(
     const result = await executeStepWithTimeout(
       step,
       itemData,
+      fileStore,
       credentials,
       options,
       metadata,
       tunnelMappings,
     );
+    const aliasedFiles = aliasProducedFiles({
+      stepId: step.id,
+      producedFiles: result.producedFiles,
+    });
     return {
       ...result,
-      data: { currentItem: items, data: result.data, success: result.success },
+      data: {
+        currentItem: items,
+        data: result.data,
+        ...(aliasedFiles.stepFileKeys.length > 0
+          ? { stepFileKeys: aliasedFiles.stepFileKeys }
+          : {}),
+        success: result.success,
+      },
+      producedFiles: aliasedFiles.aliasedFiles,
+      stepFileKeys: aliasedFiles.stepFileKeys,
     };
   }
 
-  const results: Array<{ currentItem: unknown; data: unknown; success: boolean; error?: string }> =
-    [];
+  const results: StepEnvelopeData[] = [];
+  const aggregatedFiles: Record<string, RuntimeExecutionFile> = {};
+  const aggregatedKeys: string[] = [];
   const maxIters = DENO_DEFAULTS.DEFAULT_LOOP_MAX_ITERS;
 
   for (let i = 0; i < Math.min(items.length, maxIters); i++) {
@@ -336,6 +464,7 @@ async function executeStepWithLoop(
     const result = await executeStepWithTimeout(
       step,
       itemData,
+      fileStore,
       credentials,
       options,
       metadata,
@@ -346,18 +475,29 @@ async function executeStepWithLoop(
       return result;
     }
 
+    const aliasedFiles = aliasProducedFiles({
+      stepId: step.id,
+      producedFiles: result.producedFiles,
+      iterationIndex: i,
+    });
+
     results.push({
       currentItem: item,
       data: result.success ? result.data : null,
+      ...(aliasedFiles.stepFileKeys.length > 0 ? { stepFileKeys: aliasedFiles.stepFileKeys } : {}),
       success: result.success,
       ...(result.error ? { error: result.error } : {}),
     });
+    Object.assign(aggregatedFiles, aliasedFiles.aliasedFiles);
+    aggregatedKeys.push(...aliasedFiles.stepFileKeys);
   }
 
   const allSuccess = results.every((r) => r.success);
   return {
     success: allSuccess || step.failureBehavior === "continue",
     data: results,
+    producedFiles: aggregatedFiles,
+    stepFileKeys: aggregatedKeys,
   };
 }
 
@@ -375,8 +515,21 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
   info(`Starting workflow execution: ${payload.workflow.name || payload.workflow.id}`, metadata);
 
   const stepResults: ToolStepResult[] = [];
-  let currentData: Record<string, unknown> = payload.payload || {};
+  const fileStore: Record<string, RuntimeExecutionFile> = Object.fromEntries(
+    Object.entries(payload.files || {}).map(([key, envelope]) => [
+      key,
+      decodeExecutionFileEnvelope(envelope),
+    ]),
+  );
+  const producedFileStore: Record<string, RuntimeExecutionFile> = {};
+  let currentData: Record<string, unknown> = {
+    ...(payload.payload || {}),
+    // Intentionally share raw byte references here to avoid duplicating large files in memory.
+    // Transform/output code should treat sourceData.__files__ as read-only.
+    __files__: createRuntimeExecutionFileViewMap(fileStore),
+  };
   let lastSuccessfulData: unknown = currentData;
+  let serializedProducedFiles: Record<string, ExecutionFileEnvelope> | undefined;
 
   try {
     // Execute each step sequentially
@@ -394,6 +547,7 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
       const result = await executeStepWithLoop(
         step,
         currentData,
+        fileStore,
         stepCredentials,
         payload.options || {},
         metadata,
@@ -405,6 +559,9 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
         success: result.success,
         data: result.data,
         error: result.error,
+        ...(result.stepFileKeys && result.stepFileKeys.length > 0
+          ? { stepFileKeys: result.stepFileKeys }
+          : {}),
       });
 
       if (!result.success) {
@@ -414,16 +571,32 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
         }
 
         logError(`Step ${step.id} failed: ${result.error}`, metadata);
+        if (payload.returnProducedFiles) {
+          serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+            enforceInlineSizeLimit: true,
+          });
+        }
         return {
           runId: payload.runId,
           success: false,
           error: `Step ${step.id} failed: ${result.error}`,
           stepResults,
+          ...(serializedProducedFiles ? { producedFiles: serializedProducedFiles } : {}),
           tool: payload.workflow,
           startedAt,
           completedAt: new Date().toISOString(),
         };
       }
+
+      if (result.producedFiles && Object.keys(result.producedFiles).length > 0) {
+        Object.assign(fileStore, result.producedFiles);
+        Object.assign(producedFileStore, result.producedFiles);
+      }
+
+      currentData = {
+        ...currentData,
+        __files__: createRuntimeExecutionFileViewMap(fileStore),
+      };
 
       if (result.data !== undefined) {
         currentData = { ...currentData, [step.id]: result.data };
@@ -459,11 +632,17 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
         );
 
         if (!transformResult.success) {
+          if (payload.returnProducedFiles) {
+            serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+              enforceInlineSizeLimit: true,
+            });
+          }
           return {
             runId: payload.runId,
             success: false,
             error: `Output transform failed: ${transformResult.error}`,
             stepResults,
+            ...(serializedProducedFiles ? { producedFiles: serializedProducedFiles } : {}),
             tool: payload.workflow,
             startedAt,
             completedAt: new Date().toISOString(),
@@ -478,11 +657,17 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
         debug("Validating output schema", metadata);
         const validationResult = validateSchema(finalData, payload.workflow.outputSchema);
         if (!validationResult.success) {
+          if (payload.returnProducedFiles) {
+            serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+              enforceInlineSizeLimit: true,
+            });
+          }
           return {
             runId: payload.runId,
             success: false,
             error: `Output schema validation failed: ${validationResult.error}`,
             stepResults,
+            ...(serializedProducedFiles ? { producedFiles: serializedProducedFiles } : {}),
             tool: payload.workflow,
             startedAt,
             completedAt: new Date().toISOString(),
@@ -505,11 +690,17 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
 
         if (filterResult.failedFilters.length > 0) {
           const error = new FilterMatchError(filterResult.failedFilters);
+          if (payload.returnProducedFiles) {
+            serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+              enforceInlineSizeLimit: true,
+            });
+          }
           return {
             runId: payload.runId,
             success: false,
             error: error.message,
             stepResults,
+            ...(serializedProducedFiles ? { producedFiles: serializedProducedFiles } : {}),
             tool: payload.workflow,
             startedAt,
             completedAt: new Date().toISOString(),
@@ -525,23 +716,35 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
     }
 
     info(`Workflow completed successfully`, metadata);
+    if (payload.returnProducedFiles) {
+      serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+        enforceInlineSizeLimit: true,
+      });
+    }
 
     return {
       runId: payload.runId,
       success: true,
       data: finalData,
       stepResults,
+      ...(serializedProducedFiles ? { producedFiles: serializedProducedFiles } : {}),
       tool: payload.workflow,
       startedAt,
       completedAt: new Date().toISOString(),
     };
   } catch (err) {
     logError(`Workflow execution error: ${(err as Error).message}`, metadata);
+    if (payload.returnProducedFiles && !serializedProducedFiles) {
+      serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+        enforceInlineSizeLimit: true,
+      });
+    }
     return {
       runId: payload.runId,
       success: false,
       error: (err as Error).message,
       stepResults,
+      ...(serializedProducedFiles ? { producedFiles: serializedProducedFiles } : {}),
       tool: payload.workflow,
       startedAt,
       completedAt: new Date().toISOString(),

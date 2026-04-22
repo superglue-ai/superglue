@@ -12,7 +12,7 @@ import {
 } from "@/src/components/ui/dialog";
 import { cn, formatLabel, getAllSimpleIcons } from "@/src/lib/general-utils";
 import { buildOnboardingRouting, type OnboardingIntentId } from "@/src/lib/agent/agent-prompts";
-import { useOrgOptional } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrgOptional } from "@/src/app/org-context";
 import { useAgentModal } from "@/src/components/agent/AgentModalContext";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { systems } from "@superglue/shared";
@@ -424,18 +424,19 @@ export function OnboardingModal() {
   const orgContext = useOrgOptional();
   const { openAgentModal } = useAgentModal();
 
-  const orgId = orgContext?.orgId || "";
+  const resolvedOrgId = orgContext?.orgId;
+  const orgId = resolvedOrgId ?? "";
   const userId = orgContext?.userId || "";
   const userEmail = orgContext?.userEmail || "";
   const isEnterprise = orgContext?.isEnterprise ?? false;
   const userIdentity = userId || userEmail;
-  const legacyStorageKey = orgId
+  const legacyStorageKey = hasResolvedOrgId(resolvedOrgId)
     ? `${ONBOARDING_STORAGE_KEY_PREFIX}-${orgId}`
     : ONBOARDING_STORAGE_KEY_PREFIX;
   const scopedStorageKey = userIdentity
     ? `${ONBOARDING_V1_SEEN_PREFIX}-${userIdentity}`
     : ONBOARDING_V1_SEEN_PREFIX;
-  const canEvaluateVisibility = Boolean(orgId && userIdentity);
+  const canEvaluateVisibility = hasResolvedOrgId(resolvedOrgId) && Boolean(userIdentity);
 
   useEffect(() => {
     if (!canEvaluateVisibility) return;

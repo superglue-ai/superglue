@@ -1,8 +1,14 @@
-import { getConnectionProtocol } from "@superglue/shared";
 import { ToolExecutionPolicies, ToolPolicy } from "../agent-types";
 import { ExecutionMode } from "../agent-types";
-import { resolveSensitiveCredentials } from "../agent-helpers";
 import { buildSystemPendingOutput } from "../agent-helpers";
+import { inferProtocolFromUrl } from "@superglue/shared";
+
+function hasCredentialInputs(input: any): boolean {
+  const candidateSections = [input?.credentials, input?.sensitiveCredentials];
+  return candidateSections.some(
+    (section) => section && typeof section === "object" && Object.keys(section).length > 0,
+  );
+}
 
 export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   build_tool: { defaultMode: "auto" },
@@ -11,6 +17,7 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   find_tool: { defaultMode: "auto" },
   find_system: { defaultMode: "auto" },
   search_documentation: { defaultMode: "auto" },
+  get_runs: { defaultMode: "auto" },
   load_skill: { defaultMode: "auto" },
 
   inspect_role: { defaultMode: "auto" },
@@ -25,16 +32,14 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   create_system: {
     defaultMode: "auto",
     computeModeFromInput: (input) => {
-      const creds = resolveSensitiveCredentials(input?.sensitiveCredentials);
-      return creds && Object.keys(creds).length > 0 ? "confirm_before_execution" : null;
+      return hasCredentialInputs(input) ? "confirm_before_execution" : null;
     },
     buildPendingOutput: buildSystemPendingOutput,
   },
   edit_system: {
     defaultMode: "auto",
     computeModeFromInput: (input) => {
-      const creds = resolveSensitiveCredentials(input?.sensitiveCredentials);
-      return creds && Object.keys(creds).length > 0 ? "confirm_before_execution" : null;
+      return hasCredentialInputs(input) ? "confirm_before_execution" : null;
     },
     buildPendingOutput: buildSystemPendingOutput,
   },
@@ -47,7 +52,7 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
       if (autoExecute === "run_everything") return "auto";
       if (autoExecute === "ask_every_time") return "confirm_before_execution";
 
-      const protocol = getConnectionProtocol(input?.url || "");
+      const protocol = input?.protocol || inferProtocolFromUrl(input?.url || "");
       if (
         autoExecute === "run_gets_only" &&
         protocol === "http" &&
@@ -59,6 +64,7 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
     },
     buildPendingOutput: (input) => ({
       request: {
+        protocol: input?.protocol,
         url: input?.url,
         method: input?.method,
         headers: input?.headers,

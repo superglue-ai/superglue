@@ -4,46 +4,36 @@ import { useSystems, useInvalidateSystems } from "@/src/queries/systems";
 import { Button } from "@/src/components/ui/button";
 import { ErrorMessage } from "@/src/components/ui/error-message";
 import { Input } from "@/src/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import {
   createToolInteractionEntry,
   ToolMutation,
 } from "@/src/lib/agent/agent-tools/tool-call-state";
-import { ToolCall } from "@superglue/shared";
-import { AlertCircle, CheckCircle, Eye, EyeOff, KeyRound, Loader2, Settings } from "lucide-react";
+import { maskCredentialValue, ToolCall } from "@superglue/shared";
+import { ChevronDown, ChevronRight, Eye, EyeOff, KeyRound, Loader2, Settings } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ToolCallPendingState } from "./ToolCallPendingState";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
+import { useAgentContext } from "../AgentContextProvider";
 
 interface ModifySystemComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
   onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
-  sendAgentRequest?: (
-    userMessage?: string,
-    options?: {
-      hiddenStarterMessage?: string;
-      hideUserMessage?: boolean;
-      resumeToolCallId?: string;
-    },
-  ) => Promise<void>;
   onAbortStream?: () => void;
-}
-
-interface ModifySystemInput {
-  id: string;
-  sensitiveCredentials?: Record<string, boolean>;
-  [key: string]: any;
 }
 
 interface ModifySystemOutput {
   success?: boolean;
   systemConfig?: any;
-  requiredSensitiveFields?: string[];
   systemId?: string;
+  environment?: string;
   system?: {
     id: string;
     [key: string]: any;
   };
+  error?: string;
 }
 
 function ModifySystemComponentImpl({
@@ -51,22 +41,21 @@ function ModifySystemComponentImpl({
   onInputChange,
   onToolUpdate,
   onToolMutation,
-  sendAgentRequest,
   onAbortStream,
 }: ModifySystemComponentProps) {
   const { systems } = useSystems();
+  const { sendAgentRequest } = useAgentContext();
   const invalidateSystems = useInvalidateSystems();
   const hasRefreshedRef = useRef(false);
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
+  const [isPrefilledExpanded, setIsPrefilledExpanded] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
 
   const input = (() => {
     if (!tool.input) return null;
     try {
-      return typeof tool.input === "string"
-        ? JSON.parse(tool.input)
-        : (tool.input as ModifySystemInput);
+      return typeof tool.input === "string" ? JSON.parse(tool.input) : tool.input;
     } catch {
       return null;
     }
@@ -92,27 +81,32 @@ function ModifySystemComponentImpl({
   const displayName =
     systemFromContext?.name || output?.system?.name || systemConfig?.name || systemId;
 
-  const requiredSensitiveFields = useMemo(() => {
-    if (output?.requiredSensitiveFields && output.requiredSensitiveFields.length > 0) {
-      return output.requiredSensitiveFields;
-    }
-    if (
-      input?.sensitiveCredentials &&
-      typeof input.sensitiveCredentials === "object" &&
-      !Array.isArray(input.sensitiveCredentials)
-    ) {
-      return Object.keys(input.sensitiveCredentials);
-    }
-    return [];
-  }, [output?.requiredSensitiveFields, input?.sensitiveCredentials]);
+  const allCredentialFields = useMemo(() => {
+    const creds = systemConfig?.credentials;
+    if (!creds || typeof creds !== "object") return {};
+    return creds as Record<string, any>;
+  }, [systemConfig?.credentials]);
 
-  const hasSensitiveCredentials = requiredSensitiveFields.length > 0;
-  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && hasSensitiveCredentials;
+  const { blankFields, prefilledFields } = useMemo(() => {
+    const blank: string[] = [];
+    const prefilled: string[] = [];
+    for (const [key, value] of Object.entries(allCredentialFields)) {
+      if (value === "" || value === null || value === undefined) {
+        blank.push(key);
+      } else {
+        prefilled.push(key);
+      }
+    }
+    return { blankFields: blank, prefilledFields: prefilled };
+  }, [allCredentialFields]);
+
+  const hasCredentials = Object.keys(allCredentialFields).length > 0;
+  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && hasCredentials;
   const isCompleted = tool.status === "completed" && output?.success;
-  const isToolInProgress =
-    tool.status === "running" ||
-    tool.status === "pending" ||
-    (tool.status === "awaiting_confirmation" && !hasSensitiveCredentials);
+  const isToolPending = tool.status === "pending";
+  const isToolRunning =
+    tool.status === "running" || (tool.status === "awaiting_confirmation" && !hasCredentials);
+  const isToolInProgress = isToolPending || isToolRunning;
   const hasError =
     tool.status === "error" || (tool.status === "completed" && output && !output.success);
 
@@ -132,28 +126,47 @@ function ModifySystemComponentImpl({
   const handleConfirm = useCallback(() => {
     if (!sendAgentRequest) return;
 
+    const allValues: Record<string, string> = {};
+    for (const key of Object.keys(allCredentialFields)) {
+      if (Object.prototype.hasOwnProperty.call(credentialValues, key)) {
+        allValues[key] = credentialValues[key].trim();
+      } else if (allCredentialFields[key] !== undefined && allCredentialFields[key] !== null) {
+        allValues[key] = String(allCredentialFields[key]);
+      }
+    }
+
     setIsExecuting(true);
     onToolUpdate?.(tool.id, { status: "running" });
     onToolMutation?.(tool.id, {
       interactionEntry: createToolInteractionEntry(
         "user_submitted_credentials_and_confirmed_system_edit",
         {
-          providedCredentialFields: Object.keys(credentialValues).filter((field) =>
-            credentialValues[field]?.trim(),
+          credentialsSummary: Object.fromEntries(
+            Object.entries(allValues)
+              .filter(([_, v]) => v?.trim())
+              .map(([k, v]) => [k, maskCredentialValue(k, v)]),
           ),
         },
       ),
       confirmationState: "confirmed",
       confirmationData: {
         systemConfig,
-        userProvidedCredentials: credentialValues,
+        userProvidedCredentials: allValues,
       },
     });
 
     sendAgentRequest(undefined, {
       resumeToolCallId: tool.id,
     });
-  }, [credentialValues, onToolMutation, onToolUpdate, sendAgentRequest, systemConfig, tool.id]);
+  }, [
+    allCredentialFields,
+    credentialValues,
+    onToolMutation,
+    onToolUpdate,
+    sendAgentRequest,
+    systemConfig,
+    tool.id,
+  ]);
 
   const handleCancel = useCallback(() => {
     if (!sendAgentRequest) return;
@@ -169,102 +182,159 @@ function ModifySystemComponentImpl({
     });
   }, [onToolMutation, onToolUpdate, sendAgentRequest, tool.id]);
 
-  const allCredentialsProvided = useMemo(() => {
-    return requiredSensitiveFields.every(
+  const allBlankFieldsFilled = useMemo(() => {
+    if (blankFields.length === 0) return true;
+    return blankFields.every(
       (field) => credentialValues[field] && credentialValues[field].trim() !== "",
     );
-  }, [requiredSensitiveFields, credentialValues]);
+  }, [blankFields, credentialValues]);
 
-  if (!input) {
+  if (isCompleted) {
     return (
-      <ToolCallWrapper tool={tool}>
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-            <div className="w-2 h-2 bg-amber-600 dark:bg-amber-400 rounded-full" />
-          </div>
-          <div className="text-sm text-muted-foreground">No input data available</div>
-        </div>
+      <ToolCallWrapper tool={tool} openByDefault={false}>
+        {null}
       </ToolCallWrapper>
     );
   }
 
-  const getStatusIcon = () => {
-    if (isCompleted) return <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />;
-    if (hasError) return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
-    if (isToolInProgress)
-      return <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />;
-    if (isAwaitingConfirmation)
-      return <Settings className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
+  if (isToolInProgress) {
     return (
-      <div className="w-4 h-4 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-        <div className="w-1.5 h-1.5 bg-amber-600 dark:bg-amber-400 rounded-full" />
-      </div>
+      <ToolCallWrapper
+        tool={tool}
+        openByDefault={true}
+        hideStatusIcon={isToolPending}
+        statusOverride={isToolRunning ? "running" : undefined}
+      >
+        <ToolCallPendingState icon={Settings} label="Updating system..." />
+      </ToolCallWrapper>
     );
-  };
+  }
 
-  const getStatusText = () => {
-    if (isCompleted) return "Updated system";
-    if (hasError) return "Update encountered an issue";
-    if (isToolInProgress) return "Updating system";
-    if (isAwaitingConfirmation) return "Update system";
-    return "Update system";
-  };
-
-  const wrapperStatusOverride =
-    tool.status === "awaiting_confirmation" && !hasSensitiveCredentials ? "running" : undefined;
+  if (!input) {
+    return (
+      <ToolCallWrapper tool={tool} openByDefault={true}>
+        <ErrorMessage title="System edit data unavailable" message="No input data available." />
+      </ToolCallWrapper>
+    );
+  }
 
   return (
-    <ToolCallWrapper tool={tool} openByDefault={true} statusOverride={wrapperStatusOverride}>
+    <ToolCallWrapper tool={tool} openByDefault={true}>
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          {getStatusIcon()}
-          <span className="text-sm font-medium">{getStatusText()}</span>
-          <code className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            {displayName}
-          </code>
-          {environment === "dev" && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-              DEV
-            </span>
-          )}
-        </div>
-
-        {isAwaitingConfirmation && requiredSensitiveFields.length > 0 && (
+        {isAwaitingConfirmation && (
           <div className="space-y-3 pt-2">
-            {requiredSensitiveFields.map((field) => (
-              <div key={field} className="space-y-1">
-                <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <KeyRound className="w-3 h-3 text-amber-500" />
-                  {field}
-                </label>
-                <div className="relative">
-                  <Input
-                    type={showCredentials[field] ? "text" : "password"}
-                    value={credentialValues[field] || ""}
-                    onChange={(e) =>
-                      setCredentialValues((prev) => ({ ...prev, [field]: e.target.value }))
-                    }
-                    placeholder={`Enter ${field}...`}
-                    className="h-9 text-sm pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
-                    onClick={() =>
-                      setShowCredentials((prev) => ({ ...prev, [field]: !prev[field] }))
-                    }
-                  >
-                    {showCredentials[field] ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Update system</span>
+              <code className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {displayName}
+              </code>
+              {environment === "dev" && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                  DEV
+                </span>
+              )}
+            </div>
+
+            {blankFields.length > 0 && (
+              <div className="space-y-3">
+                <div className="text-xs font-medium text-muted-foreground">Enter credentials</div>
+                {blankFields.map((field) => (
+                  <div key={field} className="space-y-1">
+                    <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <KeyRound className="w-3 h-3 text-amber-500" />
+                      {field}
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type={showCredentials[field] ? "text" : "password"}
+                        value={credentialValues[field] || ""}
+                        onChange={(e) =>
+                          setCredentialValues((prev) => ({ ...prev, [field]: e.target.value }))
+                        }
+                        placeholder={`Enter ${field}...`}
+                        className="h-9 text-sm pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
+                        onClick={() =>
+                          setShowCredentials((prev) => ({ ...prev, [field]: !prev[field] }))
+                        }
+                      >
+                        {showCredentials[field] ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {prefilledFields.length > 0 && (
+              <Collapsible open={isPrefilledExpanded} onOpenChange={setIsPrefilledExpanded}>
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    {isPrefilledExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                    Pre-filled configuration ({prefilledFields.length} field
+                    {prefilledFields.length !== 1 ? "s" : ""})
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-3 pt-2">
+                    {prefilledFields.map((field) => (
+                      <div key={field} className="space-y-1">
+                        <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                          <KeyRound className="w-3 h-3 text-muted-foreground" />
+                          {field}
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type={showCredentials[field] ? "text" : "password"}
+                            value={
+                              credentialValues[field] !== undefined
+                                ? credentialValues[field]
+                                : String(allCredentialFields[field] ?? "")
+                            }
+                            onChange={(e) =>
+                              setCredentialValues((prev) => ({
+                                ...prev,
+                                [field]: e.target.value,
+                              }))
+                            }
+                            placeholder={`Enter ${field}...`}
+                            className="h-9 text-sm pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
+                            onClick={() =>
+                              setShowCredentials((prev) => ({ ...prev, [field]: !prev[field] }))
+                            }
+                          >
+                            {showCredentials[field] ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
         )}
 
@@ -275,7 +345,7 @@ function ModifySystemComponentImpl({
               variant="glass"
               className="!bg-[#ffa500] hover:!bg-[#ffd700] dark:!bg-[#ffa500] dark:hover:!bg-[#ffd700] !text-black !border-amber-400/50 dark:!border-amber-500/50 font-semibold"
               onClick={handleConfirm}
-              disabled={!allCredentialsProvided || isExecuting}
+              disabled={!allBlankFieldsFilled || isExecuting}
             >
               {isExecuting ? (
                 <>
@@ -292,9 +362,12 @@ function ModifySystemComponentImpl({
           </div>
         )}
 
-        {hasError && tool.error && (
+        {hasError && (
           <ErrorMessage
-            message={typeof tool.error === "string" ? tool.error : "Update encountered an issue"}
+            message={
+              output?.error ||
+              (typeof tool.error === "string" ? tool.error : "Update encountered an issue")
+            }
           />
         )}
       </div>

@@ -3,7 +3,7 @@ import { useMemo, useCallback } from "react";
 import type { OrgMember, OrgInvitation, EndUserCredentialStatus, Role } from "@superglue/shared";
 import { queryKeys } from "./query-keys";
 import { useEESuperglueClient } from "./use-client";
-import { useOrg } from "@/src/app/org-context";
+import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 
 export interface OrgUser {
   id: string;
@@ -47,7 +47,7 @@ export function useOrgUsers() {
         invitations: data.invitations,
       };
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   // Roles query
@@ -57,7 +57,7 @@ export function useOrgUsers() {
       const client = createClient();
       return client.listRoles();
     },
-    enabled: !!orgId,
+    enabled: hasResolvedOrgId(orgId),
   });
 
   const allUsers = membersQuery.data?.members ?? [];

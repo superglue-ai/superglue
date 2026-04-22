@@ -7,13 +7,12 @@ import { useToast } from "@/src/hooks/use-toast";
 import { useSystemActions } from "@/src/hooks/use-system-actions";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible";
-import { System, SystemInput, ToolCall } from "@superglue/shared";
+import { maskCredentialValue, System, SystemInput, ToolCall } from "@superglue/shared";
 import {
   createToolInteractionEntry,
   ToolMutation,
 } from "@/src/lib/agent/agent-tools/tool-call-state";
 import {
-  AlertTriangle,
   CheckCircle,
   ChevronDown,
   ChevronRight,
@@ -27,30 +26,20 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ToolCallWrapper } from "./ToolComponentWrapper";
+import { useAgentContext } from "../AgentContextProvider";
 
 interface CreateSystemComponentProps {
   tool: ToolCall;
   onInputChange: (newInput: any) => void;
   onToolUpdate?: (toolCallId: string, updates: Partial<ToolCall>) => void;
   onToolMutation?: (toolCallId: string, mutation: ToolMutation) => void;
-  sendAgentRequest?: (
-    userMessage?: string,
-    options?: {
-      hiddenStarterMessage?: string;
-      hideUserMessage?: boolean;
-      resumeToolCallId?: string;
-    },
-  ) => Promise<void>;
   onAbortStream?: () => void;
 }
-
-type CreateSystemInput = SystemInput & { sensitiveCredentials?: Record<string, boolean> };
 
 interface CreateSystemOutput {
   success?: boolean;
   confirmationState?: string;
   systemConfig?: any;
-  requiredSensitiveFields?: string[];
   system?: System;
 }
 
@@ -59,14 +48,14 @@ function CreateSystemComponentImpl({
   onInputChange,
   onToolUpdate,
   onToolMutation,
-  sendAgentRequest,
   onAbortStream,
 }: CreateSystemComponentProps) {
   const [isInstructionsExpanded, setIsInstructionsExpanded] = useState(false);
-  const [systemNotFound, setSystemNotFound] = useState(false);
+  const [isPrefilledExpanded, setIsPrefilledExpanded] = useState(false);
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
   const [isExecuting, setIsExecuting] = useState(false);
+  const { sendAgentRequest } = useAgentContext();
   const { saveSystem, handleOAuth } = useSystemActions();
   const { toast } = useToast();
   const { systems, isRefreshing } = useSystems();
@@ -97,9 +86,7 @@ function CreateSystemComponentImpl({
   const input = (() => {
     if (!tool.input) return null;
     try {
-      return typeof tool.input === "string"
-        ? JSON.parse(tool.input)
-        : (tool.input as CreateSystemInput);
+      return typeof tool.input === "string" ? JSON.parse(tool.input) : tool.input;
     } catch {
       return null;
     }
@@ -116,27 +103,32 @@ function CreateSystemComponentImpl({
     }
   })();
 
-  const requiredSensitiveFields = useMemo(() => {
-    if (output?.requiredSensitiveFields && output.requiredSensitiveFields.length > 0) {
-      return output.requiredSensitiveFields;
-    }
-    if (
-      input?.sensitiveCredentials &&
-      typeof input.sensitiveCredentials === "object" &&
-      !Array.isArray(input.sensitiveCredentials)
-    ) {
-      return Object.keys(input.sensitiveCredentials);
-    }
-    return [];
-  }, [output?.requiredSensitiveFields, input?.sensitiveCredentials]);
+  const systemConfig = output?.systemConfig || input;
 
-  const hasSensitiveCredentials = requiredSensitiveFields.length > 0;
-  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && hasSensitiveCredentials;
-  const isConfirming = tool.status === "running" && hasSensitiveCredentials;
+  const allCredentialFields = useMemo(() => {
+    const creds = systemConfig?.credentials;
+    if (!creds || typeof creds !== "object") return {};
+    return creds as Record<string, any>;
+  }, [systemConfig?.credentials]);
+
+  const { blankFields, prefilledFields } = useMemo(() => {
+    const blank: string[] = [];
+    const prefilled: string[] = [];
+    for (const [key, value] of Object.entries(allCredentialFields)) {
+      if (value === "" || value === null || value === undefined) {
+        blank.push(key);
+      } else {
+        prefilled.push(key);
+      }
+    }
+    return { blankFields: blank, prefilledFields: prefilled };
+  }, [allCredentialFields]);
+
+  const hasCredentials = Object.keys(allCredentialFields).length > 0;
+  const isAwaitingConfirmation = tool.status === "awaiting_confirmation" && hasCredentials;
+  const isConfirming = tool.status === "running" && hasCredentials;
   const isCompleted = tool.status === "completed" && output?.success;
   const isToolInProgress = tool.status === "running" || tool.status === "pending";
-
-  const systemConfig = output?.systemConfig || input;
 
   const systemId = output?.system?.id || systemConfig?.id || input?.id;
   const systemName = output?.system?.name || systemConfig?.name || input?.name;
@@ -175,18 +167,17 @@ function CreateSystemComponentImpl({
     }
   }, [isCompleted, tool.status]);
 
-  const wasFoundInContextRef = useRef(false);
-  useEffect(() => {
-    if (systemFromContext) {
-      wasFoundInContextRef.current = true;
-      setSystemNotFound(false);
-    } else if (wasFoundInContextRef.current && !isRefreshing) {
-      setSystemNotFound(true);
-    }
-  }, [systemFromContext, isRefreshing]);
-
   const handleConfirm = useCallback(() => {
     if (!sendAgentRequest) return;
+
+    const allValues: Record<string, string> = {};
+    for (const key of Object.keys(allCredentialFields)) {
+      if (Object.prototype.hasOwnProperty.call(credentialValues, key)) {
+        allValues[key] = credentialValues[key].trim();
+      } else if (allCredentialFields[key] !== undefined && allCredentialFields[key] !== null) {
+        allValues[key] = String(allCredentialFields[key]);
+      }
+    }
 
     setIsExecuting(true);
     onToolUpdate?.(tool.id, { status: "running" });
@@ -194,22 +185,32 @@ function CreateSystemComponentImpl({
       interactionEntry: createToolInteractionEntry(
         "user_submitted_credentials_and_confirmed_system_creation",
         {
-          providedCredentialFields: Object.keys(credentialValues).filter((field) =>
-            credentialValues[field]?.trim(),
+          credentialsSummary: Object.fromEntries(
+            Object.entries(allValues)
+              .filter(([_, v]) => v?.trim())
+              .map(([k, v]) => [k, maskCredentialValue(k, v)]),
           ),
         },
       ),
       confirmationState: "confirmed",
       confirmationData: {
         systemConfig,
-        userProvidedCredentials: credentialValues,
+        userProvidedCredentials: allValues,
       },
     });
 
     sendAgentRequest(undefined, {
       resumeToolCallId: tool.id,
     });
-  }, [credentialValues, onToolMutation, onToolUpdate, sendAgentRequest, systemConfig, tool.id]);
+  }, [
+    allCredentialFields,
+    credentialValues,
+    onToolMutation,
+    onToolUpdate,
+    sendAgentRequest,
+    systemConfig,
+    tool.id,
+  ]);
 
   const handleCancel = useCallback(() => {
     if (!sendAgentRequest) return;
@@ -225,11 +226,12 @@ function CreateSystemComponentImpl({
     });
   }, [onToolMutation, onToolUpdate, sendAgentRequest, tool.id]);
 
-  const allCredentialsProvided = useMemo(() => {
-    return requiredSensitiveFields.every(
+  const allBlankFieldsFilled = useMemo(() => {
+    if (blankFields.length === 0) return true;
+    return blankFields.every(
       (field) => credentialValues[field] && credentialValues[field].trim() !== "",
     );
-  }, [requiredSensitiveFields, credentialValues]);
+  }, [blankFields, credentialValues]);
 
   if (!displaySystem) {
     if (isRefreshing || isToolInProgress) {
@@ -279,18 +281,6 @@ function CreateSystemComponentImpl({
   return (
     <ToolCallWrapper tool={tool} openByDefault={!isCompleted}>
       <div className="space-y-4">
-        {systemNotFound && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <div className="text-sm text-amber-800 dark:text-amber-200">
-                <strong>System Deleted:</strong> This system was removed from the database. Showing
-                original tool call data.
-              </div>
-            </div>
-          </div>
-        )}
-
         <div
           className={`bg-background border rounded-lg p-4 ${
             isAwaitingConfirmation ? "border-amber-200 dark:border-amber-800" : "border-border"
@@ -342,9 +332,10 @@ function CreateSystemComponentImpl({
                 </div>
               )}
 
-              {isAwaitingConfirmation && requiredSensitiveFields.length > 0 && (
+              {isAwaitingConfirmation && blankFields.length > 0 && (
                 <div className="space-y-3 pt-2">
-                  {requiredSensitiveFields.map((field) => (
+                  <div className="text-xs font-medium text-muted-foreground">Enter credentials</div>
+                  {blankFields.map((field) => (
                     <div key={field} className="space-y-1">
                       <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
                         <KeyRound className="w-3 h-3 text-amber-500" />
@@ -381,6 +372,67 @@ function CreateSystemComponentImpl({
                 </div>
               )}
 
+              {isAwaitingConfirmation && prefilledFields.length > 0 && (
+                <Collapsible open={isPrefilledExpanded} onOpenChange={setIsPrefilledExpanded}>
+                  <CollapsibleTrigger asChild>
+                    <button className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors pt-2">
+                      {isPrefilledExpanded ? (
+                        <ChevronDown className="w-3 h-3" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3" />
+                      )}
+                      Pre-filled configuration ({prefilledFields.length} field
+                      {prefilledFields.length !== 1 ? "s" : ""})
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-3 pt-2">
+                      {prefilledFields.map((field) => (
+                        <div key={field} className="space-y-1">
+                          <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                            <KeyRound className="w-3 h-3 text-muted-foreground" />
+                            {field}
+                          </label>
+                          <div className="relative">
+                            <Input
+                              type={showCredentials[field] ? "text" : "password"}
+                              value={
+                                credentialValues[field] !== undefined
+                                  ? credentialValues[field]
+                                  : String(allCredentialFields[field] ?? "")
+                              }
+                              onChange={(e) =>
+                                setCredentialValues((prev) => ({
+                                  ...prev,
+                                  [field]: e.target.value,
+                                }))
+                              }
+                              placeholder={`Enter ${field}...`}
+                              className="h-9 text-sm pr-10"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
+                              onClick={() =>
+                                setShowCredentials((prev) => ({ ...prev, [field]: !prev[field] }))
+                              }
+                            >
+                              {showCredentials[field] ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
               {displaySystem.specificInstructions && displaySystem.specificInstructions.trim() && (
                 <div>
                   <Collapsible
@@ -394,7 +446,7 @@ function CreateSystemComponentImpl({
                         ) : (
                           <ChevronRight className="w-3 h-3" />
                         )}
-                        Additional API Instructions
+                        Additional System Instructions
                       </button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -417,7 +469,7 @@ function CreateSystemComponentImpl({
               size="sm"
               variant="glass"
               onClick={handleConfirm}
-              disabled={!allCredentialsProvided || isExecuting}
+              disabled={!allBlankFieldsFilled || isExecuting}
             >
               {isExecuting ? (
                 <>

@@ -55,6 +55,7 @@ export function useToolExecution(
   const inputSchema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
   const instructions = tool.instruction;
   const computedPayload = payload.computedPayload;
+  const executionFiles = payload.filePayloads;
 
   // Extract system IDs from request steps. For transform-only tools or output transforms
   // that need credentials, fall back to systems explicitly associated with this tool context.
@@ -166,6 +167,7 @@ export function useToolExecution(
           client,
           step: stepToExecute,
           payload: computedPayload,
+          files: executionFiles,
           previousResults: currentStepResultsMap,
           onRunIdGenerated: (singleRunId) => {
             currentRunIdRef.current = singleRunId;
@@ -222,6 +224,7 @@ export function useToolExecution(
         outputSchema: parsedSchema,
         inputSchema: inputSchema ? JSON.parse(inputSchema) : null,
         payload: computedPayload,
+        files: executionFiles,
         previousResults: stepData,
         onRunIdGenerated: (transformRunId) => {
           currentRunIdRef.current = transformRunId;
@@ -291,6 +294,7 @@ export function useToolExecution(
         client,
         tool: executionTool,
         payload: computedPayload,
+        files: executionFiles,
         onStepComplete: (i: number, res: StepExecutionResult) => {
           if (i < executionTool.steps.length - 1) {
             setCurrentExecutingStepIndex(i + 1);
@@ -358,6 +362,7 @@ export function useToolExecution(
             success: result.success,
             data: result.data,
             error: result.error,
+            stepFileKeys: result.stepFileKeys,
           })),
         tool: {
           id: toolId,

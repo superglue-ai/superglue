@@ -19,6 +19,7 @@
  */
 
 import {
+  ExecutionFileEnvelope,
   RequestOptions,
   RequestSource,
   ServiceMetadata,
@@ -76,6 +77,10 @@ export interface ExecuteToolOptions {
   tool: Tool;
   /** Input payload for the tool */
   payload?: Record<string, unknown>;
+  /** Uploaded file envelopes */
+  files?: Record<string, ExecutionFileEnvelope>;
+  /** Internal-only: return produced file envelopes inline for step-by-step execution */
+  returnProducedFiles?: boolean;
   /** Credentials to use (merged with system credentials) */
   credentials?: Record<string, string>;
   /** Request options (timeout, webhook, etc.) */
@@ -106,6 +111,8 @@ export interface ExecuteToolResult {
   error?: string;
   /** Results from each step */
   stepResults: ToolStepResult[];
+  /** Internal-only live produced file envelopes for step-by-step chaining */
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
   /** Updated tool configuration (may include self-healed changes) */
   tool?: Tool;
   /** When execution started */
@@ -213,6 +220,8 @@ export async function executeTool(
   const {
     tool,
     payload = {},
+    files = {},
+    returnProducedFiles = false,
     credentials = {},
     requestOptions = {},
     createRun = true,
@@ -276,6 +285,8 @@ export async function executeTool(
       runId,
       workflow: tool,
       payload,
+      files,
+      returnProducedFiles,
       credentials,
       options: requestOptions,
       systems,
@@ -297,6 +308,7 @@ export async function executeTool(
       data: denoResult.data,
       error: denoResult.error,
       stepResults: denoResult.stepResults,
+      producedFiles: denoResult.producedFiles,
       tool: denoResult.tool,
       startedAt: new Date(denoResult.startedAt),
       completedAt: new Date(denoResult.completedAt),
@@ -337,6 +349,7 @@ export async function executeTool(
       data: executionResult.data,
       error: executionResult.error,
       stepResults: executionResult.stepResults,
+      producedFiles: executionResult.producedFiles,
       tool: executionResult.tool,
       startedAt,
       completedAt: new Date(),

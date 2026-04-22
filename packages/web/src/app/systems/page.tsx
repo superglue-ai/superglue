@@ -41,20 +41,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/src/lib/general-utils";
 
-export const detectAuthType = (credentials: any): "oauth" | "apikey" | "none" => {
-  if (!credentials || Object.keys(credentials).length === 0) return "none";
-
-  const allKeys = Object.keys(credentials);
-
-  // OAuth requires client_id AND at least one OAuth URL (token_url or auth_url)
-  // This distinguishes from APIs that just happen to use client_id/client_secret naming
-  const hasClientId = allKeys.includes("client_id");
-  const hasOAuthUrl = allKeys.includes("token_url") || allKeys.includes("auth_url");
-
-  if (hasClientId && hasOAuthUrl) return "oauth";
-  return allKeys.length > 0 ? "apikey" : "none";
-};
-
 export const getAuthLabel = (system: System): string => {
   const status = getSystemAuthStatus(system);
 
@@ -64,6 +50,10 @@ export const getAuthLabel = (system: System): string => {
 
   if (status.authType === "oauth") {
     return "OAuth";
+  }
+
+  if (status.authType === "connection_string") {
+    return "Connection";
   }
 
   return "API Key";

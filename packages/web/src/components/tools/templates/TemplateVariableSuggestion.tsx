@@ -403,6 +403,23 @@ interface SuggestionCallbacks {
   onClose?: () => void;
 }
 
+function coerceReactRendererOptions(
+  options: unknown,
+): ConstructorParameters<typeof ReactRenderer>[1] {
+  // CI can materialize multiple physical @tiptap/core installs, so cast the full
+  // constructor options object at the ReactRenderer boundary instead of any field.
+  return options as ConstructorParameters<typeof ReactRenderer>[1];
+}
+
+function coerceSuggestionOptions(options: unknown): Parameters<typeof Suggestion>[0] {
+  // Suggestion() has the same nominal typing issue via its editor field.
+  return options as Parameters<typeof Suggestion>[0];
+}
+
+function coercePlugins(plugins: unknown): any {
+  return plugins as any;
+}
+
 export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
   return {
     char: "@",
@@ -449,10 +466,13 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
           currentRange = props.range;
           currentClientRect = props.clientRect as () => DOMRect;
 
-          component = new ReactRenderer(VariableCommandMenu, {
-            props: makeMenuProps(),
-            editor: props.editor,
-          });
+          component = new ReactRenderer(
+            VariableCommandMenu,
+            coerceReactRendererOptions({
+              props: makeMenuProps(),
+              editor: props.editor,
+            }),
+          );
 
           if (!props.clientRect) return;
 
@@ -511,6 +531,8 @@ export const VariableSuggestion = Extension.create<VariableSuggestionOptions>({
   },
 
   addProseMirrorPlugins() {
-    return [Suggestion({ editor: this.editor, ...this.options.suggestion })];
+    return coercePlugins([
+      Suggestion(coerceSuggestionOptions({ editor: this.editor, ...this.options.suggestion })),
+    ]);
   },
 });

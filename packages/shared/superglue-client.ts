@@ -1,5 +1,6 @@
 import {
   ClientRequestSource,
+  ExecutionFileEnvelope,
   ExtractArgs,
   ExtractResult,
   FileReference,
@@ -16,6 +17,14 @@ import {
   SSESubscription,
 } from "./sse-log-subscription.js";
 import { isAbortError } from "./utils.js";
+
+type ClientToolStepResult = {
+  stepId: string;
+  success: boolean;
+  data?: any;
+  error?: string;
+  stepFileKeys?: string[];
+};
 
 export class SuperglueClient {
   private apiKey: string;
@@ -34,11 +43,7 @@ export class SuperglueClient {
   }) {
     this.apiKey = apiKey;
     this.apiEndpoint = apiEndpoint ?? "https://api.superglue.cloud";
-    this.sseManager = new SSELogSubscriptionManager(
-      this.apiEndpoint,
-      this.apiKey,
-      this.onInfrastructureError,
-    );
+    this.sseManager = new SSELogSubscriptionManager(this.apiEndpoint, this.apiKey);
     this.onInfrastructureError = onInfrastructureError;
   }
 
@@ -124,6 +129,7 @@ export class SuperglueClient {
   async runTool(params: {
     toolId: string;
     payload?: Record<string, any>;
+    files?: Record<string, ExecutionFileEnvelope>;
     credentials?: Record<string, string>;
     options?: {
       timeout?: number;
@@ -142,9 +148,10 @@ export class SuperglueClient {
       toolPayload?: Record<string, any>;
       data?: any;
       error?: string;
-      stepResults?: Array<{ stepId: string; success: boolean; data?: any; error?: string }>;
+      stepResults?: ClientToolStepResult[];
     }>("POST", `/v1/tools/${encodeURIComponent(params.toolId)}/run`, {
       inputs: params.payload,
+      files: params.files,
       credentials: params.credentials,
       options: params.options,
       runId: params.runId,
@@ -155,12 +162,7 @@ export class SuperglueClient {
       data: response.data,
       error: response.error,
       tool: response.tool,
-      stepResults: response.stepResults?.map((sr) => ({
-        stepId: sr.stepId,
-        success: sr.success,
-        data: sr.data,
-        error: sr.error,
-      })),
+      stepResults: response.stepResults?.map((sr) => ({ ...sr })) || [],
     };
   }
 
@@ -171,6 +173,7 @@ export class SuperglueClient {
   async runToolConfig(params: {
     tool: Tool;
     payload?: Record<string, any>;
+    files?: Record<string, ExecutionFileEnvelope>;
     credentials?: Record<string, string>;
     options?: { timeout?: number; requestSource?: ClientRequestSource };
     runId?: string;
@@ -195,7 +198,7 @@ export class SuperglueClient {
       // Shared fields
       data?: any;
       error?: string;
-      stepResults?: Array<{ stepId: string; success: boolean; data?: any; error?: string }>;
+      stepResults?: ClientToolStepResult[];
       options?: Record<string, unknown>;
       requestSource?: string;
       traceId?: string;
@@ -205,6 +208,7 @@ export class SuperglueClient {
       {
         tool: params.tool,
         payload: params.payload,
+        files: params.files,
         credentials: params.credentials,
         options: params.options,
         runId: params.runId,
@@ -220,13 +224,7 @@ export class SuperglueClient {
       data: response.data,
       error: response.error,
       tool: response.tool || params.tool,
-      stepResults:
-        response.stepResults?.map((sr) => ({
-          stepId: sr.stepId,
-          success: sr.success,
-          data: sr.data,
-          error: sr.error,
-        })) || [],
+      stepResults: response.stepResults?.map((sr) => ({ ...sr })) || [],
     };
   }
 
@@ -245,6 +243,7 @@ export class SuperglueClient {
   async executeStep({
     step,
     payload,
+    files,
     previousResults,
     credentials,
     options,
@@ -254,6 +253,7 @@ export class SuperglueClient {
   }: {
     step: any;
     payload?: Record<string, any>;
+    files?: Record<string, ExecutionFileEnvelope>;
     previousResults?: Record<string, any>;
     credentials?: Record<string, string>;
     options?: { timeout?: number };
@@ -266,10 +266,13 @@ export class SuperglueClient {
     data?: any;
     error?: string;
     updatedStep?: any;
+    stepFileKeys?: string[];
+    producedFiles?: Record<string, ExecutionFileEnvelope>;
   }> {
     return this.restRequest("POST", "/v1/tools/step/run", {
       step,
       payload,
+      files,
       previousResults,
       credentials,
       options,
@@ -295,6 +298,7 @@ export class SuperglueClient {
     outputSchema,
     inputSchema,
     payload,
+    files,
     stepResults,
     responseFilters,
     options,
@@ -304,6 +308,7 @@ export class SuperglueClient {
     outputSchema?: any;
     inputSchema?: any;
     payload?: Record<string, any>;
+    files?: Record<string, ExecutionFileEnvelope>;
     stepResults?: Record<string, any>;
     responseFilters?: any[];
     options?: { timeout?: number };
@@ -320,6 +325,7 @@ export class SuperglueClient {
       outputSchema,
       inputSchema,
       payload,
+      files,
       stepResults,
       responseFilters,
       options,
@@ -345,7 +351,13 @@ export class SuperglueClient {
     toolId: string;
     toolConfig: Tool;
     toolResult?: unknown;
-    stepResults?: Array<{ stepId: string; success: boolean; data?: unknown; error?: string }>;
+    stepResults?: Array<{
+      stepId: string;
+      success: boolean;
+      data?: unknown;
+      error?: string;
+      stepFileKeys?: string[];
+    }>;
     toolPayload?: Record<string, unknown>;
     status: "success" | "failed" | "aborted";
     error?: string;
@@ -369,7 +381,10 @@ export class SuperglueClient {
     });
   }
 
-  async extract<T = any>({ file }: ExtractArgs): Promise<ExtractResult & { data: T }> {
+  async extract<T = any>({
+    file,
+    envelope,
+  }: ExtractArgs): Promise<ExtractResult & { data?: T; file?: ExecutionFileEnvelope }> {
     if (!file) {
       throw new Error("File must be provided for extract.");
     }
@@ -377,7 +392,12 @@ export class SuperglueClient {
     const formData = new FormData();
     formData.append("file", file);
 
-    const url = `${this.apiEndpoint.replace(/\/$/, "")}/v1/extract`;
+    const extractUrl = new URL(`${this.apiEndpoint.replace(/\/$/, "")}/v1/extract`);
+    if (envelope) {
+      extractUrl.searchParams.set("envelope", "true");
+    }
+
+    const url = extractUrl.toString();
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -786,17 +806,26 @@ export class SuperglueClient {
 
   async uploadSystemFileReferences(
     systemId: string,
-    files: Array<{ fileName: string; content: string; contentType?: string }>,
+    files: Array<{
+      fileName: string;
+      content: string | Uint8Array;
+      contentType?: string;
+      contentLength?: number;
+    }>,
   ): Promise<Array<{ id: string; fileName: string }>> {
     const uploadUrls = await this.createSystemFileUploadUrls(
       systemId,
-      files.map((f) => ({ fileName: f.fileName, contentType: f.contentType })),
+      files.map((f) => ({
+        fileName: f.fileName,
+        contentType: f.contentType,
+        contentLength: f.contentLength,
+      })),
     );
     await Promise.all(
       uploadUrls.map(async (fileInfo, i) => {
         const uploadResponse = await fetch(fileInfo.uploadUrl, {
           method: "PUT",
-          body: files[i].content,
+          body: files[i].content as BodyInit,
           headers: files[i].contentType ? { "Content-Type": files[i].contentType } : undefined,
         });
         if (!uploadResponse.ok) {

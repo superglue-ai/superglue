@@ -52,6 +52,52 @@ export interface FileParsingStrategy {
 export class FileStrategyRegistry {
   private strategies: FileParsingStrategy[] = [];
 
+  private async findMatchingStrategy(buffer: Buffer): Promise<FileParsingStrategy | null> {
+    for (const strategy of this.strategies) {
+      try {
+        const canHandle = await strategy.canHandle(buffer);
+        if (canHandle) {
+          return strategy;
+        }
+      } catch (error) {
+        console.warn(`Strategy ${strategy.fileType} failed:`, error);
+      }
+    }
+
+    return null;
+  }
+
+  private isAllowedTextControlByte(byte: number): boolean {
+    return byte === 0x09 || byte === 0x0a || byte === 0x0d;
+  }
+
+  private isLikelyTextBuffer(buffer: Buffer): boolean {
+    if (buffer.length === 0) {
+      return true;
+    }
+
+    const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
+    let suspiciousControlBytes = 0;
+
+    for (const byte of sample) {
+      if (byte === 0x00) {
+        return false;
+      }
+
+      if ((byte < 0x20 || byte === 0x7f) && !this.isAllowedTextControlByte(byte)) {
+        suspiciousControlBytes++;
+      }
+    }
+
+    if (suspiciousControlBytes / sample.length > 0.1) {
+      return false;
+    }
+
+    const decodedSample = sample.toString("utf8");
+    const replacementChars = decodedSample.match(/\uFFFD/g);
+    return !replacementChars || replacementChars.length === 0;
+  }
+
   register(strategy: FileParsingStrategy): void {
     this.strategies.push(strategy);
     // Sort by priority (lower number = higher priority)
@@ -60,6 +106,19 @@ export class FileStrategyRegistry {
 
   getStrategies(): FileParsingStrategy[] {
     return [...this.strategies];
+  }
+
+  async detectFileType(buffer: Buffer): Promise<SupportedFileType> {
+    if (!buffer || buffer.length === 0) {
+      return SupportedFileType.RAW;
+    }
+
+    const strategy = await this.findMatchingStrategy(buffer);
+    if (strategy) {
+      return strategy.fileType;
+    }
+
+    return this.isLikelyTextBuffer(buffer) ? SupportedFileType.RAW : SupportedFileType.BINARY;
   }
 
   async detectAndParse(buffer: Buffer): Promise<{ fileType: SupportedFileType; data: any }> {
@@ -79,8 +138,11 @@ export class FileStrategyRegistry {
       }
     }
 
+    const fileType = this.isLikelyTextBuffer(buffer)
+      ? SupportedFileType.RAW
+      : SupportedFileType.BINARY;
     return {
-      fileType: SupportedFileType.RAW,
+      fileType,
       data: buffer.toString("utf8"),
     };
   }

@@ -95,11 +95,70 @@ export interface Tool {
   responseFilters?: ResponseFilter[];
 }
 
+export type SupportedFileType =
+  | "JSON"
+  | "CSV"
+  | "XML"
+  | "HTML"
+  | "YAML"
+  | "EXCEL"
+  | "PDF"
+  | "DOCX"
+  | "ZIP"
+  | "GZIP"
+  | "BINARY"
+  | "RAW"
+  | "AUTO";
+
+export interface ExecutionFileEnvelope {
+  kind: "execution_file";
+  filename: string;
+  contentType: string;
+  size: number;
+  rawBase64: string;
+  fileType?: SupportedFileType;
+  extracted?: unknown;
+  parseError?: string;
+}
+
+export interface RawFileBytes {
+  kind: "raw_file_bytes";
+  base64: string;
+  filename: string;
+  contentType: string;
+}
+
+export interface RuntimeExecutionFile {
+  filename: string;
+  contentType: string;
+  size: number;
+  raw: Uint8Array;
+  fileType?: SupportedFileType;
+  extracted?: unknown;
+  parseError?: string;
+}
+
+export interface TransformRuntimeFileInput {
+  filename: string;
+  contentType: string;
+  raw: Uint8Array | ArrayBuffer | number[] | string | Record<string, unknown> | null | undefined;
+  size?: number;
+  fileType?: SupportedFileType;
+  extracted?: unknown;
+  parseError?: string;
+}
+
+export interface RuntimeFilePointer {
+  kind: "runtime_file_pointer";
+  key: string;
+}
+
 export interface ToolStepResult {
   stepId: string;
   success: boolean;
   data?: unknown;
   error?: string;
+  stepFileKeys?: string[];
 }
 
 export interface ToolResult {
@@ -139,6 +198,9 @@ export interface WorkflowPayload {
   runId: string;
   workflow: Tool;
   payload?: Record<string, unknown>;
+  files?: Record<string, ExecutionFileEnvelope>;
+  /** Internal-only: return produced file envelopes inline for step-by-step execution */
+  returnProducedFiles?: boolean;
   credentials?: Record<string, string>;
   options?: RequestOptions;
   systems: System[];
@@ -159,6 +221,7 @@ export interface WorkflowResult {
   data?: unknown;
   error?: string;
   stepResults: ToolStepResult[];
+  producedFiles?: Record<string, ExecutionFileEnvelope>;
   tool?: Tool;
   startedAt: string;
   completedAt: string;
@@ -171,6 +234,8 @@ export interface StepExecutionResult {
   success: boolean;
   data?: unknown;
   error?: string;
+  producedFiles?: Record<string, RuntimeExecutionFile>;
+  stepFileKeys?: string[];
 }
 
 /**
@@ -189,13 +254,14 @@ export interface TransformResult {
 export const DENO_DEFAULTS = {
   TRANSFORM_TIMEOUT_MS: 600_000, // 10 minutes
   STEP_TIMEOUT_MS: 3_600_000, // 1 hour
-  WORKFLOW_TIMEOUT_MS: 21_600_000, // 6 hours
+  WORKFLOW_TIMEOUT_MS: 36_000_000, // 10 hours
   HTTP: {
     DEFAULT_TIMEOUT: 3_600_000, // 1 hour
     DEFAULT_RETRY_DELAY_MS: 1000,
     MAX_RATE_LIMIT_WAIT_MS: 3_600_000, // 1 hour
   },
   POSTGRES: {
+    CONNECTION_TIMEOUT: 30_000, // 30 seconds
     DEFAULT_TIMEOUT: 600_000, // 10 minutes
     DEFAULT_RETRIES: 0,
     DEFAULT_RETRY_DELAY: 1000,
@@ -221,6 +287,7 @@ export const DENO_DEFAULTS = {
     POOL_MIN: 0,
   },
   REDIS: {
+    CONNECTION_TIMEOUT: 30_000, // 30 seconds
     DEFAULT_TIMEOUT: 30_000, // 30 seconds
     DEFAULT_RETRIES: 0,
     DEFAULT_RETRY_DELAY: 1000,

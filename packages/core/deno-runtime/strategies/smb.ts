@@ -6,15 +6,25 @@
 
 import smb2 from "npm:@awo00/smb2";
 import { Buffer } from "node:buffer";
+import * as path from "node:path";
 import type {
   RequestStepConfig,
   RequestOptions,
+  RawFileBytes,
+  RuntimeExecutionFile,
+  RuntimeFilePointer,
   ServiceMetadata,
   StepExecutionResult,
 } from "../types.ts";
 import { DENO_DEFAULTS } from "../types.ts";
 import { replaceVariables } from "../utils/transform.ts";
-import { parseJSON, parseFile } from "../utils/files.ts";
+import {
+  buildRuntimeFile,
+  contentToBuffer,
+  guessContentType,
+  parseJSON,
+  resolveFileTokens,
+} from "../utils/files.ts";
 import { debug } from "../utils/logging.ts";
 
 // Type aliases for internal smb2 types
@@ -37,8 +47,17 @@ const SUPPORTED_OPERATIONS = [
 interface SMBOperation {
   operation: "list" | "get" | "put" | "delete" | "rename" | "mkdir" | "rmdir" | "exists" | "stat";
   path?: string;
-  content?: string | Uint8Array;
+  content?: string | Uint8Array | RawFileBytes | RuntimeFilePointer;
   newPath?: string;
+}
+
+interface SmbOperationResult {
+  data: unknown;
+  producedFiles?: Record<string, RuntimeExecutionFile>;
+}
+
+function getProducedFileKey(filePath: string): string {
+  return filePath;
 }
 
 /**
@@ -47,19 +66,23 @@ interface SMBOperation {
 export async function executeSmbStep(
   config: RequestStepConfig,
   payload: Record<string, unknown>,
+  fileLookup: Record<string, RuntimeExecutionFile>,
   credentials: Record<string, unknown>,
   options: RequestOptions,
   metadata: ServiceMetadata,
+  stepId?: string,
 ): Promise<StepExecutionResult> {
   try {
     const result = await callSMB({
       endpoint: config,
       stepInputData: payload,
+      fileLookup,
       credentials,
       options,
       metadata,
+      stepId,
     });
-    return { success: true, data: result };
+    return { success: true, data: result.data, producedFiles: result.producedFiles };
   } catch (error) {
     return { success: false, error: (error as Error).message };
   }
@@ -175,91 +198,59 @@ function normalizePath(basePath: string | undefined, operationPath: string | und
 }
 
 /**
- * Convert content to Buffer
- */
-function contentToBuffer(content: string | Uint8Array | unknown): Uint8Array {
-  if (content instanceof Uint8Array) {
-    return content;
-  }
-  if (typeof content === "string") {
-    return new TextEncoder().encode(content);
-  }
-  return new TextEncoder().encode(JSON.stringify(content, null, 2));
-}
-
-/**
  * Execute SMB operation
  */
 async function executeSMBOperation(
   tree: SMBTree,
   operation: SMBOperation,
   basePath: string | undefined,
-): Promise<unknown> {
+  fileLookup: Record<string, RuntimeExecutionFile>,
+): Promise<SmbOperationResult> {
   const fullPath = normalizePath(basePath, operation.path);
 
   switch (operation.operation) {
     case "list": {
       const entries = await tree.readDirectory(fullPath);
       // deno-lint-ignore no-explicit-any
-      return (entries as any[]).map(
-        (entry: {
-          filename: string;
-          fileSize: bigint;
-          type: string;
-          creationTime?: Date;
-          lastWriteTime?: Date;
-          lastAccessTime?: Date;
-        }) => {
-          const name = entry.filename.startsWith("./") ? entry.filename.slice(2) : entry.filename;
-          return {
-            name,
-            path: fullPath + (fullPath.endsWith("/") ? "" : "/") + name,
-            size: Number(entry.fileSize),
-            type: entry.type === "Directory" ? "directory" : "file",
-            createdAt: entry.creationTime?.toISOString() || null,
-            modifyTime: entry.lastWriteTime?.toISOString() || null,
-            accessTime: entry.lastAccessTime?.toISOString() || null,
-          };
-        },
-      );
+      return {
+        data: (entries as any[]).map(
+          (entry: {
+            filename: string;
+            fileSize: bigint;
+            type: string;
+            creationTime?: Date;
+            lastWriteTime?: Date;
+            lastAccessTime?: Date;
+          }) => {
+            const name = entry.filename.startsWith("./") ? entry.filename.slice(2) : entry.filename;
+            return {
+              name,
+              path: fullPath + (fullPath.endsWith("/") ? "" : "/") + name,
+              size: Number(entry.fileSize),
+              type: entry.type === "Directory" ? "directory" : "file",
+              createdAt: entry.creationTime?.toISOString() || null,
+              modifyTime: entry.lastWriteTime?.toISOString() || null,
+              accessTime: entry.lastAccessTime?.toISOString() || null,
+            };
+          },
+        ),
+      };
     }
 
     case "get": {
       if (!operation.path) throw new Error("path required for get operation");
       const content = await tree.readFile(fullPath);
-
-      try {
-        return await parseFile(new Uint8Array(content), "AUTO");
-      } catch {
-        // Check if binary
-        const sample = content.slice(0, Math.min(8000, content.length));
-        let nonPrintable = 0;
-        for (let i = 0; i < sample.length; i++) {
-          const byte = sample[i];
-          if (byte === 0) {
-            return {
-              _binary: true,
-              encoding: "base64",
-              data: Buffer.from(content).toString("base64"),
-              size: content.length,
-              path: fullPath,
-            };
-          }
-          if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) {
-            nonPrintable++;
-          }
-        }
-        if (nonPrintable / sample.length > 0.1) {
-          return {
-            _binary: true,
-            encoding: "base64",
-            data: Buffer.from(content).toString("base64"),
-            size: content.length,
-            path: fullPath,
-          };
-        }
-        return new TextDecoder().decode(content);
-      }
+      const file = await buildRuntimeFile(
+        new Uint8Array(content),
+        path.basename(fullPath),
+        guessContentType(fullPath),
+      );
+      return {
+        data: file.extracted,
+        producedFiles: {
+          [getProducedFileKey(fullPath)]: file,
+        },
+      };
     }
 
     case "put": {
@@ -267,19 +258,21 @@ async function executeSMBOperation(
       if (operation.content === undefined || operation.content === null) {
         throw new Error("content required for put operation");
       }
-      const buffer = contentToBuffer(operation.content);
+      const buffer = contentToBuffer(operation.content, fileLookup);
       await tree.createFile(fullPath, Buffer.from(buffer));
       return {
-        success: true,
-        message: `Uploaded content to ${fullPath}`,
-        size: buffer.length,
+        data: {
+          success: true,
+          message: `Uploaded content to ${fullPath}`,
+          size: buffer.length,
+        },
       };
     }
 
     case "delete": {
       if (!operation.path) throw new Error("path required for delete operation");
       await tree.removeFile(fullPath);
-      return { success: true, message: `Deleted ${fullPath}` };
+      return { data: { success: true, message: `Deleted ${fullPath}` } };
     }
 
     case "rename": {
@@ -288,25 +281,25 @@ async function executeSMBOperation(
       }
       const newFullPath = normalizePath(basePath, operation.newPath);
       await tree.renameFile(fullPath, newFullPath);
-      return { success: true, message: `Renamed ${fullPath} to ${newFullPath}` };
+      return { data: { success: true, message: `Renamed ${fullPath} to ${newFullPath}` } };
     }
 
     case "mkdir": {
       if (!operation.path) throw new Error("path required for mkdir operation");
       await tree.createDirectory(fullPath);
-      return { success: true, message: `Created directory ${fullPath}` };
+      return { data: { success: true, message: `Created directory ${fullPath}` } };
     }
 
     case "rmdir": {
       if (!operation.path) throw new Error("path required for rmdir operation");
       await tree.removeDirectory(fullPath);
-      return { success: true, message: `Removed directory ${fullPath}` };
+      return { data: { success: true, message: `Removed directory ${fullPath}` } };
     }
 
     case "exists": {
       if (!operation.path) throw new Error("path required for exists operation");
       const exists = await tree.exists(fullPath);
-      return { exists, path: fullPath };
+      return { data: { exists, path: fullPath } };
     }
 
     case "stat": {
@@ -314,11 +307,11 @@ async function executeSMBOperation(
       try {
         const exists = await tree.exists(fullPath);
         if (!exists) {
-          return { exists: false, path: fullPath };
+          return { data: { exists: false, path: fullPath } };
         }
 
         if (fullPath === "/" || fullPath === "") {
-          return { exists: true, path: fullPath, name: "/", type: "directory" };
+          return { data: { exists: true, path: fullPath, name: "/", type: "directory" } };
         }
 
         const lastSlashIndex = fullPath.lastIndexOf("/");
@@ -327,10 +320,12 @@ async function executeSMBOperation(
 
         if (!fileName) {
           return {
-            exists: true,
-            path: fullPath,
-            name: fullPath.split("/").filter(Boolean).pop() || "/",
-            type: "directory",
+            data: {
+              exists: true,
+              path: fullPath,
+              name: fullPath.split("/").filter(Boolean).pop() || "/",
+              type: "directory",
+            },
           };
         }
 
@@ -340,21 +335,23 @@ async function executeSMBOperation(
         );
 
         if (!entry) {
-          return { exists: false, path: fullPath };
+          return { data: { exists: false, path: fullPath } };
         }
 
         return {
-          exists: true,
-          path: fullPath,
-          name: entry.filename.startsWith("./") ? entry.filename.slice(2) : entry.filename,
-          size: Number(entry.fileSize),
-          type: entry.type === "Directory" ? "directory" : "file",
-          createdAt: entry.creationTime?.toISOString() || null,
-          modifyTime: entry.lastWriteTime?.toISOString() || null,
-          accessTime: entry.lastAccessTime?.toISOString() || null,
+          data: {
+            exists: true,
+            path: fullPath,
+            name: entry.filename.startsWith("./") ? entry.filename.slice(2) : entry.filename,
+            size: Number(entry.fileSize),
+            type: entry.type === "Directory" ? "directory" : "file",
+            createdAt: entry.creationTime?.toISOString() || null,
+            modifyTime: entry.lastWriteTime?.toISOString() || null,
+            accessTime: entry.lastAccessTime?.toISOString() || null,
+          },
         };
       } catch {
-        return { exists: false, path: fullPath };
+        return { data: { exists: false, path: fullPath } };
       }
     }
 
@@ -371,16 +368,20 @@ async function executeSMBOperation(
 async function callSMB({
   endpoint,
   stepInputData,
+  fileLookup,
   credentials,
   options,
   metadata,
+  stepId,
 }: {
   endpoint: RequestStepConfig;
   stepInputData?: Record<string, unknown>;
+  fileLookup: Record<string, RuntimeExecutionFile>;
   credentials: Record<string, unknown>;
   options: RequestOptions;
   metadata: ServiceMetadata;
-}): Promise<unknown> {
+  stepId?: string;
+}): Promise<{ data: unknown; producedFiles: Record<string, RuntimeExecutionFile> }> {
   const allVars = { ...stepInputData, ...credentials };
 
   const connectionString = await replaceVariables(endpoint.url || "", allVars, metadata);
@@ -389,7 +390,7 @@ async function callSMB({
   let operations: SMBOperation[] = [];
   try {
     const resolvedBody = await replaceVariables(endpoint.body || "", allVars, metadata);
-    const body = parseJSON(resolvedBody);
+    const body = resolveFileTokens(parseJSON(resolvedBody), fileLookup, { stepId });
     if (!Array.isArray(body)) {
       operations.push(body as SMBOperation);
     } else {
@@ -422,6 +423,7 @@ async function callSMB({
 
   let attempts = 0;
   let results: unknown[] = [];
+  let producedFiles: Record<string, RuntimeExecutionFile> = {};
   const maxRetries = options?.retries || DENO_DEFAULTS.SMB.DEFAULT_RETRIES;
   const timeout = options?.timeout || DENO_DEFAULTS.SMB.DEFAULT_TIMEOUT;
 
@@ -431,6 +433,8 @@ async function callSMB({
     let tree: SMBTree | null = null;
 
     try {
+      const attemptProducedFiles: Record<string, RuntimeExecutionFile> = {};
+
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error(`SMB operation timed out after ${timeout}ms`)), timeout);
       });
@@ -449,13 +453,23 @@ async function callSMB({
         const opResults: unknown[] = [];
         for (const operation of operations) {
           debug(`Executing SMB operation: ${operation.operation}`, metadata);
-          const result = await executeSMBOperation(tree, operation, connectionInfo.basePath);
-          opResults.push(result);
+          const result = await executeSMBOperation(
+            tree,
+            operation,
+            connectionInfo.basePath,
+            fileLookup,
+          );
+          opResults.push(result.data);
+          if (result.producedFiles) {
+            Object.assign(attemptProducedFiles, result.producedFiles);
+          }
         }
-        return opResults;
+        return { opResults, attemptProducedFiles };
       })();
 
-      results = await Promise.race([operationPromise, timeoutPromise]);
+      const attemptResult = await Promise.race([operationPromise, timeoutPromise]);
+      results = attemptResult.opResults;
+      producedFiles = attemptResult.attemptProducedFiles;
       break;
     } catch (error) {
       attempts++;
@@ -481,5 +495,8 @@ async function callSMB({
     }
   }
 
-  return results.length === 1 ? results[0] : results;
+  return {
+    data: results.length === 1 ? results[0] : results,
+    producedFiles,
+  };
 }

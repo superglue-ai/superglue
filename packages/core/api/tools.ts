@@ -1,4 +1,5 @@
 import {
+  ExecutionFileEnvelope,
   RequestOptions,
   RequestSource,
   RunStatus,
@@ -83,6 +84,7 @@ export function buildRunResponse(params: {
       stepId: sr.stepId,
       success: sr.success,
       error: sr.error,
+      stepFileKeys: sr.stepFileKeys,
     })),
     options: options as Record<string, unknown>,
     requestSource,
@@ -348,6 +350,7 @@ const runTool: RouteHandler = async (request, reply) => {
     const { runId, startedAt } = await executeToolAsync(ctx, {
       tool,
       payload: body?.inputs as Record<string, unknown>,
+      files: body?.files as Record<string, ExecutionFileEnvelope> | undefined,
       credentials: body?.credentials as Record<string, string> | undefined,
       requestOptions,
       runId: body?.runId,
@@ -382,6 +385,7 @@ const runTool: RouteHandler = async (request, reply) => {
   const result = await executeTool(ctx, {
     tool,
     payload: body?.inputs as Record<string, unknown>,
+    files: body?.files as Record<string, ExecutionFileEnvelope> | undefined,
     credentials: body?.credentials as Record<string, string> | undefined,
     requestOptions,
     runId: body?.runId,
@@ -423,6 +427,7 @@ const runTool: RouteHandler = async (request, reply) => {
 interface RunToolConfigRequestBody {
   tool: Tool;
   payload?: Record<string, unknown>;
+  files?: Record<string, ExecutionFileEnvelope>;
   credentials?: Record<string, unknown>;
   options?: {
     timeout?: number;
@@ -508,6 +513,7 @@ const runToolConfig: RouteHandler = async (request, reply) => {
   const result = await executeTool(ctx, {
     tool,
     payload: body?.payload || {},
+    files: body?.files,
     credentials: body?.credentials as Record<string, string> | undefined,
     requestOptions: { timeout: body?.options?.timeout },
     createRun,

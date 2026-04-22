@@ -1,7 +1,7 @@
-import { resolveFileReferences, validateFileReferences } from "@/src/lib/agent/agent-helpers";
+import { resolveFileInputBindings, validateFileReferences } from "@/src/lib/agent/agent-helpers";
 import { abortExecution, generateUUID, shouldDebounceAbort } from "@/src/lib/client-utils";
 import { useSuperglueClient } from "@/src/queries/use-client";
-import { Tool, ToolCall } from "@superglue/shared";
+import { ExecutionFileEnvelope, Tool, ToolCall } from "@superglue/shared";
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 
 export interface RunResult {
@@ -130,7 +130,20 @@ export function useToolExecution({
         } catch {}
       }
 
-      const validation = validateFileReferences(runPayload, filePayloads || {});
+      const resolvedFileBindings = resolveFileInputBindings(tool.input?.files, filePayloads);
+      if (resolvedFileBindings.success === false) {
+        const errorMsg = resolvedFileBindings.error;
+        setRunResult({ success: false, error: errorMsg });
+        cleanup();
+        handleFailure(errorMsg);
+        return;
+      }
+
+      const availableExecutionFiles = {
+        ...(filePayloads || {}),
+        ...(resolvedFileBindings.resolved as Record<string, ExecutionFileEnvelope>),
+      };
+      const validation = validateFileReferences(runPayload, availableExecutionFiles);
       if (validation.valid === false) {
         const errorMsg = `Missing files: ${validation.missingFiles.join(", ")}. ${validation.availableKeys.length > 0 ? `Available: ${validation.availableKeys.join(", ")}` : "No files uploaded in this session."}`;
         setRunResult({ success: false, error: errorMsg });
@@ -139,22 +152,15 @@ export function useToolExecution({
         return;
       }
 
-      if (filePayloads && Object.keys(filePayloads).length > 0) {
-        try {
-          runPayload = resolveFileReferences(runPayload, filePayloads);
-        } catch (error: any) {
-          const errorMsg = error.message || "Failed to resolve file references";
-          setRunResult({ success: false, error: errorMsg });
-          cleanup();
-          handleFailure(errorMsg);
-          return;
-        }
-      }
+      const executionFiles = {
+        ...availableExecutionFiles,
+      };
 
       try {
         const result = await client.runToolConfig({
           tool: toolConfig,
           payload: runPayload,
+          files: executionFiles,
           runId,
           traceId: runId,
         });

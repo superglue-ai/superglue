@@ -86,6 +86,12 @@ export interface StreamableHTTPReconnectionOptions {
   maxRetries: number;
 }
 
+type ParsedSseEvent = {
+  id?: string;
+  event?: string;
+  data: string;
+};
+
 /**
  * Configuration options for the `StreamableHTTPClientTransport`.
  */
@@ -342,15 +348,17 @@ export class StreamableHTTPClientTransport implements Transport {
             break;
           }
 
+          const parsedEvent = event as ParsedSseEvent;
+
           // Update last event ID if provided
-          if (event.id) {
-            lastEventId = event.id;
-            onresumptiontoken?.(event.id);
+          if (parsedEvent.id) {
+            lastEventId = parsedEvent.id;
+            onresumptiontoken?.(parsedEvent.id);
           }
 
-          if (!event.event || event.event === "message") {
+          if (!parsedEvent.event || parsedEvent.event === "message") {
             try {
-              const message = JSONRPCMessageSchema.parse(JSON.parse(event.data));
+              const message = JSONRPCMessageSchema.parse(JSON.parse(parsedEvent.data));
               if (replayMessageId !== undefined && isJSONRPCResponse(message)) {
                 message.id = replayMessageId;
               }
