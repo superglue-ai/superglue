@@ -1,7 +1,30 @@
 import { useRef, useState, useMemo, useCallback } from "react";
 import { createVariableSuggestionConfig } from "../templates/TemplateVariableSuggestion";
 import type { CategorizedVariables, CategorizedSources } from "../context/types";
-import type { Editor } from "@tiptap/react";
+
+type TemplateAwareEditorLike = {
+  chain: () => {
+    focus: () => {
+      deleteRange: (range: { from: number; to: number }) => {
+        insertContent: (content: unknown) => { run: () => boolean };
+        run: () => boolean;
+      };
+      insertContent: (content: unknown) => { run: () => boolean };
+      run: () => boolean;
+    };
+  };
+  state: {
+    selection: {
+      from: number;
+    };
+  };
+  view?: {
+    coordsAtPos: (pos: number) => {
+      left: number;
+      bottom: number;
+    };
+  };
+};
 
 interface UseTemplateAwareEditorOptions {
   categorizedVariables: CategorizedVariables;
@@ -14,7 +37,7 @@ export function useTemplateAwareEditor({
 }: UseTemplateAwareEditorOptions) {
   const [codePopoverOpen, setCodePopoverOpen] = useState(false);
   const [popoverAnchorPos, setPopoverAnchorPos] = useState<number | null>(null);
-  const editorRef = useRef<Editor | null>(null);
+  const editorRef = useRef<TemplateAwareEditorLike | null>(null);
   const suggestionDestroyRef = useRef<(() => void) | null>(null);
 
   const suggestionConfig = useMemo(

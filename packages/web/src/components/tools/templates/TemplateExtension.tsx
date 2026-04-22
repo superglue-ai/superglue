@@ -1,4 +1,5 @@
 import { Node, mergeAttributes, InputRule } from "@tiptap/core";
+import type { NodeViewRenderer } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from "@tiptap/react";
 import { TemplateChip } from "./TemplateChip";
 import { useExecution } from "../context/tool-execution-context";
@@ -16,6 +17,12 @@ export interface TemplateExtensionStorage {
 type TemplateStorageShape = {
   template?: TemplateExtensionStorage;
 };
+
+function coerceNodeViewRenderer(renderer: unknown): NodeViewRenderer {
+  // In CI, @tiptap/react can be typed against a different physical @tiptap/core
+  // install than the Node.create() call below. Cast at this boundary only.
+  return renderer as NodeViewRenderer;
+}
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -184,7 +191,7 @@ export const TemplateExtension = Node.create<TemplateExtensionOptions, TemplateE
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(TemplateNodeView);
+    return coerceNodeViewRenderer(ReactNodeViewRenderer(TemplateNodeView));
   },
 
   addInputRules() {

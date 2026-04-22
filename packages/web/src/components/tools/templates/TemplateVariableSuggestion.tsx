@@ -1,4 +1,6 @@
 import { Extension } from "@tiptap/core";
+import type { Editor as TiptapEditor } from "@tiptap/core";
+import type { Plugin } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion, { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion";
 import tippy, { Instance as TippyInstance } from "tippy.js";
@@ -403,6 +405,16 @@ interface SuggestionCallbacks {
   onClose?: () => void;
 }
 
+function coerceTiptapEditor(editor: unknown): TiptapEditor {
+  // CI can materialize multiple physical @tiptap/core installs.
+  // Cast the editor only at integration boundaries between tiptap packages.
+  return editor as TiptapEditor;
+}
+
+function coercePlugins(plugins: unknown): Plugin[] {
+  return plugins as Plugin[];
+}
+
 export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
   return {
     char: "@",
@@ -451,7 +463,7 @@ export function createVariableSuggestionConfig(callbacks: SuggestionCallbacks) {
 
           component = new ReactRenderer(VariableCommandMenu, {
             props: makeMenuProps(),
-            editor: props.editor,
+            editor: coerceTiptapEditor(props.editor),
           });
 
           if (!props.clientRect) return;
@@ -511,6 +523,8 @@ export const VariableSuggestion = Extension.create<VariableSuggestionOptions>({
   },
 
   addProseMirrorPlugins() {
-    return [Suggestion({ editor: this.editor, ...this.options.suggestion })];
+    return coercePlugins([
+      Suggestion({ editor: coerceTiptapEditor(this.editor), ...this.options.suggestion }),
+    ]);
   },
 });
