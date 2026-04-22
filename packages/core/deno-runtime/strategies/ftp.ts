@@ -1,11 +1,11 @@
 /**
  * FTP/SFTP Strategy for Deno runtime
  *
- * Uses npm:ssh2-sftp-client for SFTP and npm:basic-ftp for FTP/FTPS.
+ * Uses npm:ssh2-sftp-client for SFTP and the pinned basic-ftp import-map entry for FTP/FTPS.
  */
 
 import SFTPClient from "npm:ssh2-sftp-client";
-import { Client as FTPClient } from "npm:basic-ftp";
+import { Client as FTPClient } from "basic-ftp";
 import { Readable, Writable } from "node:stream";
 import { Buffer } from "node:buffer";
 import * as path from "node:path";
