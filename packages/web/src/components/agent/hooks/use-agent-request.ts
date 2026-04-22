@@ -111,7 +111,9 @@ export function useAgentRequest({
     if (currentStateKey === prevFileKeysRef.current) return null;
 
     const prevEntries = new Map(
-      parseFileStateSnapshot(prevFileKeysRef.current).files.map((file) => [file.key, file.name] as const),
+      parseFileStateSnapshot(prevFileKeysRef.current).files.map(
+        (file) => [file.key, file.name] as const,
+      ),
     );
     const currKeys = new Set(currentFiles.map((file) => file.key));
     prevFileKeysRef.current = currentStateKey;
