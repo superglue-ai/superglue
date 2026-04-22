@@ -119,7 +119,7 @@ To produce new files from a transform, return them via a `__files__` key:
 
 ### `raw` rules
 
-- `raw` accepts: `Uint8Array | ArrayBuffer | number[] | string | object | null`.
+- `raw` accepts: `Uint8Array | ArrayBuffer | number[] | string | object | null | undefined`.
   - **String** → UTF-8 encoded. Pass a JSON string for structured data: `raw: JSON.stringify(data)`.
   - **Object / array of objects** → automatically JSON-stringified to UTF-8 bytes. Works, but prefer explicit `JSON.stringify` with a `text/csv` or `application/json` contentType for clarity.
   - **`null` / `undefined`** → produces an empty file (0 bytes).

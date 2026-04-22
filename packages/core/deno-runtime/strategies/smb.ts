@@ -56,6 +56,10 @@ interface SmbOperationResult {
   producedFiles?: Record<string, RuntimeExecutionFile>;
 }
 
+function getProducedFileKey(filePath: string): string {
+  return filePath;
+}
+
 /**
  * Execute an SMB step
  */
@@ -244,7 +248,7 @@ async function executeSMBOperation(
       return {
         data: file.extracted,
         producedFiles: {
-          [path.basename(fullPath)]: file,
+          [getProducedFileKey(fullPath)]: file,
         },
       };
     }

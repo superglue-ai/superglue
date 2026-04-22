@@ -36,21 +36,11 @@ Using system URL variables enables the same tool to work across environments wit
 
 ## System Knowledge
 
-System knowledge auto-populates system endpoints, documentation URLs, and (for some) OAuth configuration. User-provided values always override system knowledge defaults.
+System knowledge auto-populates system endpoints, documentation URLs, and sometimes non-secret OAuth metadata such as `auth_url`, `token_url`, or `scopes`. User-provided values always override system knowledge defaults.
 
 IMPORTANT: Never mention templates, system knowledge, or internal system configuration sources to users. Use available system knowledge silently to set up systems correctly. If information is missing, ask the user directly.
 
-### Systems with Managed OAuth
-
-These have superglue-managed OAuth credentials — no user-provided `client_id` or `client_secret` needed:
-
-- slack, salesforce, asana, notion, airtable, jira, confluence
-
-If users are trying to set up any of these systems, do not ask them for `client_id` and `client_secret`. The `client_id` is visible in the system knowledge config. The `client_secret` is stored securely server-side and resolved during the OAuth token exchange.
-
-### Other Systems
-
-Many services have system knowledge that contains the API URL and docs URL but require user-provided credentials.
+Many services have system knowledge that contains the API URL, docs URL, and OAuth metadata, but in OSS users still need to provide their own OAuth app credentials when the provider requires them.
 
 ### System Knowledge Resolution
 
@@ -68,18 +58,11 @@ When looking up which system knowledge applies to a system, resolution order is:
 create_system({ id: "slack", templateId: "slack" })
 ```
 
-`templateId` auto-populates: URL, name, OAuth settings, documentation references. Some systems also include `systemSpecificInstructions` (e.g., Jira has instructions about cloud ID requirements and deprecated endpoints). Read and follow them when building tools / creating systems.
+`templateId` auto-populates: URL, name, OAuth metadata, and documentation references. Some systems also include `systemSpecificInstructions` (e.g., Jira has instructions about cloud ID requirements and deprecated endpoints). Read and follow them when building tools / creating systems.
 
 ## OAuth Setup Flow
 
-### For Systems with Managed OAuth (slack, salesforce, etc.)
-
-1. `create_system` with `templateId` — credentials auto-populated
-2. `authenticate_oauth` with `systemId` and `scopes`
-3. User completes OAuth in browser popup
-4. Tokens auto-saved to system
-
-### For Custom OAuth
+### For OAuth Systems
 
 Tell users the required steps to retrieve OAuth credentials for the system they are trying to set up if you know them.
 
@@ -88,16 +71,15 @@ Tell users the required steps to retrieve OAuth credentials for the system they 
 3. `authenticate_oauth` with `systemId`, `scopes`, and optionally `auth_url`, `token_url`
 4. User completes OAuth flow
 
-Note: NEVER ask the user for OAuth access tokens or refresh tokens directly. These are obtained automatically through the OAuth authentication flow via `authenticate_oauth`. Only ask for client credentials (client_id, client_secret) when needed for custom OAuth setups.
+In OSS, `client_id` and `client_secret` must come from the user's own OAuth app setup.
+
+Note: NEVER ask the user for OAuth access tokens or refresh tokens directly. These are obtained automatically through the OAuth authentication flow via `authenticate_oauth`.
 
 ### OAuth Credential Resolution
 
-`authenticate_oauth` resolves credentials in order:
+`authenticate_oauth` resolves credentials from the system's stored OAuth configuration. Template metadata may still provide non-secret defaults like `auth_url`, `token_url`, or `scopes`, but OSS does not supply `client_id` or `client_secret`.
 
-1. System credentials (`system.credentials.client_id` / `client_secret`)
-2. System knowledge defaults (only for managed OAuth systems above)
-
-If missing, use `edit_system` to store them first.
+If client credentials are missing, use `edit_system` to store them first.
 
 ### OAuth Configuration Options
 

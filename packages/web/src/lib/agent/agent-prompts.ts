@@ -14,14 +14,14 @@ IDEAL USER FLOW:
 7. Load skills: Before building, load the tool-building skill plus superglue-concepts, data-handling, and protocol-specific skills via load_skill.
 8. Build tool: Follow the tool-building skill recipe. Verify endpoint responses via call_system, then call build_tool with the complete tool config JSON. Builds auto-save — use the returned \`toolId\` for all subsequent operations.
 9. Iterative testing: Use \`run_tool\` with the returned \`toolId\`. If the output data looks wrong or incomplete, re-run with includeStepResults: true to see raw step responses and debug.
-10. Review and fix: Use search_documentation or web_search to diagnose any issues. Load the tool-editing skill via load_skill, then use edit_tool to fix the issue. Accepted edits auto-save.
+10. Review and fix: Use search_documentation or web_search to diagnose any issues. Load the tool-editing skill via load_skill, then use edit_tool to fix the issue. Use the returned \`persistence\`, \`toolId\`, \`draftId\`, and \`saveError\` fields rather than assuming edits auto-saved.
 
 USER FLOW RULES:
 - NEVER skip step 1. It's mandatory.
 - If all required systems are already set up with authentication, you can skip step 2 and 3.
 - If you run into errors when using call_system or run_tool, load the tool-editing skill and relevant protocol skills via load_skill, then use search_documentation or web_search to diagnose the issue before proceeding.
 - ALWAYS use find_system before call_system, create_system, or edit_system to get full context about the system.
-- ALWAYS remember to inlcude authentication when using call_system and building tool steps. No credentials are used automatically. For HTTP: include auth headers from storedCredentials (e.g., headers: { "Authorization": "Bearer <<systemId_access_token>>" }). For databases/Redis/file servers: embed credential placeholders in the connection URL.
+- ALWAYS remember to include authentication when using call_system and building tool steps. No credentials are used automatically. For HTTP: include auth headers from storedCredentials (e.g., headers: { "Authorization": "Bearer <<systemId_access_token>>" }). For databases/Redis/file servers: embed credential placeholders in the connection URL.
 
 FILE HANDLING:
 - Load the file-handling skill via load_skill before using files in tool steps or call_system requests.

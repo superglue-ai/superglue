@@ -487,7 +487,7 @@ const runRunTool = async (input: any, ctx: ToolExecutionContext) => {
 const editToolDefinition = (): ToolDefinition => ({
   name: "edit_tool",
   description:
-    "Modifies a tool using JSON Patch operations. Provide either draftId (for playground drafts) or toolId (for saved tools), not both. You MUST include payload with the same test data from build_tool. In the main agent, accepted edits auto-save.",
+    "Modifies a tool using JSON Patch operations. Provide either draftId (for playground drafts) or toolId (for saved tools), not both. You MUST include payload with the same test data from build_tool. Check the returned persistence/toolId/draftId/saveError fields instead of assuming accepted edits auto-save.",
   inputSchema: {
     type: "object",
     properties: {
@@ -1745,7 +1745,7 @@ const runSearchDocumentation = async (input: any, ctx: ToolExecutionContext) => 
 const authenticateOAuthDefinition = (): ToolDefinition => ({
   name: "authenticate_oauth",
   description:
-    "Initiates OAuth flow for a system. Credentials (client_id/secret) must already be stored on the system or provided by a preconfigured template. On success, tokens are auto-saved.",
+    "Initiates OAuth flow for a system. Credentials (client_id/secret) must already be stored on the system. On success, tokens are auto-saved.",
   inputSchema: {
     type: "object",
     properties: {
@@ -1764,12 +1764,12 @@ const authenticateOAuthDefinition = (): ToolDefinition => ({
       auth_url: {
         type: "string",
         description:
-          "OAuth authorization URL - only needed if not already stored in system credentials or template",
+          "OAuth authorization URL - only needed if not already stored in system credentials or template metadata",
       },
       token_url: {
         type: "string",
         description:
-          "OAuth token URL - only needed if not already stored in system credentials or template",
+          "OAuth token URL - only needed if not already stored in system credentials or template metadata",
       },
       grant_type: {
         type: "string",
@@ -1822,8 +1822,7 @@ const runAuthenticateOAuth = async (input: any, ctx: ToolExecutionContext) => {
     if (!oauthConfig.client_id) {
       return {
         success: false,
-        error:
-          "Missing client_id. The system does not have a client_id in its credentials and no matching template provides one.",
+        error: "Missing client_id. The system does not have a client_id stored in its credentials.",
       };
     }
 

@@ -91,7 +91,7 @@ Creates the field if missing, overwrites if it exists. **Prefer `add` over `repl
 
 Main agent:
 
-- Accepted edits (full or partial approval) auto-save. Use `toolId` for follow-up operations.
+- Accepted edits usually auto-save, but follow-up operations should use the returned `persistence`, `toolId`, `draftId`, and `saveError` fields rather than assuming the save succeeded.
 
 Tool playground agent:
 

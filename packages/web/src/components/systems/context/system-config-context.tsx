@@ -283,7 +283,11 @@ export function SystemConfigProvider({
       url !== (initialSystem.url || "") ||
       icon !== (initialSystem.icon || "") ||
       specificInstructions !== (initialSystem.specificInstructions || "") ||
-      authType !== detectSystemAuthType(initialSystem.credentials || {}) ||
+      authType !==
+        detectSystemAuthType(initialSystem.credentials || {}, {
+          url: initialSystem.url,
+          templateName: initialSystem.templateName,
+        }) ||
       multiTenancyMode !==
         ((initialSystem.multiTenancyMode as "disabled" | "enabled") || "disabled");
 

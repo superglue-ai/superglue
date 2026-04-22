@@ -155,16 +155,23 @@ async function createNodeBackend(): Promise<PgBackend> {
   }
   const pools = new Map<string, PoolEntry>();
 
+  function getNodePoolCacheKey(cs: string, options: RequestOptions): string {
+    const timeout = options?.timeout || DENO_DEFAULTS.POSTGRES.DEFAULT_TIMEOUT;
+    return `${cs}::timeout=${timeout}`;
+  }
+
   async function resolveSsl(
     cs: string,
     metadata: ServiceMetadata,
   ): Promise<false | { rejectUnauthorized: boolean }> {
     if (cs.includes("sslmode=disable")) return false;
     if (cs.includes("sslmode=")) return { rejectUnauthorized: false };
-    if (cs.includes("localhost")) return false;
     try {
       const url = new URL(cs.replace(/^postgresql:/, "http:").replace(/^postgres:/, "http:"));
       const host = url.hostname;
+      if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+        return false;
+      }
       const port = parseInt(url.port, 10) || 5432;
       const supportsSSL = await new Promise<boolean>((resolve) => {
         const socket = createConnection({ host, port }, () => {
@@ -203,7 +210,8 @@ async function createNodeBackend(): Promise<PgBackend> {
     options: RequestOptions,
     metadata: ServiceMetadata,
   ): Promise<NpmPool> {
-    const existing = pools.get(cs);
+    const cacheKey = getNodePoolCacheKey(cs, options);
+    const existing = pools.get(cacheKey);
     if (existing) {
       existing.lastUsed = Date.now();
       return existing.pool;
@@ -218,9 +226,9 @@ async function createNodeBackend(): Promise<PgBackend> {
     });
     pool.on("error", (err: Error) => {
       console.error("Unexpected pool error:", err);
-      pools.delete(cs);
+      pools.delete(cacheKey);
     });
-    pools.set(cs, { pool, lastUsed: Date.now(), connectionString: cs });
+    pools.set(cacheKey, { pool, lastUsed: Date.now(), connectionString: cs });
     return pool;
   }
 

@@ -32,5 +32,5 @@ export function getCacheScopeIdentifier(): string | null {
 
   // OSS uses raw API keys rather than JWTs. Fall back to a stable token-derived scope
   // so caches still persist across reloads and remain separated per configured API key.
-  return `token:${Math.abs(hashString(token))}`;
+  return `token:${(hashString(token) >>> 0).toString(16)}`;
 }

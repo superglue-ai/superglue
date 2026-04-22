@@ -50,7 +50,7 @@ function createClient(connectionString: string): Redis {
     connectTimeout: 5000,
     maxRetriesPerRequest: 1,
     lazyConnect: true,
-    ...(useTls ? { tls: { rejectUnauthorized: false } } : {}),
+    ...(useTls ? { tls: {} } : {}),
   });
 }
 

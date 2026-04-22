@@ -19,10 +19,18 @@ export function convertBasicAuthToBase64(headerValue: string): string {
   const seemsEncoded = /^[A-Za-z0-9+/=]+$/.test(credentials);
 
   if (!seemsEncoded) {
-    const base64Credentials = btoa(credentials);
+    const base64Credentials = Buffer.from(credentials, "utf8").toString("base64");
     return `Basic ${base64Credentials}`;
   }
   return headerValue;
+}
+
+function safeDecodeUriComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 export function getValueByPath(obj: unknown, path: string): unknown {
@@ -339,7 +347,7 @@ export function deriveResponseFilename(response: Response, fallbackUrl: string):
   const disposition = response.headers.get("content-disposition") || "";
   const filenameMatch = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
   if (filenameMatch?.[1]) {
-    return decodeURIComponent(filenameMatch[1].replace(/"/g, ""));
+    return safeDecodeUriComponent(filenameMatch[1].replace(/"/g, ""));
   }
 
   try {
@@ -347,7 +355,7 @@ export function deriveResponseFilename(response: Response, fallbackUrl: string):
     const pathname = parsedUrl.pathname;
     const lastSegment = pathname.split("/").filter(Boolean).pop();
     if (lastSegment) {
-      return decodeURIComponent(lastSegment);
+      return safeDecodeUriComponent(lastSegment);
     }
   } catch {
     // ignore

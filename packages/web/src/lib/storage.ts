@@ -171,6 +171,7 @@ async function getPayloadWithLegacyFallback(
   const legacyValue = await db.get("payloads", legacyKey);
   if (legacyValue !== undefined && legacyValue !== null) {
     await db.put("payloads", legacyValue, scopedKey);
+    await db.delete("payloads", legacyKey);
     return legacyValue;
   }
 
@@ -194,6 +195,7 @@ async function getDraftWithLegacyFallback(
   const legacyValue = await db.get("drafts", legacyKey);
   if (legacyValue !== undefined && legacyValue !== null) {
     await db.put("drafts", legacyValue, scopedKey);
+    await db.delete("drafts", legacyKey);
     return legacyValue;
   }
 

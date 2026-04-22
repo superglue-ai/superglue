@@ -54,6 +54,10 @@ interface FtpOperationResult {
   producedFiles?: Record<string, RuntimeExecutionFile>;
 }
 
+function getProducedFileKey(filePath: string): string {
+  return filePath;
+}
+
 /**
  * Execute an FTP/SFTP step
  */
@@ -221,7 +225,7 @@ async function executeSFTPOperation(
       return {
         data: file.extracted,
         producedFiles: {
-          [path.basename(operation.path)]: file,
+          [getProducedFileKey(operation.path)]: file,
         },
       };
     }
@@ -361,7 +365,7 @@ async function executeFTPOperation(
       return {
         data: file.extracted,
         producedFiles: {
-          [path.basename(operation.path)]: file,
+          [getProducedFileKey(operation.path)]: file,
         },
       };
     }
@@ -530,9 +534,6 @@ async function callFTP({
             retries: 1,
             retry_minTimeout: 1000,
             timeout: timeout,
-            algorithms: {
-              cipher: ["aes128-ctr", "aes192-ctr", "aes256-ctr"],
-            },
           });
 
           const resolvedOps = resolveOperationPaths(operations, connectionInfo.basePath);

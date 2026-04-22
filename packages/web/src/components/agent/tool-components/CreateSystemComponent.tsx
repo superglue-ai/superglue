@@ -172,10 +172,9 @@ function CreateSystemComponentImpl({
 
     const allValues: Record<string, string> = {};
     for (const key of Object.keys(allCredentialFields)) {
-      const userVal = credentialValues[key]?.trim();
-      if (userVal) {
-        allValues[key] = userVal;
-      } else if (allCredentialFields[key] && String(allCredentialFields[key]).trim()) {
+      if (Object.prototype.hasOwnProperty.call(credentialValues, key)) {
+        allValues[key] = credentialValues[key].trim();
+      } else if (allCredentialFields[key] !== undefined && allCredentialFields[key] !== null) {
         allValues[key] = String(allCredentialFields[key]);
       }
     }
@@ -400,7 +399,7 @@ function CreateSystemComponentImpl({
                               value={
                                 credentialValues[field] !== undefined
                                   ? credentialValues[field]
-                                  : String(allCredentialFields[field] || "")
+                                  : String(allCredentialFields[field] ?? "")
                               }
                               onChange={(e) =>
                                 setCredentialValues((prev) => ({

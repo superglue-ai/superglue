@@ -15,7 +15,7 @@ The `<<expression>>` syntax injects dynamic values into step config fields (url,
 <<sg_auth_email>>    email of the authenticated user
 ```
 
-**CRITICAL**: Simple `<<varName>>` references only work for the above list of top-level keys. NO dots, NO nesting.
+**CRITICAL**: Simple `<<varName>>` references only work for top-level keys in the merged variable object. The examples above are common keys, not an exhaustive list. NO dots, NO nesting.
 
 - VALID: `<<userId>>`, `<<currentItem>>`, `<<page>>`, `<<stripe_api_key>>`, `<<stripe_url>>`, `<<sg_auth_email>>`
 - INVALID: `<<currentItem.id>>`, `<<sourceData.userId>>`, `<<user.name>>` — these FAIL at runtime

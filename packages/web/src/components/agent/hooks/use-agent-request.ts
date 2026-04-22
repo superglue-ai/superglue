@@ -33,6 +33,27 @@ interface UseAgentRequestOptions {
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void;
 }
 
+interface FileStateSnapshot {
+  files: Array<{ key: string; name: string }>;
+  loadedSkills: string[];
+}
+
+function parseFileStateSnapshot(raw: string): FileStateSnapshot {
+  if (!raw) {
+    return { files: [], loadedSkills: [] };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<FileStateSnapshot>;
+    return {
+      files: Array.isArray(parsed.files) ? parsed.files : [],
+      loadedSkills: Array.isArray(parsed.loadedSkills) ? parsed.loadedSkills : [],
+    };
+  } catch {
+    return { files: [], loadedSkills: [] };
+  }
+}
+
 export function useAgentRequest({
   config,
   messagesRef,
@@ -81,23 +102,16 @@ export function useAgentRequest({
     const currentFiles = [...sessionFiles, ...readyPending]
       .map((file) => ({ key: file.key, name: file.name }))
       .sort((a, b) => a.key.localeCompare(b.key));
-    const currentKeys = currentFiles
-      .map((f) => `${f.key}:${f.name}`)
-      .sort()
-      .join(",");
-    const currentStateKey = `${currentKeys}|skills:${[...loadedSkills].sort().join(",")}`;
+    const currentSnapshot: FileStateSnapshot = {
+      files: currentFiles,
+      loadedSkills: [...loadedSkills].sort(),
+    };
+    const currentStateKey = JSON.stringify(currentSnapshot);
 
     if (currentStateKey === prevFileKeysRef.current) return null;
 
     const prevEntries = new Map(
-      prevFileKeysRef.current
-        .split("|skills:")[0]
-        .split(",")
-        .filter(Boolean)
-        .map((entry) => {
-          const [key, ...rest] = entry.split(":");
-          return [key, rest.join(":") || key] as const;
-        }),
+      parseFileStateSnapshot(prevFileKeysRef.current).files.map((file) => [file.key, file.name] as const),
     );
     const currKeys = new Set(currentFiles.map((file) => file.key));
     prevFileKeysRef.current = currentStateKey;

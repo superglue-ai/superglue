@@ -119,7 +119,7 @@ Multiple commands:
 ## Connection Management
 
 - A fresh connection is created per execution and closed after completion
-- TLS auto-configured for `rediss://` URLs (currently uses `rejectUnauthorized: false`)
+- TLS auto-configured for `rediss://` URLs using the runtime's default certificate verification behavior
 - 5-second connection timeout, 30-second command timeout
 - Array commands (pipeline) run on a single connection for efficiency
 

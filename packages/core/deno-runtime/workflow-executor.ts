@@ -734,6 +734,11 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
     };
   } catch (err) {
     logError(`Workflow execution error: ${(err as Error).message}`, metadata);
+    if (payload.returnProducedFiles && !serializedProducedFiles) {
+      serializedProducedFiles = serializeProducedFiles(producedFileStore, {
+        enforceInlineSizeLimit: true,
+      });
+    }
     return {
       runId: payload.runId,
       success: false,

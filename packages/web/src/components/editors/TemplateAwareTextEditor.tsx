@@ -1,3 +1,4 @@
+import type { AnyExtension } from "@tiptap/core";
 import { useEditor, EditorContent } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -24,6 +25,12 @@ interface TemplateAwareTextEditorProps {
 const SingleLineDocument = Document.extend({ content: "paragraph" });
 
 const DEBOUNCE_MS = 200;
+
+function coerceExtension(extension: unknown): AnyExtension {
+  // CI can end up with multiple physical @tiptap/core installs in the workspace tree,
+  // which makes otherwise-compatible extensions fail nominal type checks.
+  return extension as AnyExtension;
+}
 
 export function TemplateAwareTextEditor({
   value,
@@ -74,8 +81,8 @@ export function TemplateAwareTextEditor({
       Paragraph,
       Text,
       History,
-      TemplateExtension.configure({ stepId }),
-      VariableSuggestion.configure({ suggestion: suggestionConfig }),
+      coerceExtension(TemplateExtension.configure({ stepId })),
+      coerceExtension(VariableSuggestion.configure({ suggestion: suggestionConfig })),
     ],
     content: templateStringToTiptap(value),
     editable: !disabled,

@@ -118,8 +118,14 @@ function ConnectionStringForm({
           <div className="relative">
             <Input
               id={`conn-${field.key}`}
-              type={field.type === "password" && !showPasswords[field.key] ? "password" : "text"}
-              value={values[field.key] || ""}
+              type={
+                field.type === "password" && !showPasswords[field.key]
+                  ? "password"
+                  : field.type === "number"
+                    ? "number"
+                    : "text"
+              }
+              value={values[field.key] ?? ""}
               onChange={(e) => handleFieldChange(field.key, e.target.value)}
               placeholder={field.placeholder || field.defaultValue || ""}
               className="h-9 bg-background/50 border-border/60 pr-9"
