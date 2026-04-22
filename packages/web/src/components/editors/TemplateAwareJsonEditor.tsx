@@ -1,4 +1,3 @@
-import type { AnyExtension } from "@tiptap/core";
 import { useEditor, EditorContent } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -32,10 +31,10 @@ interface TemplateAwareJsonEditorProps {
 
 const DEBOUNCE_MS = 200;
 
-function coerceExtension(extension: unknown): AnyExtension {
+function coerceExtension(extension: unknown): any {
   // CI can end up with multiple physical @tiptap/core installs in the workspace tree,
   // which makes otherwise-compatible extensions fail nominal type checks.
-  return extension as AnyExtension;
+  return extension as any;
 }
 
 function coerceEditorOptions(options: unknown): Parameters<typeof useEditor>[0] {

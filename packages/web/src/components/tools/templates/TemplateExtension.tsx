@@ -1,5 +1,4 @@
 import { Node, mergeAttributes, InputRule } from "@tiptap/core";
-import type { NodeViewRenderer } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from "@tiptap/react";
 import { TemplateChip } from "./TemplateChip";
 import { useExecution } from "../context/tool-execution-context";
@@ -18,10 +17,10 @@ type TemplateStorageShape = {
   template?: TemplateExtensionStorage;
 };
 
-function coerceNodeViewRenderer(renderer: unknown): NodeViewRenderer {
+function coerceNodeViewRenderer(renderer: unknown): any {
   // In CI, @tiptap/react can be typed against a different physical @tiptap/core
   // install than the Node.create() call below. Cast at this boundary only.
-  return renderer as NodeViewRenderer;
+  return renderer as any;
 }
 
 declare module "@tiptap/core" {
