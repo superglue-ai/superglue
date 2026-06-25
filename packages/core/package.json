@@ -31,9 +31,9 @@
     "build": "node --max-old-space-size=8192 ../../node_modules/typescript/bin/tsc",
     "start": "node dist/index.js",
     "dev": "npm run build && node -r dotenv/config ./dist/index.js dotenv_config_path=../../.env",
-    "test": "vitest --exclude '**/eval/integration-testing/integration.test.ts' --exclude '**/*integration.test.ts'",
-    "test-no-watch": "vitest run --exclude '**/tests/integration.test.ts'",
-    "test:coverage": "vitest run --coverage --exclude '**/tests/integration.test.ts'",
+    "test": "vitest",
+    "test-no-watch": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:workflow": "vitest run -t ApiWorkflowOrchestrator-dog"
   },
   "type": "module",
