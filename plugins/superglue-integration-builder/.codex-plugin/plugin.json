@@ -1,0 +1,29 @@
+{
+  "name": "superglue-integration-builder",
+  "version": "0.1.0",
+  "description": "Build and verify Superglue natural-language integrations.",
+  "author": {
+    "name": "Superglue contributors"
+  },
+  "skills": "./skills/",
+  "repository": "https://github.com/superglue-ai/superglue",
+  "keywords": [
+    "agent-plugin",
+    "evals",
+    "superglue"
+  ],
+  "interface": {
+    "displayName": "Superglue Integration Builder",
+    "shortDescription": "Build and verify Superglue natural-language integrations.",
+    "longDescription": "Help agents turn integration requests into explicit schemas, auth assumptions, generated tool metadata, and regression checks for Superglue workflows.",
+    "developerName": "Superglue contributors",
+    "category": "Developer Tools",
+    "capabilities": [
+      "schema discovery",
+      "integration mapping",
+      "auth setup review",
+      "generated tool QA"
+    ],
+    "defaultPrompt": "Use the Superglue plugin to plan the workflow, identify verification checks, and produce plugin eval metadata."
+  }
+}
