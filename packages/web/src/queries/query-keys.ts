@@ -2,7 +2,6 @@ export const queryKeys = {
   org: {
     all: () => ["org"] as const,
     me: (orgId: string) => [...queryKeys.org.all(), orgId, "me"] as const,
-    billing: (userId: string) => [...queryKeys.org.all(), userId, "billing"] as const,
   },
 
   tools: {

@@ -12,7 +12,6 @@ interface OrgContextValue {
   isAdmin: boolean;
   isEnterprise: boolean;
   isPro: boolean;
-  isLoadingBilling: boolean;
   canManageMembers: boolean;
 }
 
@@ -60,7 +59,6 @@ export function OrgProvider({ children }: OrgProviderProps) {
       isAdmin: true,
       isEnterprise: false,
       isPro: false,
-      isLoadingBilling: false,
       canManageMembers: false,
     }),
     [session],

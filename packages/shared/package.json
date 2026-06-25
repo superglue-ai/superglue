@@ -32,7 +32,7 @@
     "@ai-sdk/google": "3.0.53",
     "@ai-sdk/google-vertex": "4.0.95",
     "@ai-sdk/openai": "3.0.48",
-    "@anthropic-ai/sdk": "0.80.0",
+    "@anthropic-ai/sdk": "0.106.0",
     "ai": "6.0.137",
     "cron-parser": "5.5.0",
     "cron-validate": "1.5.3",

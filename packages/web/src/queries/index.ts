@@ -30,7 +30,7 @@ export {
   hasProcessingDiscoveryFiles,
   seedDiscoveryQueryData,
 } from "./discovery";
-export { useOrgProfileQuery, useBillingStatusQuery } from "./org";
+export { useOrgProfileQuery } from "./org";
 export {
   useSystems,
   useSystemsOptional,
