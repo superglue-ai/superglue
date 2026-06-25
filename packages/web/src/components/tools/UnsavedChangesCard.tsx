@@ -5,7 +5,7 @@ import { DiffDisplay } from "@/src/components/agent/tool-components/DiffDisplayC
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { computeToolDiffs, EnrichedDiff } from "@/src/lib/config-diff-utils";
 import { cn } from "@/src/lib/general-utils";
-import { useEESuperglueClient } from "@/src/queries/use-client";
+import { useSuperglueClient } from "@/src/queries/use-client";
 import { Tool } from "@superglue/shared";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -87,7 +87,7 @@ export function UnsavedChangesCard({
   currentTool,
   className,
 }: UnsavedChangesCardProps) {
-  const createEEClient = useEESuperglueClient();
+  const createEEClient = useSuperglueClient();
   const [isOpen, setIsOpen] = useState(false);
 
   const enrichedDiffs = useMemo(() => {

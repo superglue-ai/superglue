@@ -3,11 +3,11 @@ import {
   ExecutionFileEnvelope,
   Message,
   ConnectionProtocol,
+  SuperglueClient,
   Tool,
 } from "@superglue/shared";
 import { SSESubscriptionClient } from "../sse-subscriptions";
 import { AgentType } from "./registries/agent-registry";
-import { EESuperglueClient } from "../ee-superglue-client";
 import { TextStreamPart, ToolSet } from "ai";
 import type { SkillName } from "./skills/index";
 
@@ -120,7 +120,7 @@ export interface ToolDefinition {
 
 export interface ToolExecutionContext {
   agentId: AgentType;
-  superglueClient: EESuperglueClient;
+  superglueClient: SuperglueClient;
   filePayloads: Record<string, ExecutionFileEnvelope>;
   messages: Message[];
   logCallback?: (message: string) => void;

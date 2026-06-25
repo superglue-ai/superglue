@@ -1,5 +1,8 @@
+# Web-only image (Next.js UI). See docker/Dockerfile for the combined image;
+# this image runs only @superglue/web and needs neither Deno nor Playwright.
+
 # Build stage
-FROM node:22-slim AS builder
+FROM node:22-slim@sha256:80fdb3f57c815e1b638d221f30a826823467c4a56c8f6a8d7aa091cd9b1675ea AS builder
 
 WORKDIR /usr/src/app
 
@@ -8,10 +11,7 @@ COPY turbo.json ./
 
 COPY packages/web/package*.json ./packages/web/
 COPY packages/shared/package*.json ./packages/shared/
-
 COPY tsconfig.json ./
-COPY packages/web/tsconfig.json ./packages/web/
-COPY packages/shared/tsconfig.json ./packages/shared/
 
 RUN npm install && \
     npm install -g typescript next turbo
@@ -23,32 +23,40 @@ RUN npx turbo run build --filter=@superglue/web --filter=@superglue/shared
 
 
 # Production stage
-FROM node:22-slim
+FROM node:22-slim@sha256:80fdb3f57c815e1b638d221f30a826823467c4a56c8f6a8d7aa091cd9b1675ea
 
 WORKDIR /usr/src/app
 
-COPY package*.json ./
-COPY turbo.json ./
-COPY packages/web/package*.json ./packages/web/
-COPY packages/shared/package*.json ./packages/shared/
+# Create non-root user and own the workdir so all subsequent nodejs writes work
+RUN groupadd -r nodejs --gid=1001 && \
+    useradd -r -g nodejs --uid=1001 --home-dir=/usr/src/app nodejs && \
+    chown nodejs:nodejs /usr/src/app
 
-# Install minimal system dependencies (no sendmail, no playwright deps)
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    (apt-get update -o Acquire::Check-Valid-Until=false || apt-get update || true) && \
+# Install minimal system dependencies (no Playwright, no Deno)
+RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y libxml2 && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        curl ca-certificates tini && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies (no Playwright)
-RUN npm ci --omit=dev && \
-    npm install -g next turbo cross-env
+# Prepare dirs for nodejs user
+RUN mkdir -p /usr/src/app/.cache /usr/src/app/.npm && \
+    chown nodejs:nodejs /usr/src/app/.cache /usr/src/app/.npm
 
-COPY --from=builder /usr/src/app/packages/web/.next ./packages/web/.next
-COPY --from=builder /usr/src/app/packages/web/public ./packages/web/public
-COPY --from=builder /usr/src/app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /usr/src/app/packages/web/src/lib/agent/skills/content ./packages/web/src/lib/agent/skills/content
+# Install production-only dependencies as nodejs
+USER nodejs
+COPY --chown=nodejs:nodejs package*.json ./
+COPY --chown=nodejs:nodejs packages/web/package*.json ./packages/web/
+COPY --chown=nodejs:nodejs packages/shared/package*.json ./packages/shared/
+RUN npm ci --omit=dev
+
+# Copy built files from builder stage
+COPY --from=builder --chown=nodejs:nodejs /usr/src/app/packages/web/.next ./packages/web/.next
+COPY --from=builder --chown=nodejs:nodejs /usr/src/app/packages/web/public ./packages/web/public
+COPY --from=builder --chown=nodejs:nodejs /usr/src/app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=nodejs:nodejs /usr/src/app/packages/web/src/lib/agent/skills/content ./packages/web/src/lib/agent/skills/content
 
 EXPOSE 3001
 
-CMD ["npx", "turbo", "run", "start", "--filter=@superglue/web"]
+ENTRYPOINT ["tini", "-g", "--"]
+CMD ["sh", "-c", "exec npx next start -p ${WEB_PORT:-3001} packages/web"]

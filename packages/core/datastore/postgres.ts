@@ -1,6 +1,5 @@
 import {
   composeUrl,
-  DiscoveryRun,
   DocumentationFiles,
   FileReference,
   FileStatus,
@@ -12,7 +11,6 @@ import {
   System,
   Tool,
 } from "@superglue/shared";
-import jsonpatch from "fast-json-patch";
 import { Pool, PoolConfig } from "pg";
 import { credentialEncryption } from "../utils/encryption.js";
 import { escapeSqlLikePattern } from "../utils/string.js";
@@ -23,7 +21,6 @@ import type {
   PrometheusRunMetrics,
   PrometheusRunSourceLabel,
   PrometheusRunStatusLabel,
-  ToolHistoryEntry,
   ToolScheduleInternal,
   ApiKeyRecord,
   CreateApiKeyParams,
@@ -433,19 +430,6 @@ export class PostgresService implements DataStore {
       `);
 
       await client.query(`
-                CREATE TABLE IF NOT EXISTS discovery_runs (
-                    id VARCHAR(255) NOT NULL,
-                    org_id VARCHAR(255) NOT NULL,
-                    sources JSONB NOT NULL,
-                    data JSONB,
-                    status VARCHAR(50) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (id, org_id)
-                )
-            `);
-
-      await client.query(`
                 CREATE TABLE IF NOT EXISTS file_references (
                     id VARCHAR(255) NOT NULL,
                     org_id VARCHAR(255) NOT NULL,
@@ -457,20 +441,6 @@ export class PostgresService implements DataStore {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (id, org_id)
-                )
-            `);
-
-      // Tool version history table (stores previous versions on each save)
-      await client.query(`
-                CREATE TABLE IF NOT EXISTS tool_history (
-                    id SERIAL PRIMARY KEY,
-                    tool_id VARCHAR(255) NOT NULL,
-                    org_id VARCHAR(255) NOT NULL,
-                    version INTEGER NOT NULL,
-                    data JSONB NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    created_by_user_id VARCHAR(255),
-                    UNIQUE(tool_id, org_id, version)
                 )
             `);
 
@@ -524,16 +494,10 @@ export class PostgresService implements DataStore {
         `CREATE INDEX IF NOT EXISTS idx_integration_oauth_expires ON integration_oauth(expires_at)`,
       );
       await client.query(
-        `CREATE INDEX IF NOT EXISTS idx_discovery_runs_org_status ON discovery_runs(org_id, status)`,
-      );
-      await client.query(
         `CREATE INDEX IF NOT EXISTS idx_file_references_org_id ON file_references(org_id, id)`,
       );
       await client.query(
         `CREATE INDEX IF NOT EXISTS idx_file_references_org_status ON file_references(org_id, status)`,
-      );
-      await client.query(
-        `CREATE INDEX IF NOT EXISTS idx_tool_history_lookup ON tool_history(tool_id, org_id, version DESC)`,
       );
 
       // API Keys table
@@ -1036,55 +1000,14 @@ export class PostgresService implements DataStore {
     return { items: result.items.map(normalizeTool), total: result.total };
   }
 
-  async upsertWorkflow(params: {
-    id: string;
-    workflow: Tool;
-    orgId?: string;
-    userId?: string;
-  }): Promise<Tool> {
-    const { id, workflow, orgId, userId } = params;
+  async upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool> {
+    const { id, workflow, orgId } = params;
     if (!id || !workflow) return null;
     const validOrgId = this.requireOrgId(orgId, "upsertWorkflow");
 
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-
-      // Check if tool already exists - if so, archive current version
-      const existingResult = await client.query(
-        "SELECT data FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3",
-        [id, "workflow", validOrgId],
-      );
-
-      if (existingResult.rows.length > 0) {
-        const existingTool = normalizeTool(existingResult.rows[0].data as Tool);
-
-        const { updatedAt: _u1, createdAt: _c1, ...existingRest } = existingTool as any;
-        const { updatedAt: _u2, createdAt: _c2, ...workflowRest } = workflow as any;
-        const hasChanges = jsonpatch.compare(existingRest, workflowRest).length > 0;
-
-        if (hasChanges) {
-          // Get next version number
-          const versionResult = await client.query(
-            "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM tool_history WHERE tool_id = $1 AND org_id = $2",
-            [id, validOrgId],
-          );
-          const nextVersion = versionResult.rows[0].next_version;
-
-          // Archive the existing version (normalized to ensure consistent format)
-          await client.query(
-            `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [
-              id,
-              validOrgId,
-              nextVersion,
-              JSON.stringify(normalizeTool(existingTool)),
-              userId || null,
-            ],
-          );
-        }
-      }
 
       // Now upsert the new version
       const version = this.extractVersion(workflow);
@@ -1174,13 +1097,7 @@ export class PostgresService implements DataStore {
         [newId, oldId, validOrgId],
       );
 
-      // 5. Migrate tool_history to new tool_id
-      await client.query(
-        `UPDATE tool_history SET tool_id = $1 WHERE tool_id = $2 AND org_id = $3`,
-        [newId, oldId, validOrgId],
-      );
-
-      // 6. Delete old workflow
+      // 5. Delete old workflow
       await client.query("DELETE FROM configurations WHERE id = $1 AND type = $2 AND org_id = $3", [
         oldId,
         "workflow",
@@ -1189,96 +1106,6 @@ export class PostgresService implements DataStore {
 
       await client.query("COMMIT");
       return newWorkflow;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  // Tool History Methods
-  async listToolHistory(params: { toolId: string; orgId?: string }): Promise<ToolHistoryEntry[]> {
-    const { toolId, orgId = "" } = params;
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `SELECT version, data, created_at, created_by_user_id
-         FROM tool_history
-         WHERE tool_id = $1 AND org_id = $2
-         ORDER BY version DESC`,
-        [toolId, orgId],
-      );
-
-      return result.rows.map((row) => ({
-        version: row.version,
-        createdAt: row.created_at,
-        createdByUserId: row.created_by_user_id || undefined,
-        tool: normalizeTool(row.data as Tool),
-      }));
-    } finally {
-      client.release();
-    }
-  }
-
-  async restoreToolVersion(params: {
-    toolId: string;
-    version: number;
-    orgId?: string;
-    userId?: string;
-  }): Promise<Tool> {
-    const { toolId, version, orgId = "", userId } = params;
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      // Get the archived version to restore
-      const archiveResult = await client.query(
-        `SELECT data FROM tool_history WHERE tool_id = $1 AND org_id = $2 AND version = $3`,
-        [toolId, orgId, version],
-      );
-
-      if (archiveResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        throw new Error(`Version ${version} not found for tool ${toolId}`);
-      }
-
-      const toolToRestore = normalizeTool(archiveResult.rows[0].data as Tool);
-
-      // Get current tool to archive it first
-      const currentResult = await client.query(
-        `SELECT data FROM configurations WHERE id = $1 AND org_id = $2 AND type = 'workflow'`,
-        [toolId, orgId],
-      );
-
-      if (currentResult.rows.length > 0) {
-        const currentTool = normalizeTool(currentResult.rows[0].data as Tool);
-
-        // Always archive the current version before restore
-        const versionResult = await client.query(
-          "SELECT COALESCE(MAX(version), 0) + 1 as next_version FROM tool_history WHERE tool_id = $1 AND org_id = $2",
-          [toolId, orgId],
-        );
-        const nextVersion = versionResult.rows[0].next_version;
-
-        await client.query(
-          `INSERT INTO tool_history (tool_id, org_id, version, data, created_by_user_id)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [toolId, orgId, nextVersion, JSON.stringify(currentTool), userId || null],
-        );
-      }
-
-      // Save the restored version (override id to match current tool's primary key)
-      const restoredWorkflow = { ...toolToRestore, id: toolId, updatedAt: new Date() };
-      const toolVersion = this.extractVersion(restoredWorkflow);
-      await client.query(
-        `UPDATE configurations SET data = $1, version = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND org_id = $4 AND type = 'workflow'`,
-        [JSON.stringify(restoredWorkflow), toolVersion, toolId, orgId],
-      );
-
-      await client.query("COMMIT");
-      return restoredWorkflow;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -2167,134 +1994,6 @@ export class PostgresService implements DataStore {
         clientId: row.client_id,
         clientSecret: decrypted?.secret || "",
       };
-    } finally {
-      client.release();
-    }
-  }
-
-  async createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun> {
-    const { run, orgId = "" } = params;
-    const client = await this.pool.connect();
-    try {
-      await client.query(
-        `INSERT INTO discovery_runs (id, org_id, sources, data, status, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [run.id, orgId, JSON.stringify(run.sources), JSON.stringify(run.data), run.status],
-      );
-      return run;
-    } finally {
-      client.release();
-    }
-  }
-
-  async getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null> {
-    const { id, orgId = "" } = params;
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `SELECT id, sources, data, status, created_at FROM discovery_runs WHERE id = $1 AND org_id = $2`,
-        [id, orgId],
-      );
-      if (result.rows.length === 0) return null;
-
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        sources: row.sources || [],
-        data: row.data,
-        status: row.status,
-        createdAt: new Date(row.created_at),
-      };
-    } finally {
-      client.release();
-    }
-  }
-
-  async updateDiscoveryRun(params: {
-    id: string;
-    updates: Partial<DiscoveryRun>;
-    orgId?: string;
-  }): Promise<DiscoveryRun> {
-    const { id, updates, orgId = "" } = params;
-    const client = await this.pool.connect();
-    try {
-      const setClauses: string[] = [];
-      const values: any[] = [];
-      let paramCount = 1;
-
-      if (updates.sources !== undefined) {
-        setClauses.push(`sources = $${paramCount++}`);
-        values.push(JSON.stringify(updates.sources));
-      }
-      if (updates.data !== undefined) {
-        setClauses.push(`data = $${paramCount++}`);
-        values.push(JSON.stringify(updates.data));
-      }
-      if (updates.status !== undefined) {
-        setClauses.push(`status = $${paramCount++}`);
-        values.push(updates.status);
-      }
-
-      setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
-      values.push(id, orgId);
-
-      await client.query(
-        `UPDATE discovery_runs SET ${setClauses.join(", ")} WHERE id = $${paramCount++} AND org_id = $${paramCount++}`,
-        values,
-      );
-
-      const updated = await this.getDiscoveryRun({ id, orgId });
-      if (!updated) throw new Error("Failed to retrieve updated discovery run");
-      return updated;
-    } finally {
-      client.release();
-    }
-  }
-
-  async listDiscoveryRuns(params?: {
-    limit?: number;
-    offset?: number;
-    orgId?: string;
-  }): Promise<{ items: DiscoveryRun[]; total: number }> {
-    const { limit = 10, offset = 0, orgId = "" } = params || {};
-    const client = await this.pool.connect();
-    try {
-      const countResult = await client.query(
-        `SELECT COUNT(*) FROM discovery_runs WHERE org_id = $1`,
-        [orgId],
-      );
-      const total = parseInt(countResult.rows[0].count);
-
-      const result = await client.query(
-        `SELECT id, org_id, sources, data, status, created_at 
-                 FROM discovery_runs WHERE org_id = $1 
-                 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-        [orgId, limit, offset],
-      );
-
-      const items = result.rows.map((row) => ({
-        id: row.id,
-        sources: row.sources || [],
-        data: row.data,
-        status: row.status,
-        createdAt: new Date(row.created_at),
-      }));
-
-      return { items, total };
-    } finally {
-      client.release();
-    }
-  }
-
-  async deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean> {
-    const { id, orgId = "" } = params;
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `DELETE FROM discovery_runs WHERE id = $1 AND org_id = $2`,
-        [id, orgId],
-      );
-      return (result.rowCount || 0) > 0;
     } finally {
       client.release();
     }

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { Tool } from "@superglue/shared";
 import { queryKeys } from "./query-keys";
-import { useSuperglueClient, useEESuperglueClient } from "./use-client";
+import { useSuperglueClient } from "./use-client";
 import { hasResolvedOrgId, useOrg, useOrgOptional } from "@/src/app/org-context";
 
 export function useInvalidateTools() {
@@ -87,21 +87,6 @@ export function useRenameTool() {
     mutationFn: async ({ oldId, newId }: { oldId: string; newId: string }) => {
       const client = createClient();
       return client.renameWorkflow(oldId, newId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tools.all(orgId) });
-    },
-  });
-}
-
-export function useRestoreToolVersion() {
-  const { orgId } = useOrg();
-  const createClient = useEESuperglueClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ toolId, version }: { toolId: string; version: number }) => {
-      const client = createClient();
-      return client.restoreToolVersion(toolId, version);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tools.all(orgId) });

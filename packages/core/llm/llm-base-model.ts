@@ -17,7 +17,7 @@ export type LLMMessage =
 
 export interface LLM {
   contextLength: number;
-  generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse>;
+  generateText(messages: LLMMessage[]): Promise<LLMResponse>;
   generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>>;
 }
 
@@ -65,7 +65,6 @@ export interface LLMToolWithContext<TContext = any> {
 export interface LLMObjectGeneratorInput {
   messages: LLMMessage[];
   schema: any;
-  temperature?: number;
   tools?: LLMToolWithContext[];
   toolChoice?: "auto" | "required" | "none" | { type: "tool"; toolName: string };
   metadata?: ServiceMetadata;
@@ -79,8 +78,8 @@ export const LanguageModel = {
     return this._getInstance().contextLength;
   },
 
-  generateText(messages: LLMMessage[], temperature?: number): Promise<LLMResponse> {
-    return this._getInstance().generateText(messages, temperature);
+  generateText(messages: LLMMessage[]): Promise<LLMResponse> {
+    return this._getInstance().generateText(messages);
   },
 
   generateObject<T>(input: LLMObjectGeneratorInput): Promise<LLMObjectResponse<T>> {

@@ -160,7 +160,6 @@ export class AiSdkModel implements LLM {
   private async generateTextWithFallback(params: {
     model: any;
     messages: LLMMessage[];
-    temperature?: number;
     tools?: Record<string, Tool>;
     toolChoice?: "auto" | "required" | "none" | { type: "tool"; toolName: string };
   }): Promise<any> {
@@ -168,7 +167,6 @@ export class AiSdkModel implements LLM {
       return await generateText({
         model: params.model,
         messages: params.messages,
-        temperature: params.temperature,
         tools: params.tools,
         toolChoice: params.toolChoice,
         maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
@@ -177,12 +175,11 @@ export class AiSdkModel implements LLM {
       if (this.fallbackModel && isProviderError(error)) {
         logMessage(
           "warn",
-          `LLM provider failed with message: (${error.message}), trying fallback provider`,
+          `LLM provider failed with message: (${(error as any)?.message}), trying fallback provider`,
         );
         return await generateText({
           model: this.fallbackModel,
           messages: params.messages,
-          temperature: params.temperature,
           tools: params.tools,
           toolChoice: params.toolChoice,
           maxRetries: server_defaults.LLM.MAX_INTERNAL_RETRIES,
@@ -192,14 +189,13 @@ export class AiSdkModel implements LLM {
     }
   }
 
-  async generateText(messages: LLMMessage[], temperature: number = 0): Promise<LLMResponse> {
+  async generateText(messages: LLMMessage[]): Promise<LLMResponse> {
     const dateMessage = getDateMessage();
     messages = [dateMessage, ...messages] as LLMMessage[];
 
     const result = await this.generateTextWithFallback({
       model: this.model,
       messages: messages,
-      temperature,
     });
 
     const updatedMessages = [...messages, ...(result.response.messages as LLMMessage[])];
@@ -222,13 +218,6 @@ export class AiSdkModel implements LLM {
 
     // Clean schema: remove patternProperties, minItems/maxItems, set strict/additionalProperties
     const schema = this.cleanSchema(input.schema);
-
-    // Handle O-model temperature
-    let temperatureToUse: number | undefined = input.temperature;
-    if (this.modelId.startsWith("o")) {
-      temperatureToUse = undefined;
-    }
-
     const schemaObj = jsonSchema(schema);
     const toolUsageCounts = new Map<string, number>();
 
@@ -248,7 +237,6 @@ export class AiSdkModel implements LLM {
           messages: conversationMessages,
           tools: availableTools,
           toolChoice: input.toolChoice || "required",
-          temperature: temperatureToUse,
         });
 
         if (
@@ -286,7 +274,9 @@ export class AiSdkModel implements LLM {
 
         for (const toolCall of result.toolCalls) {
           toolUsageCounts.set(toolCall.toolName, (toolUsageCounts.get(toolCall.toolName) ?? 0) + 1);
-          const toolResult = result.toolResults.find((tr) => tr.toolCallId === toolCall.toolCallId);
+          const toolResult = result.toolResults.find(
+            (tr: any) => tr.toolCallId === toolCall.toolCallId,
+          );
           if (toolResult) {
             logToolExecution(toolCall.toolName, toolCall.input, toolResult.output, input.metadata);
           }

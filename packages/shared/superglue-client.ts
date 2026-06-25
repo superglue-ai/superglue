@@ -10,6 +10,7 @@ import {
   System,
   Tool,
   ToolResult,
+  ToolSchedule,
 } from "./types.js";
 import {
   SSELogSubscriptionManager,
@@ -914,5 +915,54 @@ export class SuperglueClient {
         error: error.message,
       };
     }
+  }
+
+  // REST API - Tool Schedules (nested under /tools/:toolId/schedules)
+  // JSON returns dates as strings, so we parse them to Date objects
+  private parseScheduleDates(s: any): ToolSchedule {
+    return {
+      ...s,
+      lastRunAt: s.lastRunAt ? new Date(s.lastRunAt) : undefined,
+      nextRunAt: new Date(s.nextRunAt),
+      createdAt: new Date(s.createdAt),
+      updatedAt: new Date(s.updatedAt),
+    };
+  }
+
+  async listToolSchedules(toolId?: string): Promise<ToolSchedule[]> {
+    const path = toolId ? `/v1/tools/${encodeURIComponent(toolId)}/schedules` : "/v1/schedules";
+    const response = await this.restRequest<{ data: any[] }>("GET", path);
+    return response.data.map((s) => this.parseScheduleDates(s));
+  }
+
+  // Summarize API - uses LLM to generate human-readable summaries
+  async summarize(prompt: string): Promise<{ summary: string; durationMs: number }> {
+    return this.restRequest<{ summary: string; durationMs: number }>("POST", "/v1/summarize", {
+      prompt,
+    });
+  }
+
+  async initializeUser({
+    userId,
+    email,
+    name,
+  }: {
+    userId: string;
+    email: string;
+    name?: string;
+  }): Promise<{ success: boolean; data?: { userId: string; orgId: string; email: string } }> {
+    return this.restRequest("POST", "/v1/internal/initializeUser", { userId, email, name });
+  }
+
+  async assignOrgRole({
+    userId,
+    orgId,
+    roleId,
+  }: {
+    userId: string;
+    orgId: string;
+    roleId: string;
+  }): Promise<{ success: boolean }> {
+    return this.restRequest("POST", "/v1/internal/assignOrgRole", { userId, orgId, roleId });
   }
 }

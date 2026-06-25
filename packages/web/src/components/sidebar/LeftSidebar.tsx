@@ -6,6 +6,7 @@ import {
   Book,
   ExternalLink,
   Hammer,
+  ListChecks,
   Menu,
   MessagesSquare,
   Moon,
@@ -26,6 +27,7 @@ const baseNavItems: {
 }[] = [
   { icon: MessagesSquare, label: "Agent", href: "/" },
   { icon: Hammer, label: "Tools", href: "/tools" },
+  { icon: ListChecks, label: "Runs", href: "/runs" },
   { icon: Blocks, label: "Systems", href: "/systems" },
   { icon: Settings2, label: "Setup", href: "/setup" },
 ];

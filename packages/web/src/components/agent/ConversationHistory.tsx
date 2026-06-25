@@ -7,7 +7,7 @@ import { loadFromCacheAsync, saveToCache } from "@/src/lib/cache-utils";
 import { Message, MessagePart } from "@superglue/shared";
 import { MessagesSquare, Trash2, X, Loader2 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
-import { useEESuperglueClient } from "@/src/queries/use-client";
+import { useSuperglueClient } from "@/src/queries/use-client";
 
 const MAX_CONVERSATIONS = 20;
 const DEFAULT_CACHE_PREFIX = "superglue-conversations";
@@ -280,7 +280,7 @@ export function ConversationHistory({
   const suppressNextAutoSaveForIdRef = useRef<string | null>(null);
   const summaryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const PANEL_WIDTH = 360;
-  const createClient = useEESuperglueClient();
+  const createClient = useSuperglueClient();
 
   // Generate summary for a conversation and save it
   const generateAndSaveSummary = useCallback(

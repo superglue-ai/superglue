@@ -1099,7 +1099,6 @@ export const CreateMessageRequestSchema = RequestSchema.extend({
      * A request to include context from one or more MCP servers (including the caller), to be attached to the prompt. The client MAY ignore this request.
      */
     includeContext: z.optional(z.enum(["none", "thisServer", "allServers"])),
-    temperature: z.optional(z.number()),
     /**
      * The maximum number of tokens to sample, as requested by the server. The client MAY choose to sample fewer tokens than requested.
      */

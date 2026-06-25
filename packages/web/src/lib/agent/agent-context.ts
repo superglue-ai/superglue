@@ -474,7 +474,6 @@ export function getInvestigationPrompts(
   const toolPayload = storedResults?.toolPayload ?? run.toolPayload;
   const toolResult = storedResults?.data ?? run.data;
   const hasStoredResults = !!storedResults;
-  const hasStorageUri = !!run.resultStorageUri;
 
   // Check if tool exists and version info
   const toolExists = !!run.tool;
@@ -676,7 +675,6 @@ RUN DETAILS:
   }
 
   const hiddenStarterMessage = `${statusIntro}
-${hasStorageUri ? (hasStoredResults ? "- Full results loaded from storage\n" : "- Results stored (URI exists but not fetched)\n") : ""}
 ${toolExistenceSection}${versionSection}${requestSourceSection}
 ${
   run.tool
@@ -687,21 +685,21 @@ ${safeStringify(run.tool)}`
 
 ${
   stepResults
-    ? `STEP RESULTS${hasStoredResults ? " (FULL EXECUTION DATA)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+    ? `STEP RESULTS:
 ${safeStringify(stepResults)}`
     : ""
 }
 
 ${
   toolResult
-    ? `TOOL OUTPUT${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+    ? `TOOL OUTPUT:
 ${safeStringify(toolResult)}`
     : ""
 }
 
 ${
   toolPayload
-    ? `INPUT PAYLOAD${hasStoredResults ? " (COMPLETE)" : hasStorageUri ? " (TRUNCATED - full data available in storage)" : ""}:
+    ? `INPUT PAYLOAD:
 ${safeStringify(toolPayload)}`
     : ""
 }
