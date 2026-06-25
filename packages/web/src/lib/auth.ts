@@ -4,7 +4,7 @@ import { organization, jwt } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
 import pg from "pg";
 import { sendEmail } from "@superglue/core/utils/email";
-import { EESuperglueClient } from "./ee-superglue-client";
+import { SuperglueClient } from "@superglue/shared";
 
 export interface SuperglueJWTClaims {
   sub: string;
@@ -103,7 +103,7 @@ export const auth = betterAuth({
           if (!apiEndpoint) return;
 
           try {
-            const client = new EESuperglueClient({
+            const client = new SuperglueClient({
               apiKey: process.env.USER_ADMIN_SECRET,
               apiEndpoint,
             });
@@ -146,7 +146,7 @@ export const auth = betterAuth({
           if (!apiEndpoint) return;
 
           try {
-            const client = new EESuperglueClient({
+            const client = new SuperglueClient({
               apiKey: process.env.USER_ADMIN_SECRET,
               apiEndpoint,
             });

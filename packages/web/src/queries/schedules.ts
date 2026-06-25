@@ -1,7 +1,7 @@
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ToolSchedule } from "@superglue/shared";
 import { queryKeys } from "./query-keys";
-import { useEESuperglueClient } from "./use-client";
+import { useSuperglueClient } from "./use-client";
 import { hasResolvedOrgId, useOrg } from "@/src/app/org-context";
 import { useCallback } from "react";
 
@@ -16,7 +16,7 @@ export function useInvalidateSchedules() {
 
 export function useSchedules() {
   const { orgId } = useOrg();
-  const createClient = useEESuperglueClient();
+  const createClient = useSuperglueClient();
 
   const query = useQuery({
     queryKey: queryKeys.schedules.list(orgId),
@@ -41,69 +41,4 @@ export function useSchedules() {
     getSchedulesForTool,
     error: query.error,
   };
-}
-
-export function useCreateSchedule() {
-  const { orgId } = useOrg();
-  const createClient = useEESuperglueClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      toolId,
-      schedule,
-    }: {
-      toolId: string;
-      schedule: {
-        cronExpression: string;
-        timezone: string;
-        enabled?: boolean;
-        payload?: Record<string, any>;
-        options?: Record<string, any>;
-      };
-    }) => {
-      const client = createClient();
-      return client.createToolSchedule(toolId, schedule);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all(orgId) });
-    },
-  });
-}
-
-export function useUpdateSchedule() {
-  const { orgId } = useOrg();
-  const createClient = useEESuperglueClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      toolId,
-      scheduleId,
-      updates,
-    }: {
-      toolId: string;
-      scheduleId: string;
-      updates: Record<string, any>;
-    }) => {
-      const client = createClient();
-      return client.updateToolSchedule(toolId, scheduleId, updates);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all(orgId) });
-    },
-  });
-}
-
-export function useDeleteSchedule() {
-  const { orgId } = useOrg();
-  const createClient = useEESuperglueClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ toolId, scheduleId }: { toolId: string; scheduleId: string }) => {
-      const client = createClient();
-      return client.deleteToolSchedule(toolId, scheduleId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all(orgId) });
-    },
-  });
 }

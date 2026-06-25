@@ -5,10 +5,6 @@ import { AgentType, getAgent } from "./registries/agent-registry";
 import { TOOL_REGISTRY, SKILL_GATED_TOOLS } from "./registries/tool-registry";
 import { truncateToolResult } from "../general-utils";
 import {
-  recordConfirmationObservation,
-  updateActiveToolObservation,
-} from "./observability/langfuse";
-import {
   PrepareMessagesResult,
   ToolExecutionContext,
   ToolRegistryEntry,
@@ -193,19 +189,6 @@ export async function processConfirmations(
       );
 
       if (result) {
-        try {
-          await recordConfirmationObservation({
-            toolName: tool.name,
-            toolCallId: tool.id,
-            action: normalizedOutput.confirmationState as string,
-            status: result.status,
-            input: tool.input,
-            normalizedOutput,
-          });
-        } catch (error) {
-          console.error("Failed to record confirmation observation:", error);
-        }
-
         tool.output = result.output;
         tool.status = result.status;
         delete tool.confirmationState;
@@ -333,19 +316,6 @@ async function* executeToolWithLogs(
 
     const toolResultAsString = truncateToolResult(result, 80_000);
 
-    try {
-      updateActiveToolObservation({
-        toolName: entry.name,
-        toolCallId,
-        executionMode,
-        awaitingConfirmation,
-        input,
-        result,
-      });
-    } catch (metadataError) {
-      console.error("Failed to enrich tool observation:", metadataError);
-    }
-
     context.messages.push({
       id: crypto.randomUUID(),
       timestamp: new Date(),
@@ -371,20 +341,6 @@ async function* executeToolWithLogs(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorResult = { success: false, error: errorMessage };
     const errorResultAsString = truncateToolResult(errorResult, 50000);
-
-    try {
-      updateActiveToolObservation({
-        toolName: entry.name,
-        toolCallId,
-        executionMode,
-        awaitingConfirmation,
-        input,
-        result: errorResult,
-        error: errorMessage,
-      });
-    } catch (metadataError) {
-      console.error("Failed to enrich tool observation:", metadataError);
-    }
 
     context.messages.push({
       id: crypto.randomUUID(),

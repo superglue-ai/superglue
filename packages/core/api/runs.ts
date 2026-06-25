@@ -57,7 +57,6 @@ export function mapRunToOpenAPI(run: Run): OpenAPIRun {
     options: run.options as Record<string, unknown>,
     requestSource: run.requestSource,
     traceId: run.traceId,
-    resultStorageUri: run.resultStorageUri,
     userId: run.userId,
     executionMode: run.executionMode,
     metadata: run.metadata,

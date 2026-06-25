@@ -23,7 +23,6 @@ export class LlmCodeGenerator {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      // temperature: 0.1,
     });
 
     const code = this.extractCode(response.text);

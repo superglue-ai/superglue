@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useConfig } from "@/src/app/config-context";
-import { EESuperglueClient } from "@/src/lib/ee-superglue-client";
-import { tokenRegistry } from "@/src/lib/token-registry";
 import { uploadFileToPresignedUrl } from "@/src/lib/file-upload";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB

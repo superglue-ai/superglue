@@ -153,7 +153,6 @@ export class ToolValidationService {
         const result = await LanguageModel.generateObject<z.infer<typeof llmJudgmentSchema>>({
             messages: [{ role: 'user', content: prompt }],
             schema: z.toJSONSchema(llmJudgmentSchema),
-            temperature: 0
         });
 
         if (!result.success || typeof result.response === 'string') {

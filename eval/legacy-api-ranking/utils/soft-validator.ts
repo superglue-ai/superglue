@@ -85,7 +85,6 @@ Please validate if the actual result reasonably aligns with the expected criteri
         const result = await LanguageModel.generateObject<z.infer<typeof softValidationSchema>>({
             messages,
             schema: z.toJSONSchema(softValidationSchema),
-            temperature: 0.1
         });
 
         if (!result.success) {

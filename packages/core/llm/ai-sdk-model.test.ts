@@ -100,7 +100,6 @@ describe("AiSdkModel", () => {
           { role: "system", content: "system prompt" },
           { role: "user", content: "user message" },
         ],
-        temperature: 0,
         maxRetries: 0,
         tools: undefined,
         toolChoice: undefined,
@@ -111,19 +110,6 @@ describe("AiSdkModel", () => {
         role: "assistant",
         content: "test response",
       });
-    });
-
-    it("should use custom temperature", async () => {
-      const model = new AiSdkModel();
-      mockGenerateText.mockResolvedValue(mockLLMResponse({ text: "test response" }) as any);
-
-      await model.generateText([{ role: "user", content: "test" }], 0.7);
-
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          temperature: 0.7,
-        }),
-      );
     });
   });
 
@@ -141,17 +127,16 @@ describe("AiSdkModel", () => {
       const schema = { type: "object", properties: { key: { type: "string" } } };
       const messages = [{ role: "user", content: "test" }] as LLMMessage[];
 
-      const result = await model.generateObject({ messages, schema, temperature: 0 });
+      const result = await model.generateObject({ messages, schema });
 
       expect(mockGenerateText).toHaveBeenCalled();
       const lastCall = mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
       expect(lastCall).toMatchObject({
         model: "mock-model",
-        temperature: 0,
         toolChoice: "required",
         maxRetries: 0,
       });
-      expect(lastCall.messages[0]).toEqual({
+      expect(lastCall.messages?.[0]).toEqual({
         role: "system",
         content: "The current date and time is " + MOCK_DATE,
       });
@@ -202,26 +187,6 @@ describe("AiSdkModel", () => {
 
       expect(result.success).toBe(false);
       expect(result.response).toEqual("Cannot complete request");
-    });
-
-    it("should handle o-model temperature", async () => {
-      const model = new AiSdkModel("o1-preview");
-
-      mockGenerateText.mockResolvedValue(
-        mockLLMResponse({
-          toolCalls: [{ toolCallId: "call_123", toolName: "submit", input: { key: "value" } }],
-        }) as any,
-      );
-
-      await model.generateObject({
-        messages: [{ role: "user", content: "test" }],
-        schema: { type: "object", properties: { key: { type: "string" } } },
-        temperature: 0.5,
-      });
-
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({ temperature: undefined }),
-      );
     });
 
     it("should handle custom tools with context", async () => {

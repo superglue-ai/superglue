@@ -59,7 +59,6 @@ async function summarizeHandler(request: any, reply: any) {
       model,
       prompt: body.prompt,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.3,
     });
     timings.llmCall = Date.now() - llmStart;
 
