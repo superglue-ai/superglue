@@ -1,5 +1,4 @@
 import type {
-  DiscoveryRun,
   FileReference,
   FileStatus,
   OrgSettings,
@@ -74,23 +73,9 @@ export interface DataStore {
     orgId?: string;
     includeArchived?: boolean;
   }): Promise<{ items: Tool[]; total: number }>;
-  upsertWorkflow(params: {
-    id: string;
-    workflow: Tool;
-    orgId?: string;
-    userId?: string;
-  }): Promise<Tool>;
+  upsertWorkflow(params: { id: string; workflow: Tool; orgId?: string }): Promise<Tool>;
   deleteWorkflow(params: { id: string; orgId?: string }): Promise<boolean>;
   renameWorkflow(params: { oldId: string; newId: string; orgId?: string }): Promise<Tool>;
-
-  // Tool History Methods (Postgres-only, returns empty for other stores)
-  listToolHistory(params: { toolId: string; orgId?: string }): Promise<ToolHistoryEntry[]>;
-  restoreToolVersion(params: {
-    toolId: string;
-    version: number;
-    orgId?: string;
-    userId?: string;
-  }): Promise<Tool>;
 
   // Tenant Information Methods
   getTenantInfo(): Promise<{ email: string | null; emailEntrySkipped: boolean }>;
@@ -175,21 +160,6 @@ export interface DataStore {
   listDueToolSchedules(): Promise<ToolScheduleInternal[]>;
   updateScheduleNextRun(params: { id: string; nextRunAt: Date; lastRunAt: Date }): Promise<boolean>;
 
-  // DiscoveryRun Methods
-  createDiscoveryRun(params: { run: DiscoveryRun; orgId?: string }): Promise<DiscoveryRun>;
-  getDiscoveryRun(params: { id: string; orgId?: string }): Promise<DiscoveryRun | null>;
-  updateDiscoveryRun(params: {
-    id: string;
-    updates: Partial<DiscoveryRun>;
-    orgId?: string;
-  }): Promise<DiscoveryRun>;
-  listDiscoveryRuns(params?: {
-    limit?: number;
-    offset?: number;
-    orgId?: string;
-  }): Promise<{ items: DiscoveryRun[]; total: number }>;
-  deleteDiscoveryRun(params: { id: string; orgId?: string }): Promise<boolean>;
-
   // FileReference Methods
   createFileReference(params: { file: FileReference; orgId?: string }): Promise<FileReference>;
   getFileReference(params: { id: string; orgId?: string }): Promise<FileReference | null>;
@@ -234,13 +204,6 @@ export interface DataStore {
 
 export type ToolScheduleInternal = ToolSchedule & {
   orgId: string;
-};
-
-export type ToolHistoryEntry = {
-  version: number;
-  createdAt: Date;
-  createdByUserId?: string;
-  tool: Tool;
 };
 
 // API Key types

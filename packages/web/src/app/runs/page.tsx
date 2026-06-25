@@ -68,8 +68,10 @@ function formatDuration(run: Run): string {
   if (ms === undefined || Number.isNaN(ms)) return "-";
   if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60_000);
-  const seconds = Math.round((ms % 60_000) / 1000);
+  // Round to whole seconds first, then carry into minutes so we never render "Xm 60s"
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
   return `${minutes}m ${seconds}s`;
 }
 
@@ -97,7 +99,7 @@ export default function RunsPage() {
     setPage(0);
   }, [debouncedSearch, status]);
 
-  const { data, isLoading, isFetching, refetch } = useRuns({
+  const { data, isLoading, isError, error, isFetching, refetch } = useRuns({
     page,
     pageSize: 25,
     search: debouncedSearch || undefined,
@@ -169,6 +171,20 @@ export default function RunsPage() {
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-foreground inline-block" />
+                </TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <div className="flex flex-col items-center gap-2 text-destructive">
+                    <span>Failed to load runs</span>
+                    <span className="text-xs text-muted-foreground">
+                      {error instanceof Error ? error.message : "Please try again."}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => refetch()}>
+                      Retry
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : runs.length === 0 ? (

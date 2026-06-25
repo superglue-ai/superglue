@@ -573,36 +573,6 @@ export type ToolSchedule = {
   updatedAt: Date;
 };
 
-export enum DiscoveryRunStatus {
-  PENDING = "PENDING",
-  PROCESSING = "PROCESSING",
-  COMPLETED = "COMPLETED",
-  FAILED = "FAILED",
-  ABORTED = "ABORTED",
-}
-
-export type DiscoverySourceType = "file" | "url" | "system";
-
-export interface DiscoverySource {
-  id: string;
-  type: DiscoverySourceType;
-}
-
-export interface DiscoveryRunData {
-  title?: string;
-  description?: string;
-  systems?: ExtendedSystem[];
-  error?: string;
-}
-
-export interface DiscoveryRun {
-  id: string;
-  sources: DiscoverySource[];
-  data?: DiscoveryRunData;
-  status: DiscoveryRunStatus;
-  createdAt: Date;
-}
-
 export enum FileStatus {
   PENDING = "PENDING",
   UPLOADING = "UPLOADING",

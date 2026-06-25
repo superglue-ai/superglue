@@ -2049,11 +2049,12 @@ const runGetRuns = async (
     search,
   } = input;
 
-  const fetchLimit = search ? Math.min(limit * 5, 200) : Math.min(limit, 50);
+  const fetchLimit = Math.min(limit, 50);
   const page = Math.floor(offset / fetchLimit) + 1;
   const skipWithinPage = offset % fetchLimit;
 
   try {
+    // `search` is applied server-side (full-text across runId/tool/payload/error).
     const result = await ctx.superglueClient.listRuns({
       toolId,
       limit: fetchLimit,
@@ -2062,10 +2063,8 @@ const runGetRuns = async (
       requestSources: requestSources as RequestSource[] | undefined,
       userId,
       systemId,
+      search,
     });
-
-    const searchTerm = search?.toLowerCase();
-    const shouldFetchResults = fetchResults || !!search;
 
     // Strip large fields from runs to avoid JSON serialization issues
     const stripRun = (run: any) => {
@@ -2073,15 +2072,39 @@ const runGetRuns = async (
       return rest;
     };
 
-    let runs = result.items.slice(skipWithinPage).slice(0, limit).map(stripRun);
+    const pageItems = result.items.slice(skipWithinPage).slice(0, limit);
+
+    // When fetchResults is requested, hydrate each run's full data/stepResults
+    // via getRun (the list endpoint omits large result fields).
+    const runs = fetchResults
+      ? await Promise.all(
+          pageItems.map(async (run: any) => {
+            try {
+              const full = await ctx.superglueClient.getRun(run.runId);
+              if (full) {
+                return {
+                  ...stripRun(run),
+                  data: full.data,
+                  stepResults: full.stepResults,
+                  toolPayload: full.toolPayload ?? run.toolPayload,
+                };
+              }
+            } catch {
+              // Fall back to the stripped run if hydration fails.
+            }
+            return stripRun(run);
+          }),
+        )
+      : pageItems.map(stripRun);
+
     return {
       success: true,
       toolId: toolId || "all",
-      total: search ? runs.length : result.total,
+      total: result.total,
       runs,
       note:
         runs.length > 0
-          ? `Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches.${search ? ` Searched through ${result.items.length} runs for "${search}".` : ""}`
+          ? `Check toolPayload field to see what was actually received. Compare against the tool's inputSchema to identify mismatches.`
           : search
             ? `No runs found containing "${search}".`
             : "No runs found matching the filters.",
