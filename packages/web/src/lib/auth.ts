@@ -3,7 +3,7 @@ import { verifyPassword as verifyScryptPassword } from "better-auth/crypto";
 import { organization, jwt } from "better-auth/plugins";
 import bcrypt from "bcryptjs";
 import pg from "pg";
-import { sendEmail } from "@superglue/core/utils/email";
+import { sendEmail } from "./email";
 import { SuperglueClient } from "@superglue/shared";
 
 export interface SuperglueJWTClaims {
