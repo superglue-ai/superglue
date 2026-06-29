@@ -67,8 +67,6 @@
     "asynckit": "0.5.0",
     "autoprefixer": "10.4.27",
     "axios": "1.18.1",
-    "bcryptjs": "2.4.3",
-    "better-auth": "1.6.20",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
@@ -84,6 +82,7 @@
     "hasown": "2.0.2",
     "idb": "8.0.3",
     "jose": "6.2.2",
+    "jsonschema": "1.5.0",
     "jszip": "3.10.1",
     "lodash.isequal": "4.5.0",
     "lucide-react": "0.577.0",
@@ -112,7 +111,6 @@
     "truncate-json": "3.0.1"
   },
   "devDependencies": {
-    "@types/bcryptjs": "2.4.6",
     "@types/node": "25.5.0",
     "@types/pako": "2.0.4",
     "@types/react": "19.2.14",
