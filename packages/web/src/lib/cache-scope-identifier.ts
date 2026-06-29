@@ -1,4 +1,3 @@
-import { decodeJWTPayload } from "./jwt-utils";
 import { tokenRegistry } from "./token-registry";
 
 const EMPTY_ORG_SCOPE = "__sg_empty_org__";
@@ -21,13 +20,6 @@ export function getCacheScopeIdentifier(): string | null {
   const token = tokenRegistry.getToken();
   if (!token) {
     return null;
-  }
-
-  // Prefer org ID from JWT when available.
-  const payload = decodeJWTPayload(token);
-  const orgScope = normalizeOrgScope(payload?.orgId);
-  if (orgScope !== null) {
-    return orgScope;
   }
 
   // OSS uses raw API keys rather than JWTs. Fall back to a stable token-derived scope

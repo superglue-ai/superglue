@@ -1,7 +1,6 @@
 import { registerApiModule } from "./registry.js";
 import { addTraceHeader } from "./response-helpers.js";
 import type { AuthenticatedFastifyRequest, RouteHandler } from "./types.js";
-import { sendSelfHostedSignupNotification } from "../utils/email.js";
 
 const getTenantInfoHandler: RouteHandler = async (request, reply) => {
   const authReq = request as AuthenticatedFastifyRequest;
@@ -43,14 +42,6 @@ const setTenantInfoHandler: RouteHandler = async (request, reply) => {
 
     // Send notification email if a new user provided their email
     // Skip in local development (localhost)
-    const isProduction = !process.env.API_ENDPOINT?.includes("localhost");
-    if (email && !emailEntrySkipped && isProduction) {
-      // Fire and forget - don't block the response
-      sendSelfHostedSignupNotification(email).catch((err) => {
-        console.error("Failed to send signup notification:", err);
-      });
-    }
-
     const currentInfo = await authReq.datastore.getTenantInfo();
     return addTraceHeader(reply, authReq.traceId).code(200).send(currentInfo);
   } catch (error) {
