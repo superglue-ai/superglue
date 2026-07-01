@@ -14,12 +14,13 @@
 
 ## What is superglue?
 
-- superglue learns how your systems work from your company's knowledge. It performs the implementation that normally requires human coordination and engineering work.
+superglue learns how your systems work from your company's knowledge. It performs the implementation that normally requires human coordination and engineering work.
+
 - Implement NetSuite, Sage Intacct, SAP, Business Central or Acumatica in days. Agents map and migrate legacy data, configure the system, and keep data in sync post go-live.
 - Connect ERP, CRM, databases, and internal systems to AI platforms like Claude. Create governed data access for AI agents and track data usage across your org.
 - Connect customer systems, import historical data and get new integrations live in hours. Let agents manage the entire implementation process end-to-end.
 
-## When to use superglue
+## Some example usecases
 
 | Scenario                                                 | Without superglue                                                                                | With superglue                                                                        |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
@@ -33,21 +34,37 @@
 superglue works with any REST, GraphQL, SOAP, file-based, or database system.
 
 **ERP & Accounting:** Sage Intacct, NetSuite, SAP, Dynamics 365, Business Central, Acumatica, QuickBooks, Xero
+
 **CRM & Sales:** Salesforce, HubSpot, Attio, Gong
+
 **Databases:** Postgres, MongoDB, Microsoft SQL Server, Redis, Supabase, PlanetScale, Snowflake, Databricks
+
 **Project Management:** Jira, Asana, Monday, ClickUp, Linear, Trello, Notion, Confluence
+
 **Communication:** Slack, Gmail, Zoom, Discord, Telegram, WhatsApp, Intercom, Twilio
+
 **Payments & Billing:** Stripe, PayPal, Square, Adyen, SumUp, Razorpay, Plaid, Ramp
+
 **E-commerce:** Shopify, BigCommerce, PrestaShop, Squarespace
+
 **HR & Payroll:** Workday, Gusto
+
 **DevOps & Cloud:** AWS, Google Cloud, Firebase, GitHub, GitLab, Bitbucket, CircleCI, Heroku, Netlify, Vercel
+
 **Analytics & Monitoring:** Google Analytics, Amplitude, Segment, Mixpanel, Looker, PostHog, Datadog, Sentry
+
 **Marketing & Ads:** Google Ads, Meta Ads, LinkedIn, Mailchimp, Klaviyo
+
 **File Systems & Protocols:** FTP, SFTP, SMB, Google Drive, Google Sheets, Dropbox, Nextcloud
+
 **Support & Ticketing:** Zendesk, Freshdesk, Help Scout, ServiceNow, PagerDuty
+
 **Content & CMS:** WordPress, Contentful, Sanity, Prismic, Figma
+
 **Identity & Auth:** Auth0, Okta
+
 **AI & LLM:** OpenAI, Anthropic, Gemini, Hugging Face, Pinecone, Elasticsearch, Algolia
+
 **Construction & Vertical:** Procore, Coupa, DocuSign
 
 ... and any system with an API, database, or file connection.
