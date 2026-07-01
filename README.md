@@ -1,3 +1,5 @@
+**superglue's AI agents connect, migrate and implement enterprise systems. Cloud-hosted or on your own infrastructure.** Connect any API, database, or file system. Open source, cloud or self-hosted.
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
@@ -23,6 +25,39 @@
 - Lightweight and maintainable data syncing tools across legacy systems
 - Migrations of complex SQL procedures to REST API calls in cloud migrations
 - Enterprise GPT tools: expose tools that work with custom legacy systems in your enterprise GPT
+
+## When to use superglue
+
+| Scenario | Without superglue | With superglue |
+|----------|-------------------|----------------|
+| Sage Intacct migration for a client | Excel transforms by hand, 10-15 cleanup iterations per GL history, 140 hours on a single project | Describe the mapping in plain English, 185 accounts migrated in under 1 hour |
+| Connect internal systems to AI use cases | Custom programming per connection, weeks per integration | 100+ AI use cases connected in weeks, 9 teams building their own tools |
+| Customer onboarding across diverse tech stacks | Build and maintain a separate connector per CRM, notetaker, ticketing system | One integration layer, onboarding in days instead of weeks |
+| University data flows across CRM, fundraising, databases | Every change requires a developer, months-long testing cycles | Business users own implementations, months reduced to days, full governance preserved |
+
+## Supported systems
+
+superglue works with any REST, GraphQL, SOAP, file-based, or database system.
+
+**ERP & Accounting:** Sage Intacct, NetSuite, SAP, Dynamics 365, Business Central, Acumatica, QuickBooks, Xero
+**CRM & Sales:** Salesforce, HubSpot, Attio, Gong
+**Databases:** Postgres, MongoDB, Microsoft SQL Server, Redis, Supabase, PlanetScale, Snowflake, Databricks
+**Project Management:** Jira, Asana, Monday, ClickUp, Linear, Trello, Notion, Confluence
+**Communication:** Slack, Gmail, Zoom, Discord, Telegram, WhatsApp, Intercom, Twilio
+**Payments & Billing:** Stripe, PayPal, Square, Adyen, SumUp, Razorpay, Plaid, Ramp
+**E-commerce:** Shopify, BigCommerce, PrestaShop, Squarespace
+**HR & Payroll:** Workday, Gusto
+**DevOps & Cloud:** AWS, Google Cloud, Firebase, GitHub, GitLab, Bitbucket, CircleCI, Heroku, Netlify, Vercel
+**Analytics & Monitoring:** Google Analytics, Amplitude, Segment, Mixpanel, Looker, PostHog, Datadog, Sentry
+**Marketing & Ads:** Google Ads, Meta Ads, LinkedIn, Mailchimp, Klaviyo
+**File Systems & Protocols:** FTP, SFTP, SMB, Google Drive, Google Sheets, Dropbox, Nextcloud
+**Support & Ticketing:** Zendesk, Freshdesk, Help Scout, ServiceNow, PagerDuty
+**Content & CMS:** WordPress, Contentful, Sanity, Prismic, Figma
+**Identity & Auth:** Auth0, Okta
+**AI & LLM:** OpenAI, Anthropic, Gemini, Hugging Face, Pinecone, Elasticsearch, Algolia
+**Construction & Vertical:** Procore, Coupa, DocuSign
+
+... and any system with an API, database, or file connection.
 
 ## Quick Start
 
