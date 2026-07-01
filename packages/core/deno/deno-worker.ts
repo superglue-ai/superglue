@@ -240,15 +240,26 @@ export class DenoWorker {
   }
 
   /**
-   * Kill the process
+   * Kill the process.
+   *
+   * Captures the process reference locally so the delayed SIGKILL can still
+   * fire even after cleanup() sets this.process = null.
+   *
+   * Note: Node.js sets `proc.killed = true` immediately after any successful
+   * kill() call (regardless of whether the process actually exited), so we
+   * cannot use it to gate the SIGKILL. Instead we unconditionally attempt
+   * SIGKILL and let the try-catch handle the already-exited case.
    */
   kill(): void {
-    if (this.process && !this.process.killed) {
-      this.process.kill("SIGTERM");
-      // Force kill after 5 seconds if still running
+    const proc = this.process;
+    if (proc && !proc.killed) {
+      proc.kill("SIGTERM");
+      // Force kill after 5 seconds if process hasn't exited
       setTimeout(() => {
-        if (this.process && !this.process.killed) {
-          this.process.kill("SIGKILL");
+        try {
+          proc.kill("SIGKILL");
+        } catch {
+          // Process already exited — nothing to do
         }
       }, 5000);
     }

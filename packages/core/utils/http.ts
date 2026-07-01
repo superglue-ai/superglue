@@ -164,4 +164,12 @@ export async function callAxios(
       await new Promise((resolve) => setTimeout(resolve, delay * retryCount));
     }
   } while (retryCount <= maxRetries || rateLimitRetryCount > 0);
+
+  // Defensive: every iteration should return or throw, but TypeScript cannot
+  // verify this statically. An explicit throw here keeps the return type
+  // honest and prevents silent undefined if the retry logic is ever refactored.
+  throw new ApiCallError(
+    `Request failed: retry loop exited unexpectedly after ${retryCount} retries`,
+    lastFailureStatus,
+  );
 }
