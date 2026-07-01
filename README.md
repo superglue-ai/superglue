@@ -14,7 +14,7 @@
 
 ## What is superglue?
 
-superglue learns how your systems work from your company's knowledge. It performs the implementation that normally requires human coordination and engineering work.
+[superglue](https://superglue.ai) learns how your systems work from your company's knowledge. It performs the implementation that normally requires human coordination and engineering work.
 
 - Implement NetSuite, Sage Intacct, SAP, Business Central or Acumatica in days. Agents map and migrate legacy data, configure the system, and keep data in sync post go-live.
 - Connect ERP, CRM, databases, and internal systems to AI platforms like Claude. Create governed data access for AI agents and track data usage across your org.
