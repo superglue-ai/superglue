@@ -14,24 +14,19 @@
 
 ## What is superglue?
 
-- superglue is an AI-powered tool builder that works with any API, database or file storage server
-- Abstracts away authentication, documentation handling and data mapping between systems
-- Self‑heals tools: When steps fail due to upstream API changes, superglue can auto-repair failures to keep your tools running
-
-## What people build with superglue
-
-- Lightweight and maintainable data syncing tools across legacy systems
-- Migrations of complex SQL procedures to REST API calls in cloud migrations
-- Enterprise GPT tools: expose tools that work with custom legacy systems in your enterprise GPT
+- superglue learns how your systems work from your company's knowledge. It performs the implementation that normally requires human coordination and engineering work.
+- Implement NetSuite, Sage Intacct, SAP, Business Central or Acumatica in days. Agents map and migrate legacy data, configure the system, and keep data in sync post go-live.
+- Connect ERP, CRM, databases, and internal systems to AI platforms like Claude. Create governed data access for AI agents and track data usage across your org.
+- Connect customer systems, import historical data and get new integrations live in hours. Let agents manage the entire implementation process end-to-end.
 
 ## When to use superglue
 
-| Scenario | Without superglue | With superglue |
-|----------|-------------------|----------------|
-| Sage Intacct migration for a client | Excel transforms by hand, 10-15 cleanup iterations per GL history, 140 hours on a single project | Describe the mapping in plain English, 185 accounts migrated in under 1 hour |
-| Connect internal systems to AI use cases | Custom programming per connection, weeks per integration | 100+ AI use cases connected in weeks, 9 teams building their own tools |
-| Customer onboarding across diverse tech stacks | Build and maintain a separate connector per CRM, notetaker, ticketing system | One integration layer, onboarding in days instead of weeks |
-| University data flows across CRM, fundraising, databases | Every change requires a developer, months-long testing cycles | Business users own implementations, months reduced to days, full governance preserved |
+| Scenario                                                 | Without superglue                                                                                | With superglue                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Sage Intacct migration for a client                      | Excel transforms by hand, 10-15 cleanup iterations per GL history, 140 hours on a single project | Describe the mapping in plain English, 185 accounts migrated in under 1 hour          |
+| Connect internal systems to AI use cases                 | Custom programming per connection, weeks per integration                                         | 100+ AI use cases connected in weeks, 9 teams building their own tools                |
+| Customer onboarding across diverse tech stacks           | Build and maintain a separate connector per CRM, notetaker, ticketing system                     | One integration layer, onboarding in days instead of weeks                            |
+| University data flows across CRM, fundraising, databases | Every change requires a developer, months-long testing cycles                                    | Business users own implementations, months reduced to days, full governance preserved |
 
 ## Supported systems
 
