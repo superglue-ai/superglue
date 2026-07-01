@@ -75,45 +75,6 @@ superglue works with any REST, GraphQL, SOAP, file-based, or database system.
 
 ### Option 2: [Self-host](https://docs.superglue.cloud/getting-started/setup#self-hosted) for maximum control and customization
 
-## Interfaces
-
-You can interact with superglue via three interfaces, regardless of whether you self-host or use the hosted version:
-
-**Web application**
-
-- The web application is available for self-hosted and superglue-hosted setups
-- If you decide to use a superglue-hosted setup, the web application has features that are not available when self-hosting (e.g. the superglue agent)
-- When doing local development on your self-hosted setup, you can customize the web application to your needs
-
-**superglue SDK**
-
-- The superglue SDK offers CRUD functionality for all superglue data types and lets you execute tools programmatically
-- For more detailed information on SDK functionality, check our [SDK guide](https://docs.superglue.cloud/sdk/overview)
-
-  Install via npm:
-
-  ```bash
-    npm install @superglue/client
-  ```
-
-  Client setup:
-
-  ```javascript
-  // Typescript SDK
-  import { SuperglueClient } from "@superglue/client";
-
-  const superglue = new SuperglueClient({
-    apiKey: "your_api_key_here", // Get from app.superglue.cloud
-  });
-  ```
-
-**MCP Server**
-
-- Look at our [MCP Guide](https://docs.superglue.cloud/mcp/using-the-mcp) for full installation instructions
-- The MCP interface gives you discoverability tools and execution capabilities for your pre-built superglue tools
-- The MCP does not support ad-hoc integration creation or tool building
-- Use MCP in production for agentic use cases and internal GPTs to access and execute pre-built tools with full control
-
 ## 📖 Documentation
 
 For detailed documentation, visit [docs.superglue.cloud](https://docs.superglue.cloud).
