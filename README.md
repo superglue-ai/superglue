@@ -1,10 +1,8 @@
-**superglue's AI agents connect, migrate and implement enterprise systems. Cloud-hosted or on your own infrastructure.** Connect any API, database, or file system. Open source, cloud or self-hosted.
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">Build production-grade integrations & tools in natural language.</h2>
+<h2 align="center">superglue's AI agents connect, migrate and implement enterprise systems. Cloud-hosted or on your own infrastructure.</h2>
 <div align="center">
   
 [![Y Combinator](https://img.shields.io/badge/Y%20Combinator-W25-orange?style=flat-square)](https://www.ycombinator.com/companies/superglue)
