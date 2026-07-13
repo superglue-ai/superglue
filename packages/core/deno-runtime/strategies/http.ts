@@ -21,6 +21,7 @@ import {
   resolveFileTokens,
 } from "../utils/files.ts";
 import { debug, maskCredentials } from "../utils/logging.ts";
+import { SSRF_BLOCKED_ERROR_NAME } from "../utils/security.ts";
 import {
   convertBasicAuthToBase64,
   deriveResponseFilename,
@@ -344,6 +345,10 @@ async function callHttp({
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           throw new Error(`Request timed out after ${timeout}ms`);
+        }
+        // SSRF-blocked requests are never retried — they will always be blocked.
+        if ((error as Error).name === SSRF_BLOCKED_ERROR_NAME) {
+          throw error;
         }
         if (retryCount >= maxRetries) {
           throw error;

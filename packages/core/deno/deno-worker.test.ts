@@ -377,4 +377,175 @@ describe.skipIf(!denoAvailable)("DenoWorker", () => {
       expect(result.data).toEqual({ got: 20 });
     });
   });
+
+  describe("SSRF protection", () => {
+    function makeRequestStep(
+      url: string,
+      id = "ssrf-step",
+      opts: { systemId?: string; method?: string } = {},
+    ) {
+      return {
+        id,
+        config: {
+          type: "request",
+          url,
+          method: opts.method || "GET",
+          ...(opts.systemId ? { systemId: opts.systemId } : {}),
+        },
+      };
+    }
+
+    function requestPayload(url: string, id = "ssrf") {
+      return makePayload({
+        workflow: { id, name: id, steps: [makeRequestStep(url)] } as any,
+      });
+    }
+
+    // Cloud metadata endpoints are blocked unconditionally, regardless of config.
+    describe("cloud metadata (always blocked)", () => {
+      it("should block request to AWS IMDS endpoint", async () => {
+        const result = await worker.execute(
+          "ssrf-imds-run",
+          requestPayload("http://169.254.169.254/latest/meta-data/", "ssrf-imds"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it("should block request to ECS task metadata endpoint", async () => {
+        const result = await worker.execute(
+          "ssrf-ecs-run",
+          requestPayload("http://169.254.170.2/v2/credentials", "ssrf-ecs"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it("should block request to Alibaba metadata endpoint", async () => {
+        const result = await worker.execute(
+          "ssrf-alibaba-run",
+          requestPayload("http://100.100.100.200/latest/meta-data/", "ssrf-alibaba"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it("should block request to Azure WireServer endpoint", async () => {
+        const result = await worker.execute(
+          "ssrf-azure-run",
+          requestPayload("http://168.63.129.16/", "ssrf-azure"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it("should block request to GCP metadata hostname", async () => {
+        const result = await worker.execute(
+          "ssrf-gcp-run",
+          requestPayload("http://metadata.google.internal/computeMetadata/v1/", "ssrf-gcp"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      // IPv4-compatible IPv6 form of AWS IMDS (::169.254.169.254 normalizes to
+      // ::a9fe:a9fe) must not smuggle the metadata IP past the always-on check.
+      it.each(["::169.254.169.254", "::ffff:169.254.169.254"])(
+        "should block request to metadata IP in IPv6 form %s",
+        async (host) => {
+          const result = await worker.execute(
+            `ssrf-metadata-v6-${host}-run`,
+            requestPayload(`http://[${host}]/latest/meta-data/`, `ssrf-metadata-v6-${host}`),
+          );
+          expect(result.success).toBe(false);
+          expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+        },
+      );
+    });
+
+    // Localhost / private ranges are only blocked when BLOCK_LOCAL_REQUESTS=true.
+    describe("localhost & private ranges (BLOCK_LOCAL_REQUESTS=true)", () => {
+      const previous = process.env.BLOCK_LOCAL_REQUESTS;
+
+      beforeEach(() => {
+        process.env.BLOCK_LOCAL_REQUESTS = "true";
+      });
+
+      afterEach(() => {
+        if (previous === undefined) delete process.env.BLOCK_LOCAL_REQUESTS;
+        else process.env.BLOCK_LOCAL_REQUESTS = previous;
+      });
+
+      it("should block request to localhost", async () => {
+        const result = await worker.execute(
+          "ssrf-localhost-run",
+          requestPayload("http://localhost:3001", "ssrf-localhost"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it("should block request to loopback 127.0.0.1", async () => {
+        const result = await worker.execute(
+          "ssrf-loopback-run",
+          requestPayload("http://127.0.0.1:8080/internal", "ssrf-loopback"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it("should block request to 0.0.0.0", async () => {
+        const result = await worker.execute(
+          "ssrf-zero-run",
+          requestPayload("http://0.0.0.0:8080/", "ssrf-zero"),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+
+      it.each(["10.0.0.1", "172.16.0.1", "192.168.1.1"])(
+        "should block request to RFC1918 address %s",
+        async (ip) => {
+          const result = await worker.execute(
+            `ssrf-rfc1918-${ip}-run`,
+            requestPayload(`http://${ip}:8080/`, `ssrf-rfc1918-${ip}`),
+          );
+          expect(result.success).toBe(false);
+          expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+        },
+      );
+
+      // fe80::/10 spans fe80–febf (link-local) and fc00::/7 spans fc00–fdff (ULA);
+      // the guard must cover the whole range, not just the base hextet.
+      it.each([
+        "fe80::1",
+        "fe90::1",
+        "febf::1",
+        "fc00::1",
+        "fd12:3456::1",
+        // IPv4-compatible IPv6 embedding a private IPv4 (::127.0.0.1, ::10.0.0.1)
+        "::127.0.0.1",
+        "::10.0.0.1",
+      ])("should block request to IPv6 private/link-local address %s", async (ip) => {
+        const result = await worker.execute(
+          `ssrf-ipv6-${ip}-run`,
+          requestPayload(`http://[${ip}]:8080/`, `ssrf-ipv6-${ip}`),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
+    });
+
+    // With BLOCK_LOCAL_REQUESTS unset (default), external hosts must NOT be blocked.
+    it("should not block an external host for SSRF reasons", async () => {
+      const result = await worker.execute(
+        "ssrf-external-run",
+        requestPayload("https://example.com/", "ssrf-external"),
+      );
+      // May succeed or fail for network reasons, but never for SSRF blocking.
+      if (!result.success) {
+        expect(result.error).not.toMatch(/blocked request.*internal/i);
+      }
+    });
+  });
 });

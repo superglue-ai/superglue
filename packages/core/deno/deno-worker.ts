@@ -13,6 +13,18 @@ import type {
   LogHandler,
 } from "./types.js";
 
+// Cloud metadata endpoints denied at the Deno network-permission layer,
+// regardless of configuration (AWS/GCP/Azure/Alibaba IMDS).
+const DENIED_METADATA_HOSTS = [
+  "169.254.169.254",
+  "169.254.170.2",
+  "100.100.100.200",
+  "168.63.129.16",
+  "[fd00:ec2::254]",
+  "metadata.google.internal",
+  "metadata.goog",
+].join(",");
+
 export interface DenoWorkerOptions {
   scriptPath: string;
   memoryMb: number;
@@ -73,6 +85,11 @@ export class DenoWorker {
         [
           "run",
           "--allow-net",
+          // Defense-in-depth: block well-known cloud metadata endpoints at the
+          // Deno permission layer (in addition to the SSRF fetch override).
+          // Local/private ranges can't be expressed as CIDRs here and would break
+          // pooled tunnel workers, so those are enforced by the fetch override.
+          `--deny-net=${DENIED_METADATA_HOSTS}`,
           "--allow-env",
           "--allow-sys=hostname",
           "--deny-read",
@@ -89,6 +106,10 @@ export class DenoWorker {
             DENO_DIR: process.env.DENO_DIR,
             DENO_NO_UPDATE_CHECK: "1",
             NODE_ENV: process.env.NODE_ENV,
+            // SSRF: when set, the fetch override also blocks localhost/private ranges.
+            ...(process.env.BLOCK_LOCAL_REQUESTS === "true" && {
+              BLOCK_LOCAL_REQUESTS: "true",
+            }),
           },
         },
       );

@@ -22,6 +22,8 @@ import type {
   ResponseFilter,
 } from "./types.ts";
 import { DENO_DEFAULTS, isRequestConfig, isTransformConfig } from "./types.ts";
+// Side-effect import: installs the SSRF-hardened globalThis.fetch override.
+import { setAllowedTunnelPorts } from "./utils/security.ts";
 import { readPayload, writeResult } from "./utils/ipc.ts";
 import { info, error as logError, debug, warn } from "./utils/logging.ts";
 import { executeTransform, replaceVariables } from "./utils/transform.ts";
@@ -513,6 +515,11 @@ async function executeWorkflow(payload: WorkflowPayload): Promise<WorkflowResult
   };
 
   info(`Starting workflow execution: ${payload.workflow.name || payload.workflow.id}`, metadata);
+
+  // Allowlist this execution's tunnel ports so the SSRF fetch override permits
+  // tunneled requests (rewritten to 127.0.0.1:<port>) even when local requests
+  // are otherwise blocked.
+  setAllowedTunnelPorts(Object.values(payload.tunnelMappings || {}).map((m) => m.port));
 
   const stepResults: ToolStepResult[] = [];
   const fileStore: Record<string, RuntimeExecutionFile> = Object.fromEntries(
