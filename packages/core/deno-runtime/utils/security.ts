@@ -67,10 +67,28 @@ async function resolveAndCheck(hostname: string, port: string): Promise<void> {
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
 const MAX_REDIRECTS = 10;
 
+// Credential-bearing headers stripped when a redirect crosses origins, so
+// configured secrets are never forwarded to an untrusted redirect target.
+// Covers the standardized auth/cookie headers plus the common custom
+// API-key / token header names used by APIs superglue talks to.
+const CROSS_ORIGIN_STRIPPED_HEADERS = [
+  "authorization",
+  "proxy-authorization",
+  "cookie",
+  "cookie2",
+  "www-authenticate",
+  "x-api-key",
+  "api-key",
+  "apikey",
+  "x-auth-token",
+  "x-access-token",
+  "x-csrf-token",
+  "x-amz-security-token",
+];
+
 function stripSensitiveHeaders(headers: HeadersInit | undefined): Headers {
   const h = new Headers(headers);
-  h.delete("authorization");
-  h.delete("cookie");
+  for (const name of CROSS_ORIGIN_STRIPPED_HEADERS) h.delete(name);
   return h;
 }
 
@@ -105,11 +123,18 @@ globalThis.fetch = async function safeFetch(
   let hops = 0;
   while (REDIRECT_STATUS.has(response.status) && response.headers.get("location")) {
     if (++hops > MAX_REDIRECTS) {
+      // Release the body before bailing — redirect:"manual" leaves it open.
+      await response.body?.cancel().catch(() => {});
       throw ssrfBlocked(`Too many redirects (>${MAX_REDIRECTS})`);
     }
     const nextUrl = new URL(response.headers.get("location")!, currentUrl);
     currentInit = applyRedirect(currentInit, response.status, nextUrl.origin === currentUrl.origin);
     currentUrl = nextUrl;
+    // With redirect:"manual" the runtime does not auto-close redirect bodies,
+    // so cancel this hop's body before overwriting it to avoid leaking the
+    // underlying stream resource across a long redirect chain. Done before
+    // resolveAndCheck so a blocked next hop still releases the current body.
+    await response.body?.cancel().catch(() => {});
     await resolveAndCheck(currentUrl.hostname, currentUrl.port);
     response = await originalFetch(currentUrl.href, { ...currentInit, redirect: "manual" });
   }
@@ -156,12 +181,17 @@ export function isInternalHost(hostname: string): boolean {
     return true;
   }
 
-  // IPv6 private/link-local ranges (fe80::/10, fc00::/7) and IPv4-mapped IPv6
-  if (
-    raw.startsWith("fe80:") ||
-    (raw.includes(":") && (raw.startsWith("fc") || raw.startsWith("fd")))
-  )
-    return true;
+  // IPv6 private/link-local ranges, matched on the first hextet so the full
+  // documented ranges are covered (not just their base address):
+  //   fe80::/10 (link-local) → top 10 bits === 0xfe80, spans fe80–febf
+  //   fc00::/7  (unique local) → top 7 bits  === 0xfc00, spans fc00–fdff
+  if (raw.includes(":") && !raw.startsWith("::ffff:")) {
+    const firstHextet = parseInt(raw.split(":")[0] || "0", 16);
+    if (!isNaN(firstHextet)) {
+      if ((firstHextet & 0xffc0) === 0xfe80) return true;
+      if ((firstHextet & 0xfe00) === 0xfc00) return true;
+    }
+  }
   if (raw.startsWith("::ffff:")) {
     const decoded = decodeIPv4MappedIPv6(raw);
     if (decoded !== raw) return isInternalHost(decoded);

@@ -500,6 +500,20 @@ describe.skipIf(!denoAvailable)("DenoWorker", () => {
           expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
         },
       );
+
+      // fe80::/10 spans fe80–febf (link-local) and fc00::/7 spans fc00–fdff (ULA);
+      // the guard must cover the whole range, not just the base hextet.
+      it.each(["fe80::1", "fe90::1", "febf::1", "fc00::1", "fd12:3456::1"])(
+        "should block request to IPv6 private/link-local address %s",
+        async (ip) => {
+          const result = await worker.execute(
+            `ssrf-ipv6-${ip}-run`,
+            requestPayload(`http://[${ip}]:8080/`, `ssrf-ipv6-${ip}`),
+          );
+          expect(result.success).toBe(false);
+          expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+        },
+      );
     });
 
     // With BLOCK_LOCAL_REQUESTS unset (default), external hosts must NOT be blocked.
