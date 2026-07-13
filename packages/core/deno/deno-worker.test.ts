@@ -447,6 +447,20 @@ describe.skipIf(!denoAvailable)("DenoWorker", () => {
         expect(result.success).toBe(false);
         expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
       });
+
+      // IPv4-compatible IPv6 form of AWS IMDS (::169.254.169.254 normalizes to
+      // ::a9fe:a9fe) must not smuggle the metadata IP past the always-on check.
+      it.each(["::169.254.169.254", "::ffff:169.254.169.254"])(
+        "should block request to metadata IP in IPv6 form %s",
+        async (host) => {
+          const result = await worker.execute(
+            `ssrf-metadata-v6-${host}-run`,
+            requestPayload(`http://[${host}]/latest/meta-data/`, `ssrf-metadata-v6-${host}`),
+          );
+          expect(result.success).toBe(false);
+          expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+        },
+      );
     });
 
     // Localhost / private ranges are only blocked when BLOCK_LOCAL_REQUESTS=true.
@@ -503,17 +517,23 @@ describe.skipIf(!denoAvailable)("DenoWorker", () => {
 
       // fe80::/10 spans fe80–febf (link-local) and fc00::/7 spans fc00–fdff (ULA);
       // the guard must cover the whole range, not just the base hextet.
-      it.each(["fe80::1", "fe90::1", "febf::1", "fc00::1", "fd12:3456::1"])(
-        "should block request to IPv6 private/link-local address %s",
-        async (ip) => {
-          const result = await worker.execute(
-            `ssrf-ipv6-${ip}-run`,
-            requestPayload(`http://[${ip}]:8080/`, `ssrf-ipv6-${ip}`),
-          );
-          expect(result.success).toBe(false);
-          expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
-        },
-      );
+      it.each([
+        "fe80::1",
+        "fe90::1",
+        "febf::1",
+        "fc00::1",
+        "fd12:3456::1",
+        // IPv4-compatible IPv6 embedding a private IPv4 (::127.0.0.1, ::10.0.0.1)
+        "::127.0.0.1",
+        "::10.0.0.1",
+      ])("should block request to IPv6 private/link-local address %s", async (ip) => {
+        const result = await worker.execute(
+          `ssrf-ipv6-${ip}-run`,
+          requestPayload(`http://[${ip}]:8080/`, `ssrf-ipv6-${ip}`),
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/blocked request.*internal (host|address)/i);
+      });
     });
 
     // With BLOCK_LOCAL_REQUESTS unset (default), external hosts must NOT be blocked.
