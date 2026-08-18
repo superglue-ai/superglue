@@ -30,6 +30,20 @@ export interface ToolInteractionEntry {
   payload?: Record<string, unknown>;
 }
 
+// A structured reference to a superglue entity that the user @-mentioned in the composer.
+// Kept separate from the message text so the agent receives an unambiguous id instead of a name.
+export type MessageReferenceType = "tool" | "system" | "run";
+
+export interface MessageReference {
+  type: MessageReferenceType;
+  id: string;
+  label: string;
+  // Only set for runs - drives the success/failure colour of the chip.
+  status?: string;
+  // Only set for systems - the entity's own icon, shown instead of the generic type icon.
+  icon?: string;
+}
+
 export interface Message {
   id: string;
   content: string;
@@ -39,6 +53,7 @@ export interface Message {
   parts?: MessagePart[];
   isStreaming?: boolean;
   isHidden?: boolean;
+  references?: MessageReference[];
   attachedFiles?: Array<{
     name: string;
     size?: number;

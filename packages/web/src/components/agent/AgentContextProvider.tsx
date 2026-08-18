@@ -1,7 +1,8 @@
 "use client";
 
 import { useToast } from "@/src/hooks/use-toast";
-import type { Message, ToolCall } from "@superglue/shared";
+import type { Message, MessageReference, ToolCall } from "@superglue/shared";
+import { reconcileReferences } from "@/src/lib/agent/mentions";
 import { ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
 import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import { useInvalidateTools } from "@/src/queries/tools";
@@ -38,7 +39,9 @@ export interface AgentContextValue {
   editingMessageId: string | null;
   editingContent: string;
   setEditingContent: React.Dispatch<React.SetStateAction<string>>;
-  handleEditMessage: (messageId: string, content: string) => void;
+  editingReferences: MessageReference[];
+  setEditingReferences: React.Dispatch<React.SetStateAction<MessageReference[]>>;
+  handleEditMessage: (messageId: string, content: string, references?: MessageReference[]) => void;
   handleCancelEdit: () => void;
   handleSaveEdit: (messageId: string) => Promise<void>;
 
@@ -86,7 +89,7 @@ export interface AgentContextValue {
   startNewConversation: () => void;
 
   // Actions
-  handleSendMessage: (content: string, attachedFiles?: UploadedFile[]) => Promise<void>;
+  handleSendMessage: (content: string, references?: MessageReference[]) => Promise<void>;
   startTemplatePrompt: (
     userPrompt: string,
     hiddenStarterMessage?: string,
@@ -331,6 +334,12 @@ export function AgentContextProvider({
       const messageIndex = messagesHook.messages.findIndex((m) => m.id === messageId);
       if (messageIndex === -1) return;
 
+      // The edited message is dropped and rebuilt from scratch, so its @-mentions have to be
+      // carried over explicitly. editingReferences holds the original message's mentions plus
+      // any added during editing; reconcile drops the ones whose token was deleted.
+      const editedContent = messagesHook.editingContent.trim();
+      const carriedReferences = reconcileReferences(editedContent, messagesHook.editingReferences);
+
       const truncatedMessages = messagesHook.messages.slice(0, messageIndex);
       const reseededMessages =
         truncatedMessages.length === 0 &&
@@ -342,22 +351,23 @@ export function AgentContextProvider({
       messagesHook.setMessages(reseededMessages);
       messagesHook.setEditingMessageId(null);
 
-      const editedContent = messagesHook.editingContent.trim();
       messagesHook.setEditingContent("");
       fileUpload.clearFiles();
       requestHook.resetFileTracking();
 
-      await requestHook.sendAgentRequest(editedContent);
+      await requestHook.sendAgentRequest(editedContent, {
+        references: carriedReferences.length ? carriedReferences : undefined,
+      });
     },
     [messagesHook, fileUpload, requestHook, config.initialMessages],
   );
 
   const handleSendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, references?: MessageReference[]) => {
       const MAX_MESSAGE_LENGTH = 50000;
       if (!content.trim() || content.length > MAX_MESSAGE_LENGTH) return;
       fileUpload.commitPendingFiles();
-      await requestHook.sendAgentRequest(content);
+      await requestHook.sendAgentRequest(content, { references });
     },
     [requestHook, fileUpload],
   );
@@ -406,6 +416,8 @@ export function AgentContextProvider({
       editingMessageId: messagesHook.editingMessageId,
       editingContent: messagesHook.editingContent,
       setEditingContent: messagesHook.setEditingContent,
+      editingReferences: messagesHook.editingReferences,
+      setEditingReferences: messagesHook.setEditingReferences,
       handleEditMessage: messagesHook.handleEditMessage,
       handleCancelEdit: messagesHook.handleCancelEdit,
       handleSaveEdit,

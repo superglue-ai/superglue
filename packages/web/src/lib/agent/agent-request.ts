@@ -12,6 +12,7 @@ import {
 } from "./agent-types";
 import { getEffectiveMode } from "./agent-tools/tool-policies";
 import { needsSystemMessage } from "./agent-helpers";
+import { buildMentionContext } from "./mention-context";
 import { type SkillName } from "./skills/index";
 
 export interface ConfirmationResult {
@@ -51,6 +52,7 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     filePayloads: body.filePayloads,
     toolExecutionPolicies: body.toolExecutionPolicies,
     loadedSkills: body.loadedSkills,
+    references: Array.isArray(body.references) ? body.references : undefined,
     playgroundDraft: body.playgroundDraft,
     systemPlaygroundContext: body.systemPlaygroundContext,
     accessRulesContext: body.accessRulesContext,
@@ -94,6 +96,24 @@ export async function prepareMessages(
         timestamp: new Date(),
       },
     ];
+  }
+
+  if (request.references?.length) {
+    const mentionContext = await buildMentionContext(request.references, ctx);
+    if (mentionContext) {
+      const contextMessage: Message = {
+        id: `references-${Date.now()}`,
+        role: "user",
+        content: mentionContext,
+        timestamp: new Date(),
+        isHidden: true,
+      };
+      // Placed directly before the message that contains the mentions so the agent reads
+      // the resolved objects first.
+      const lastUserIndex = messages.map((m) => m.role).lastIndexOf("user");
+      const insertAt = lastUserIndex === -1 ? messages.length : lastUserIndex;
+      messages = [...messages.slice(0, insertAt), contextMessage, ...messages.slice(insertAt)];
+    }
   }
 
   return { messages, systemMessage };
