@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MessageReference } from "@superglue/shared";
 import {
   dedupeReferences,
+  isInsideMentionToken,
   sanitizeReferences,
   findMentionQuery,
   findTokenAt,
@@ -226,5 +227,25 @@ describe("sanitizeReferences", () => {
   it("should return an empty array for non-array input", () => {
     expect(sanitizeReferences(undefined)).toEqual([]);
     expect(sanitizeReferences("not an array")).toEqual([]);
+  });
+});
+
+describe("isInsideMentionToken", () => {
+  const text = "Why did @customer-sync fail?";
+  // token spans [8, 22)
+
+  it("should be true for a caret strictly inside the token", () => {
+    expect(isInsideMentionToken(text, [toolRef], 12)).toBe(true);
+    expect(isInsideMentionToken(text, [toolRef], 21)).toBe(true);
+  });
+
+  it("should be false at the token edges so re-selection after the token still works", () => {
+    expect(isInsideMentionToken(text, [toolRef], 8)).toBe(false);
+    expect(isInsideMentionToken(text, [toolRef], 22)).toBe(false);
+  });
+
+  it("should be false in plain text and with no references", () => {
+    expect(isInsideMentionToken(text, [toolRef], 3)).toBe(false);
+    expect(isInsideMentionToken(text, [], 12)).toBe(false);
   });
 });

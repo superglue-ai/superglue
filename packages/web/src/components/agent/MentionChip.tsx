@@ -125,7 +125,7 @@ export function MentionChip({
       )}
       title={
         missing
-          ? `This ${MENTION_TYPE_SINGULAR[reference.type]} no longer exists.`
+          ? `This ${MENTION_TYPE_SINGULAR[reference.type]} no longer exists or is not accessible.`
           : `${reference.type}: ${reference.id}`
       }
     >

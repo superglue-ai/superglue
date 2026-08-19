@@ -30,7 +30,11 @@ async function fetchAllPages<T>(
   return items;
 }
 
-/** Every tool the user may see - the mention popover must not hide any of them. */
+/**
+ * Tools for the mention popover, paginated to the backend's ceiling: the list handler
+ * fetches at most 10000 rows from the datastore before filtering, so tools beyond that
+ * are not reachable through this endpoint at all.
+ */
 export function useAllToolsForMentions() {
   const org = useOrgOptional();
   const orgId = org?.orgId;
@@ -48,7 +52,12 @@ export function useAllToolsForMentions() {
   return { tools: query.data ?? [], isLoading: query.isLoading };
 }
 
-/** Every system the user may see, across environments. */
+/**
+ * Systems for the mention popover, paginated to the backend's ceiling: the list handler
+ * always fetches limit 1000 / offset 0 from the datastore and paginates in memory, so an
+ * org with more than 1000 systems cannot reach the rest through this endpoint - a
+ * platform-wide limit (the systems page shares it), not something this hook can lift.
+ */
 export function useAllSystemsForMentions() {
   const org = useOrgOptional();
   const orgId = org?.orgId;

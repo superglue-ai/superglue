@@ -190,6 +190,22 @@ export function findTokenAt(
   return scanMentionTokens(text, references).find((m) => index >= m.start && index < m.end) ?? null;
 }
 
+/**
+ * True when the caret sits strictly inside a completed mention token. Used to suppress
+ * the query popover there: seen from the left, a caret parked inside "@customer-sync"
+ * is indistinguishable from a half-typed query, and selecting a suggestion would then
+ * replace only "@"-to-caret and orphan the token's tail. A caret directly after the
+ * token is deliberately allowed - the query equals the full token and a selection
+ * replaces it cleanly.
+ */
+export function isInsideMentionToken(
+  text: string,
+  references: MessageReference[],
+  caret: number,
+): boolean {
+  return scanMentionTokens(text, references).some((m) => caret > m.start && caret < m.end);
+}
+
 const MENTION_REFERENCE_TYPES = new Set(["tool", "system", "run"]);
 
 /**

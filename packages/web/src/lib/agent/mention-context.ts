@@ -63,7 +63,9 @@ async function resolveReference(
   ctx: ToolExecutionContext,
 ): Promise<string> {
   const token = mentionTokenText(reference);
-  const missing = `${reference.type.toUpperCase()} ${token} (id: ${reference.id})\nTHIS ${reference.type.toUpperCase()} NO LONGER EXISTS - it was deleted after the user mentioned it. State this plainly in your answer. Do not guess, do not substitute a similarly named ${reference.type}, and do not try to look it up with tools.`;
+  // getWorkflow maps both 404 and 403 to null, so "gone" and "restricted" are not
+  // distinguishable here - the wording has to stay truthful for both cases.
+  const missing = `${reference.type.toUpperCase()} ${token} (id: ${reference.id})\nTHIS ${reference.type.toUpperCase()} NO LONGER EXISTS OR IS NOT ACCESSIBLE - it was deleted, or the current permissions cannot access it. State this plainly in your answer. Do not guess, do not substitute a similarly named ${reference.type}, and do not try to look it up with tools.`;
 
   try {
     if (reference.type === "tool") {

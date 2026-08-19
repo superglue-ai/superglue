@@ -6,6 +6,7 @@ import {
   findMentionQuery,
   findTokenAt,
   insertMention,
+  isInsideMentionToken,
   splitByMentions,
   MENTION_TRIGGER,
   type MentionQuery,
@@ -199,6 +200,12 @@ export function useMentionInput({
         closeMention();
         return;
       }
+      // A caret parked inside a completed token is a click, not a query - opening the
+      // popover there and selecting would orphan the token's tail.
+      if (references?.length && isInsideMentionToken(text, references, caret)) {
+        closeMention();
+        return;
+      }
       const next = findMentionQuery(text, caret);
       const key = next ? `${next.start}:${next.query}` : null;
       if (key !== mentionKeyRef.current) {
@@ -209,7 +216,7 @@ export function useMentionInput({
       setMention(next);
       onMentionQueryChange?.(next ? next.query : null);
     },
-    [mentionsEnabled, closeMention, onMentionQueryChange],
+    [mentionsEnabled, closeMention, onMentionQueryChange, references],
   );
 
   const applyMention = useCallback(
