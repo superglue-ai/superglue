@@ -13,6 +13,7 @@ import {
 import { getEffectiveMode } from "./agent-tools/tool-policies";
 import { needsSystemMessage } from "./agent-helpers";
 import { buildMentionContext } from "./mention-context";
+import { sanitizeReferences } from "./mentions";
 import { type SkillName } from "./skills/index";
 
 export interface ConfirmationResult {
@@ -52,7 +53,10 @@ export function validateAgentRequest(body: any): ValidatedAgentRequest {
     filePayloads: body.filePayloads,
     toolExecutionPolicies: body.toolExecutionPolicies,
     loadedSkills: body.loadedSkills,
-    references: Array.isArray(body.references) ? body.references : undefined,
+    references: (() => {
+      const sanitized = sanitizeReferences(body.references);
+      return sanitized.length > 0 ? sanitized : undefined;
+    })(),
     playgroundDraft: body.playgroundDraft,
     systemPlaygroundContext: body.systemPlaygroundContext,
     accessRulesContext: body.accessRulesContext,

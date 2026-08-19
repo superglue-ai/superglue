@@ -73,6 +73,61 @@ export function insertMention(
   return { text: next, caret: start + token.length };
 }
 
+export interface MentionTokenMatch {
+  start: number;
+  end: number;
+  reference: MessageReference;
+}
+
+// Characters that would continue a token word. A candidate occurrence followed by one of
+// these is part of a longer word (e.g. "@sync" inside "@sync-orders") and does not count.
+const TOKEN_CONTINUATION = /[A-Za-z0-9_-]/;
+
+function hasTokenBoundaries(text: string, start: number, end: number): boolean {
+  // Same rule as findMentionQuery: a token starts at the text start or after whitespace,
+  // so "@customer-sync" inside "ops@customer-sync.io" is not a token.
+  const before = start === 0 ? "" : text[start - 1];
+  if (before && !/\s/.test(before)) return false;
+  const after = end >= text.length ? "" : text[end];
+  if (after && TOKEN_CONTINUATION.test(after)) return false;
+  return true;
+}
+
+/**
+ * The single source of truth for "where in this text are mention tokens". Longest tokens
+ * claim their ranges first (so a token that is a prefix of another can never shadow it),
+ * candidates need word boundaries on both sides, and claimed ranges never overlap.
+ * Display, whole-token deletion and reference reconciliation all build on this scan,
+ * which is what keeps the three from ever disagreeing about what counts as a token.
+ */
+export function scanMentionTokens(
+  text: string,
+  references: MessageReference[],
+): MentionTokenMatch[] {
+  if (!text || references.length === 0) return [];
+
+  const entries = references
+    .map((reference) => ({ reference, token: mentionTokenText(reference) }))
+    .sort((a, b) => b.token.length - a.token.length);
+
+  const matches: MentionTokenMatch[] = [];
+  const overlapsClaimed = (start: number, end: number) =>
+    matches.some((m) => start < m.end && m.start < end);
+
+  for (const { reference, token } of entries) {
+    let from = text.indexOf(token);
+    while (from !== -1) {
+      const to = from + token.length;
+      if (hasTokenBoundaries(text, from, to) && !overlapsClaimed(from, to)) {
+        matches.push({ start: from, end: to, reference });
+      }
+      from = text.indexOf(token, from + 1);
+    }
+  }
+
+  return matches.sort((a, b) => a.start - b.start);
+}
+
 /**
  * Drops references whose token no longer appears in the text, so deleting "@customer-sync"
  * by hand also removes the structured reference instead of silently keeping it.
@@ -81,7 +136,10 @@ export function reconcileReferences(
   text: string,
   references: MessageReference[],
 ): MessageReference[] {
-  return references.filter((reference) => text.includes(mentionTokenText(reference)));
+  const present = new Set(
+    scanMentionTokens(text, references).map((m) => `${m.reference.type}:${m.reference.id}`),
+  );
+  return references.filter((reference) => present.has(`${reference.type}:${reference.id}`));
 }
 
 /** Removes duplicates so mentioning the same entity twice only resolves it once. */
@@ -105,37 +163,18 @@ export interface MentionSegment {
  * transcript can render mentions as chips instead of raw text.
  */
 export function splitByMentions(text: string, references: MessageReference[]): MentionSegment[] {
-  if (references.length === 0) return text ? [{ text }] : [];
-
-  // Longest token first so one token can never shadow another that starts with it.
-  const tokens = references
-    .map((reference) => ({ reference, token: mentionTokenText(reference) }))
-    .sort((a, b) => b.token.length - a.token.length);
+  const matches = scanMentionTokens(text, references);
+  if (matches.length === 0) return text ? [{ text }] : [];
 
   const segments: MentionSegment[] = [];
   let cursor = 0;
-  let plainStart = 0;
-
-  while (cursor < text.length) {
-    const hit = tokens.find((entry) => text.startsWith(entry.token, cursor));
-    if (!hit) {
-      cursor += 1;
-      continue;
-    }
-    if (cursor > plainStart) segments.push({ text: text.slice(plainStart, cursor) });
-    segments.push({ text: hit.token, reference: hit.reference });
-    cursor += hit.token.length;
-    plainStart = cursor;
+  for (const match of matches) {
+    if (match.start > cursor) segments.push({ text: text.slice(cursor, match.start) });
+    segments.push({ text: text.slice(match.start, match.end), reference: match.reference });
+    cursor = match.end;
   }
-
-  if (plainStart < text.length) segments.push({ text: text.slice(plainStart) });
+  if (cursor < text.length) segments.push({ text: text.slice(cursor) });
   return segments;
-}
-
-export interface MentionTokenMatch {
-  start: number;
-  end: number;
-  reference: MessageReference;
 }
 
 /**
@@ -148,15 +187,32 @@ export function findTokenAt(
   index: number,
 ): MentionTokenMatch | null {
   if (index < 0 || index >= text.length) return null;
+  return scanMentionTokens(text, references).find((m) => index >= m.start && index < m.end) ?? null;
+}
 
-  for (const reference of references) {
-    const token = mentionTokenText(reference);
-    let from = text.indexOf(token);
-    while (from !== -1) {
-      const to = from + token.length;
-      if (index >= from && index < to) return { start: from, end: to, reference };
-      from = text.indexOf(token, from + 1);
-    }
+const MENTION_REFERENCE_TYPES = new Set(["tool", "system", "run"]);
+
+/**
+ * Validates reference objects coming from the client before they reach any code that
+ * dereferences them. Malformed entries (null, wrong shape, unknown type) are dropped so a
+ * bad request degrades to fewer references instead of crashing the whole agent call.
+ */
+export function sanitizeReferences(value: unknown): MessageReference[] {
+  if (!Array.isArray(value)) return [];
+
+  const sanitized: MessageReference[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const { type, id, label, status, icon } = entry as Record<string, unknown>;
+    if (typeof type !== "string" || !MENTION_REFERENCE_TYPES.has(type)) continue;
+    if (typeof id !== "string" || id.length === 0) continue;
+    sanitized.push({
+      type: type as MessageReference["type"],
+      id,
+      label: typeof label === "string" && label.length > 0 ? label : id,
+      status: typeof status === "string" ? status : undefined,
+      icon: typeof icon === "string" ? icon : undefined,
+    });
   }
-  return null;
+  return sanitized;
 }

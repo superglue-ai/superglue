@@ -249,9 +249,12 @@ export function AgentInputArea({
                   syncMention(e.target.value, e.target.selectionStart);
                 }}
                 onKeyDown={handleKeyDown}
-                onSelect={(e) =>
-                  syncMention(value, (e.target as HTMLTextAreaElement).selectionStart)
-                }
+                onSelect={(e) => {
+                  // Read text and caret from the same element so they can never come from
+                  // two different generations of the input (native undo, drag-drop, IME).
+                  const el = e.target as HTMLTextAreaElement;
+                  syncMention(el.value, el.selectionStart);
+                }}
                 onBlur={closeMention}
                 placeholder={placeholder}
                 rows={compact ? 2 : undefined}

@@ -119,7 +119,10 @@ export function MentionEditBox({
         onKeyDown={(e) => {
           handleKeyDown(e);
         }}
-        onSelect={(e) => syncMention(value, (e.target as HTMLTextAreaElement).selectionStart)}
+        onSelect={(e) => {
+          const el = e.target as HTMLTextAreaElement;
+          syncMention(el.value, el.selectionStart);
+        }}
         onBlur={closeMention}
         onScroll={syncMirrorScroll}
         placeholder={placeholder}

@@ -74,8 +74,8 @@ async function resolveReference(
 
     if (reference.type === "system") {
       // filterSystemFields masks credential values and swaps in <<system_key>> placeholders.
+      // Note: unlike getWorkflow/getRun, getSystem throws on 404 - handled in the catch below.
       const system = await ctx.superglueClient.getSystem(reference.id);
-      if (!system) return missing;
       // The token carries the display name, so the real id is spelled out for the agent.
       return `SYSTEM ${token} (id: ${reference.id})\n\`\`\`json\n${safeStringify(filterSystemFields(system), 2)}\n\`\`\``;
     }
@@ -84,7 +84,11 @@ async function resolveReference(
     if (!run) return missing;
     return `RUN ${token} (full id: ${run.runId})\n\`\`\`json\n${safeStringify(projectRun(run), 2)}\n\`\`\``;
   } catch (error: any) {
-    return `${reference.type.toUpperCase()} ${token}\nCould not be loaded: ${error?.message || "unknown error"}`;
+    const message = error?.message || "unknown error";
+    // getSystem signals a deleted system by throwing (e.g. "System not found") instead of
+    // returning null like its siblings - treat that the same as any other deletion.
+    if (/404|not found/i.test(message)) return missing;
+    return `${reference.type.toUpperCase()} ${token}\nCould not be loaded: ${message}`;
   }
 }
 

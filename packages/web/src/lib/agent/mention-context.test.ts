@@ -128,3 +128,15 @@ describe("buildMentionContext", () => {
     expect(result).toContain("Could not be loaded: network down");
   });
 });
+
+describe("buildMentionContext review findings", () => {
+  it("should report a deleted system as no longer existing when the client throws 404", async () => {
+    // The real SuperglueClient.getSystem throws on 404 (it never resolves null) -
+    // the server message is "System not found".
+    const { ctx, client } = makeCtx();
+    client.getSystem.mockRejectedValueOnce(new Error("System not found"));
+    const result = (await buildMentionContext([systemRef], ctx))!;
+    expect(result).toContain("NO LONGER EXISTS");
+    expect(result).not.toContain("Could not be loaded");
+  });
+});

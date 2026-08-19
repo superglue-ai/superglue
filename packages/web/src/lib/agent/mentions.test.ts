@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MessageReference } from "@superglue/shared";
 import {
   dedupeReferences,
+  sanitizeReferences,
   findMentionQuery,
   findTokenAt,
   insertMention,
@@ -163,5 +164,67 @@ describe("findTokenAt", () => {
       end: 34,
       reference: toolRef,
     });
+  });
+});
+
+// Reproduction tests for the review findings. Written before the fix - each of these
+// fails on the original implementation and pins the corrected behavior.
+describe("findTokenAt review findings", () => {
+  const short: MessageReference = { type: "tool", id: "sync", label: "sync" };
+  const long: MessageReference = { type: "tool", id: "sync-orders", label: "sync-orders" };
+
+  it("should return the longer token when a shorter reference is its prefix", () => {
+    // refs deliberately ordered short-first - the order that triggered the bug
+    const hit = findTokenAt("run @sync-orders now", [short, long], 6);
+    expect(hit).toEqual({ start: 4, end: 16, reference: long });
+  });
+
+  it("should not match a token inside an email address", () => {
+    const ref: MessageReference = { type: "tool", id: "customer-sync", label: "customer-sync" };
+    expect(findTokenAt("mail ops@customer-sync.io", [ref], 12)).toBeNull();
+  });
+});
+
+describe("reconcileReferences review findings", () => {
+  const short: MessageReference = { type: "tool", id: "sync", label: "sync" };
+  const long: MessageReference = { type: "tool", id: "sync-orders", label: "sync-orders" };
+
+  it("should drop a reference whose token is only a prefix of another token", () => {
+    expect(reconcileReferences("run @sync-orders now", [short, long])).toEqual([long]);
+  });
+
+  it("should not keep a reference that only appears inside an email address", () => {
+    expect(reconcileReferences("mail ops@sync.io please", [short])).toEqual([]);
+  });
+});
+
+describe("sanitizeReferences", () => {
+  it("should drop malformed entries and keep valid ones", () => {
+    const input = [
+      null,
+      42,
+      { id: "no-type" },
+      { type: "weird", id: "bad-type" },
+      { type: "tool", id: "" },
+      { type: "tool", id: "customer-sync", label: "Customer Sync" },
+    ];
+    expect(sanitizeReferences(input)).toEqual([
+      {
+        type: "tool",
+        id: "customer-sync",
+        label: "Customer Sync",
+        status: undefined,
+        icon: undefined,
+      },
+    ]);
+  });
+
+  it("should fall back to the id when the label is missing", () => {
+    expect(sanitizeReferences([{ type: "system", id: "gmail" }])[0].label).toBe("gmail");
+  });
+
+  it("should return an empty array for non-array input", () => {
+    expect(sanitizeReferences(undefined)).toEqual([]);
+    expect(sanitizeReferences("not an array")).toEqual([]);
   });
 });
