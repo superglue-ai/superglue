@@ -87,9 +87,10 @@ async function resolveReference(
     return `RUN ${token} (full id: ${run.runId})\n\`\`\`json\n${safeStringify(projectRun(run), 2)}\n\`\`\``;
   } catch (error: any) {
     const message = error?.message || "unknown error";
-    // getSystem signals a deleted system by throwing (e.g. "System not found") instead of
-    // returning null like its siblings - treat that the same as any other deletion.
-    if (/404|not found/i.test(message)) return missing;
+    // Only getSystem signals a deleted system by throwing (e.g. "System not found");
+    // getWorkflow/getRun already map real 404s to null above, so a throw from them is a
+    // genuine load error and must not be classified as deletion.
+    if (reference.type === "system" && /404|not found/i.test(message)) return missing;
     return `${reference.type.toUpperCase()} ${token}\nCould not be loaded: ${message}`;
   }
 }

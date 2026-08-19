@@ -140,3 +140,15 @@ describe("buildMentionContext review findings", () => {
     expect(result).not.toContain("Could not be loaded");
   });
 });
+
+describe("not-found classification is scoped to systems", () => {
+  it("should not classify a tool load error mentioning not found as deletion", async () => {
+    // getWorkflow already maps real 404/403 to null; a THROW from it is a genuine load
+    // error, even if the server message happens to embed "not found".
+    const { ctx, client } = makeCtx();
+    client.getWorkflow.mockRejectedValueOnce(new Error("upstream config not found (503)"));
+    const result = (await buildMentionContext([toolRef], ctx))!;
+    expect(result).toContain("Could not be loaded");
+    expect(result).not.toContain("NO LONGER EXISTS");
+  });
+});

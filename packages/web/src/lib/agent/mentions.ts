@@ -106,20 +106,30 @@ export function scanMentionTokens(
 ): MentionTokenMatch[] {
   if (!text || references.length === 0) return [];
 
-  const entries = references
-    .map((reference) => ({ reference, token: mentionTokenText(reference) }))
-    .sort((a, b) => b.token.length - a.token.length);
+  // References sharing one token text (e.g. two systems with the same display name) are
+  // grouped, so occurrences get distributed across them - otherwise the first reference
+  // would claim every occurrence and reconciliation would drop its same-named twins.
+  const groups = new Map<string, MessageReference[]>();
+  for (const reference of references) {
+    const token = mentionTokenText(reference);
+    const group = groups.get(token);
+    if (group) group.push(reference);
+    else groups.set(token, [reference]);
+  }
+  const ordered = [...groups.entries()].sort((a, b) => b[0].length - a[0].length);
 
   const matches: MentionTokenMatch[] = [];
   const overlapsClaimed = (start: number, end: number) =>
     matches.some((m) => start < m.end && m.start < end);
 
-  for (const { reference, token } of entries) {
+  for (const [token, groupRefs] of ordered) {
+    let occurrence = 0;
     let from = text.indexOf(token);
     while (from !== -1) {
       const to = from + token.length;
       if (hasTokenBoundaries(text, from, to) && !overlapsClaimed(from, to)) {
-        matches.push({ start: from, end: to, reference });
+        matches.push({ start: from, end: to, reference: groupRefs[occurrence % groupRefs.length] });
+        occurrence += 1;
       }
       from = text.indexOf(token, from + 1);
     }

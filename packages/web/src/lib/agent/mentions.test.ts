@@ -10,6 +10,7 @@ import {
   mentionToken,
   mentionTokenText,
   reconcileReferences,
+  scanMentionTokens,
   splitByMentions,
 } from "./mentions";
 
@@ -247,5 +248,23 @@ describe("isInsideMentionToken", () => {
   it("should be false in plain text and with no references", () => {
     expect(isInsideMentionToken(text, [toolRef], 3)).toBe(false);
     expect(isInsideMentionToken(text, [], 12)).toBe(false);
+  });
+});
+
+describe("equal-token references (same display name)", () => {
+  const sysA: MessageReference = { type: "system", id: "gmail_eu", label: "Gmail" };
+  const sysB: MessageReference = { type: "system", id: "gmail_us", label: "Gmail" };
+
+  it("should keep both same-named references when their token appears twice", () => {
+    expect(reconcileReferences("@Gmail and @Gmail ", [sysA, sysB])).toEqual([sysA, sysB]);
+  });
+
+  it("should assign the occurrences to distinct references", () => {
+    const ids = scanMentionTokens("@Gmail and @Gmail", [sysA, sysB]).map((m) => m.reference.id);
+    expect(new Set(ids)).toEqual(new Set(["gmail_eu", "gmail_us"]));
+  });
+
+  it("should drop only the surplus reference when one occurrence remains", () => {
+    expect(reconcileReferences("only @Gmail left", [sysA, sysB])).toEqual([sysA]);
   });
 });
