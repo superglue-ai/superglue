@@ -2,6 +2,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { MessageReference, Run, System, Tool } from "@superglue/shared";
 import { hasResolvedOrgId, useOrgOptional } from "@/src/app/org-context";
 import { useSuperglueClient } from "./use-client";
+import { queryKeys } from "./query-keys";
 import { useMemo } from "react";
 
 // The REST layer clamps page size to 1000, so that is the largest useful request.
@@ -41,7 +42,9 @@ export function useAllToolsForMentions() {
   const createClient = useSuperglueClient();
 
   const query = useQuery<Tool[]>({
-    queryKey: ["mention-sources", "tools", orgId ?? ""],
+    // Nested under the app-wide tools prefix so every existing invalidation (e.g. after
+    // the agent's save_tool confirmation) refreshes the mention candidates too.
+    queryKey: [...queryKeys.tools.all(orgId ?? ""), "mention-source"],
     queryFn: async () => {
       const client = createClient();
       return fetchAllPages((page) => client.listWorkflows(PAGE_SIZE, (page - 1) * PAGE_SIZE));
@@ -64,7 +67,10 @@ export function useAllSystemsForMentions() {
   const createClient = useSuperglueClient();
 
   const query = useQuery<System[]>({
-    queryKey: ["mention-sources", "systems", orgId ?? ""],
+    // Nested under the app-wide systems prefix: creating a system (systems page or the
+    // agent's create_system flow) invalidates ["systems", orgId] and this query with it -
+    // without this, a freshly created system was only mentionable after a hard refresh.
+    queryKey: [...queryKeys.systems.all(orgId ?? ""), "mention-source"],
     queryFn: async () => {
       const client = createClient();
       return fetchAllPages((page) => client.listSystems(PAGE_SIZE, page, { mode: "all" }));
@@ -87,7 +93,7 @@ export function useRunsForMentions(search: string) {
   const trimmed = search.trim();
 
   const query = useQuery<Run[]>({
-    queryKey: ["mention-sources", "runs", orgId ?? "", trimmed],
+    queryKey: [...queryKeys.runs.all(orgId ?? ""), "mention-source", trimmed],
     queryFn: async ({ signal }) => {
       const client = createClient();
       const startedAfter = new Date(Date.now() - RUN_MENTION_WINDOW_DAYS * 24 * 60 * 60 * 1000);
