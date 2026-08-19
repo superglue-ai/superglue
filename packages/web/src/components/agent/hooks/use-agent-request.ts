@@ -2,7 +2,7 @@
 
 import { tokenRegistry } from "@/src/lib/token-registry";
 import { AgentRequest, ToolExecutionPolicies } from "@/src/lib/agent/agent-types";
-import { ExecutionFileEnvelope, Message } from "@superglue/shared";
+import { ExecutionFileEnvelope, Message, MessageReference } from "@superglue/shared";
 import { useCallback, useRef } from "react";
 import type { AgentConfig, UploadedFile, UseAgentRequestReturn } from "./types";
 import type { StreamState } from "./use-agent-streaming";
@@ -170,6 +170,7 @@ export function useAgentRequest({
         hiddenStarterMessage?: string;
         hideUserMessage?: boolean;
         resumeToolCallId?: string;
+        references?: MessageReference[];
       },
     ) => {
       const hasMessage = userMessage && userMessage.trim().length > 0;
@@ -236,6 +237,7 @@ export function useAgentRequest({
           timestamp: new Date(),
           attachedFiles: readyPendingFiles.length > 0 ? readyPendingFiles : undefined,
           isHidden: options?.hideUserMessage,
+          references: options?.references?.length ? options.references : undefined,
         };
         if (!options?.hideUserMessage) visibleUserMessageId = userMessageObj.id;
         currentMessages.push(userMessageObj);
@@ -266,6 +268,7 @@ export function useAgentRequest({
           Object.keys(toolExecutionPolicies).length > 0 ? toolExecutionPolicies : undefined,
         conversationId: conversationIdRef.current ?? undefined,
         loadedSkills: loadedSkills.length > 0 ? loadedSkills : undefined,
+        references: options?.references?.length ? options.references : undefined,
         playgroundDraft,
         systemPlaygroundContext,
         accessRulesContext,

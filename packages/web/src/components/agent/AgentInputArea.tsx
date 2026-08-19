@@ -6,10 +6,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/pop
 import { Textarea } from "@/src/components/ui/textarea";
 import { cn } from "@/src/lib/general-utils";
 import { formatBytes } from "@/src/lib/file-utils";
-import { ALLOWED_FILE_EXTENSIONS } from "@superglue/shared";
+import {
+  ALLOWED_FILE_EXTENSIONS,
+  type MessageReference,
+  type MessageReferenceType,
+} from "@superglue/shared";
+import { useMentionInput, type MentionItem } from "./hooks/use-mention-input";
+import { MentionOverlay, MentionPopover } from "./MentionPopover";
 import { AlertTriangle, ChevronUp, Paperclip, Send, Square } from "lucide-react";
 import React, { useCallback, useEffect, useRef } from "react";
 import { useAgentContext } from "./AgentContextProvider";
+
+// Re-exported so existing imports keep working after the mention logic moved into the hook.
+export { mentionItemToReference } from "./hooks/use-mention-input";
+export type { MentionItem } from "./hooks/use-mention-input";
 
 export interface AgentInputAreaProps {
   value: string;
@@ -26,6 +36,16 @@ export interface AgentInputAreaProps {
   containerClassName?: string;
   inputClassName?: string;
   scrollToBottom?: () => void;
+  // Mentions stay opt-in: composers that do not pass candidates keep the plain textarea.
+  mentionItems?: MentionItem[];
+  isLoadingMentions?: boolean;
+  // Short note per group, e.g. telling the user that runs are limited to a time window.
+  mentionGroupHints?: Partial<Record<MessageReferenceType, string>>;
+  onMentionSelect?: (item: MentionItem) => void;
+  // Lets the owner run a server-side search while the popover is open.
+  onMentionQueryChange?: (query: string | null) => void;
+  // Drives the chip highlights painted behind the text.
+  references?: MessageReference[];
 }
 
 export function AgentInputArea({
@@ -43,9 +63,39 @@ export function AgentInputArea({
   containerClassName,
   inputClassName,
   scrollToBottom,
+  mentionItems,
+  isLoadingMentions = false,
+  mentionGroupHints,
+  onMentionSelect,
+  onMentionQueryChange,
+  references,
 }: AgentInputAreaProps) {
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = inputRefProp ?? internalInputRef;
+
+  const {
+    isMentionOpen,
+    visibleGroups,
+    highlightedIndex,
+    mentionSegments,
+    mirrorRef,
+    syncMirrorScroll,
+    syncMention,
+    closeMention,
+    applyMention,
+    setActiveIndex,
+    setGroupLevel,
+    handleKeyDown: handleMentionKeyDown,
+  } = useMentionInput({
+    value,
+    onChange,
+    inputRef,
+    mentionItems,
+    isLoadingMentions,
+    onMentionSelect,
+    onMentionQueryChange,
+    references,
+  });
 
   const {
     pendingFiles,
@@ -63,6 +113,9 @@ export function AgentInputArea({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Mention handling first: token deletion and, while the popover is open, navigation.
+      if (handleMentionKeyDown(e)) return;
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (value.trim() && value.length <= maxLength) {
@@ -71,7 +124,7 @@ export function AgentInputArea({
         }
       }
     },
-    [value, maxLength, onSend, scrollToBottom],
+    [handleMentionKeyDown, value, maxLength, onSend, scrollToBottom],
   );
 
   useEffect(() => {
@@ -84,7 +137,17 @@ export function AgentInputArea({
     }
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, maxH)}px`;
-  }, [value, compact]);
+    syncMirrorScroll();
+  }, [value, compact, syncMirrorScroll]);
+
+  // Both the textarea and the overlay are built from this one string: identical padding and
+  // font metrics are what keeps the highlights sitting exactly behind their characters.
+  const composerTextClasses = cn(
+    compact
+      ? "!min-h-[32px] max-h-[100px] text-sm py-1.5 px-2 pr-20"
+      : "min-h-[44px] max-h-[200px] text-[15px] py-3 px-4 pr-28",
+    inputClassName,
+  );
 
   const canSend = value.trim() && value.length <= maxLength;
   const showCount = showCharCount && value.length > maxLength * 0.8;
@@ -95,7 +158,18 @@ export function AgentInputArea({
       className={cn(!compact && "sticky bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm")}
     >
       <div className={cn(compact ? "p-0" : "mx-0 sm:mx-2 lg:mx-6 pb-4 px-2 sm:px-4")}>
-        <div className={cn(!compact && "max-w-7xl mx-auto")}>
+        <div className={cn("relative", !compact && "max-w-7xl mx-auto")}>
+          {isMentionOpen && (
+            <MentionPopover
+              visibleGroups={visibleGroups}
+              highlightedIndex={highlightedIndex}
+              isLoading={isLoadingMentions}
+              groupHints={mentionGroupHints}
+              onSelect={applyMention}
+              onHoverIndex={setActiveIndex}
+              onToggleGroup={setGroupLevel}
+            />
+          )}
           <div
             className={cn(
               "relative flex flex-col overflow-hidden transition-all duration-200",
@@ -144,6 +218,15 @@ export function AgentInputArea({
                 compact ? "px-1.5 pb-1 pt-0.5" : "",
               )}
             >
+              {mentionSegments && (
+                <MentionOverlay
+                  segments={mentionSegments}
+                  mirrorRef={mirrorRef}
+                  wrapperClassName={compact ? "px-1.5 pb-1 pt-0.5" : undefined}
+                  textClassName={composerTextClasses}
+                />
+              )}
+
               <input
                 ref={fileInputRef as React.RefObject<HTMLInputElement>}
                 type="file"
@@ -161,16 +244,24 @@ export function AgentInputArea({
               <Textarea
                 ref={inputRef}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={(e) => {
+                  onChange(e.target.value);
+                  syncMention(e.target.value, e.target.selectionStart);
+                }}
                 onKeyDown={handleKeyDown}
+                onSelect={(e) => {
+                  // Read text and caret from the same element so they can never come from
+                  // two different generations of the input (native undo, drag-drop, IME).
+                  const el = e.target as HTMLTextAreaElement;
+                  syncMention(el.value, el.selectionStart);
+                }}
+                onBlur={closeMention}
                 placeholder={placeholder}
                 rows={compact ? 2 : undefined}
+                onScroll={syncMirrorScroll}
                 className={cn(
-                  "flex-1 resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0",
-                  compact
-                    ? "!min-h-[32px] max-h-[100px] text-sm py-1.5 px-2 pr-20"
-                    : "min-h-[44px] max-h-[200px] text-[15px] py-3 px-4 pr-28",
-                  inputClassName,
+                  "relative flex-1 resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0",
+                  composerTextClasses,
                 )}
               />
 

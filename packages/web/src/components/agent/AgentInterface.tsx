@@ -5,14 +5,24 @@ import { Textarea } from "@/src/components/ui/textarea";
 import { ThinkingIndicator } from "@/src/components/ui/thinking-indicator";
 import { SystemIcon } from "@/src/components/ui/system-icon";
 import { cn, handleCopyCode } from "@/src/lib/general-utils";
-import { Message, ToolCall } from "@superglue/shared";
+import { Message, MessageReference, ToolCall } from "@superglue/shared";
 import { AlertTriangle, ChevronDown, ChevronUp, Pencil, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { AgentCapabilities } from "./AgentCapabilities";
 import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import { AgentContextProvider, useAgentContext } from "./AgentContextProvider";
-import { AgentInputArea } from "./AgentInputArea";
+import { AgentInputArea, mentionItemToReference, type MentionItem } from "./AgentInputArea";
+import { MentionEditBox } from "./MentionEditBox";
+import { MentionChip } from "./MentionChip";
+import { dedupeReferences, reconcileReferences, splitByMentions } from "@/src/lib/agent/mentions";
+import {
+  RUN_MENTION_WINDOW_DAYS,
+  useAllSystemsForMentions,
+  useAllToolsForMentions,
+  useMissingReferences,
+  useRunsForMentions,
+} from "@/src/queries/mention-sources";
 import { ConversationHistory } from "./ConversationHistory";
 import { ToolMutation } from "@/src/lib/agent/agent-tools/tool-call-state";
 import {
@@ -27,6 +37,34 @@ import { AgentWelcome } from "./welcome/AgentWelcome";
 import { STREAMDOWN_COMPONENTS } from "../ui/streamdown-components";
 
 const MAX_MESSAGE_LENGTH = 50000;
+const MENTION_SEARCH_DEBOUNCE_MS = 150;
+const MENTION_GROUP_HINTS = {
+  run: `last ${RUN_MENTION_WINDOW_DAYS} days`,
+} as const;
+
+/** Keeps the server-side run search from firing on every keystroke. */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+/** Compact age used in the run suggestions, e.g. "12 min ago". */
+function formatRunAge(startedAt?: string): string {
+  if (!startedAt) return "unknown time";
+  const started = new Date(startedAt).getTime();
+  if (Number.isNaN(started)) return "unknown time";
+
+  const minutes = Math.floor((Date.now() - started) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.floor(hours / 24)} d ago`;
+}
 
 function ErrorMessagePart({ content, errorDetails }: { content: string; errorDetails?: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -80,6 +118,13 @@ const MemoMessage = React.memo(
     handleSaveEdit,
     handleCancelEdit,
     filePayloads,
+    missingReferenceKeys,
+    editingReferences,
+    setEditingReferences,
+    mentionItems,
+    isLoadingMentions,
+    mentionGroupHints,
+    onMentionQueryChange,
   }: {
     message: Message;
     onInputChange: (newInput: any) => void;
@@ -99,10 +144,21 @@ const MemoMessage = React.memo(
     setEditingContent: (content: string) => void;
     isLoading: boolean;
     formatTimestamp: (date: Date) => string;
-    handleEditMessage: (messageId: string, content: string) => void;
+    handleEditMessage: (
+      messageId: string,
+      content: string,
+      references?: MessageReference[],
+    ) => void;
     handleSaveEdit: (messageId: string) => void;
     handleCancelEdit: () => void;
     filePayloads?: Record<string, any>;
+    missingReferenceKeys?: Set<string>;
+    editingReferences: MessageReference[];
+    setEditingReferences: (references: MessageReference[]) => void;
+    mentionItems?: MentionItem[];
+    isLoadingMentions?: boolean;
+    mentionGroupHints?: Partial<Record<string, string>>;
+    onMentionQueryChange?: (query: string | null) => void;
   }) => {
     return (
       <div key={message.id} className={cn("flex gap-4 p-2 pt-4 rounded-xl group min-h-16")}>
@@ -146,7 +202,7 @@ const MemoMessage = React.memo(
             {message.role === "user" && !isLoading && (
               <button
                 type="button"
-                onClick={() => handleEditMessage(message.id, message.content)}
+                onClick={() => handleEditMessage(message.id, message.content, message.references)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
                 title="Edit message"
               >
@@ -174,12 +230,16 @@ const MemoMessage = React.memo(
 
           {editingMessageId === message.id ? (
             <div className="space-y-3">
-              <Textarea
+              <MentionEditBox
                 value={editingContent}
-                onChange={(e) => setEditingContent(e.target.value)}
-                className="min-h-[72px] max-h-[200px] resize-y text-[13px] bg-gradient-to-br from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/20 backdrop-blur-sm border border-border/50 rounded-xl shadow-sm focus-visible:ring-0 px-3 py-2"
+                onChange={setEditingContent}
+                references={editingReferences}
+                onReferencesChange={setEditingReferences}
+                mentionItems={mentionItems}
+                isLoadingMentions={isLoadingMentions}
+                mentionGroupHints={mentionGroupHints as any}
+                onMentionQueryChange={onMentionQueryChange}
                 placeholder="Edit your message..."
-                autoFocus
               />
               <div className="flex gap-2">
                 <Button
@@ -254,7 +314,29 @@ const MemoMessage = React.memo(
                       message.isStreaming && "streaming-message streaming-active",
                     )}
                   >
-                    <Streamdown components={STREAMDOWN_COMPONENTS}>{message.content}</Streamdown>
+                    {message.role === "user" && message.references?.length ? (
+                      // Mentions are rendered as chips instead of markdown so the referenced
+                      // entity stays recognisable after sending.
+                      <p className="whitespace-pre-wrap break-words">
+                        {splitByMentions(message.content, message.references).map(
+                          (segment, index) =>
+                            segment.reference ? (
+                              <MentionChip
+                                key={index}
+                                reference={segment.reference}
+                                text={segment.text}
+                                missing={missingReferenceKeys?.has(
+                                  `${segment.reference.type}:${segment.reference.id}`,
+                                )}
+                              />
+                            ) : (
+                              <React.Fragment key={index}>{segment.text}</React.Fragment>
+                            ),
+                        )}
+                      </p>
+                    ) : (
+                      <Streamdown components={STREAMDOWN_COMPONENTS}>{message.content}</Streamdown>
+                    )}
                   </div>
                   {message.tools && message.tools.length > 0 && (
                     <div className="space-y-3">
@@ -286,6 +368,12 @@ const MemoMessage = React.memo(
     if (prevProps.editingMessageId !== nextProps.editingMessageId) return false;
     if (prevProps.editingContent !== nextProps.editingContent) return false;
     if (prevProps.isLoading !== nextProps.isLoading) return false;
+    // New Set identity means a reference's existence changed - chips must repaint.
+    if (prevProps.missingReferenceKeys !== nextProps.missingReferenceKeys) return false;
+    // The edit box needs fresh mention data and reference state while it is open.
+    if (prevProps.editingReferences !== nextProps.editingReferences) return false;
+    if (prevProps.mentionItems !== nextProps.mentionItems) return false;
+    if (prevProps.isLoadingMentions !== nextProps.isLoadingMentions) return false;
 
     // For filePayloads, only compare keys (not the actual content)
     const prevKeys = Object.keys(prevProps.filePayloads || {})
@@ -337,6 +425,8 @@ function AgentInterfaceContent({
     editingMessageId,
     editingContent,
     setEditingContent,
+    editingReferences,
+    setEditingReferences,
     handleEditMessage,
     handleCancelEdit,
     handleSaveEdit,
@@ -387,6 +477,66 @@ function AgentInterfaceContent({
   );
 
   const [input, setInput] = React.useState("");
+  const [references, setReferences] = React.useState<MessageReference[]>([]);
+
+  // The run list is searched server-side, so the popover query is pushed down to it.
+  const [mentionQuery, setMentionQuery] = useState("");
+  const debouncedMentionQuery = useDebouncedValue(mentionQuery, MENTION_SEARCH_DEBOUNCE_MS);
+
+  const { tools, isLoading: isLoadingTools } = useAllToolsForMentions();
+  const { systems, isLoading: isLoadingSystems } = useAllSystemsForMentions();
+  const { runs, isLoading: isLoadingRuns } = useRunsForMentions(debouncedMentionQuery);
+
+  const handleMentionQueryChange = useCallback((query: string | null) => {
+    setMentionQuery(query ?? "");
+  }, []);
+
+  // Every reference ever sent in this conversation, so deleted targets can be flagged.
+  const transcriptReferences = useMemo(
+    () => messages.flatMap((message) => message.references ?? []),
+    [messages],
+  );
+  const missingReferenceKeys = useMissingReferences(transcriptReferences);
+
+  const mentionItems = useMemo<MentionItem[]>(() => {
+    const toolItems: MentionItem[] = tools.map((tool) => ({
+      type: "tool",
+      id: tool.id,
+      label: tool.name || tool.id,
+      description: tool.instruction || undefined,
+    }));
+
+    const systemItems: MentionItem[] = systems.map((system) => ({
+      type: "system",
+      id: system.id,
+      label: system.name || system.id,
+      description: system.url || undefined,
+      icon: system.icon || undefined,
+    }));
+
+    const runItems: MentionItem[] = runs.map((run) => ({
+      type: "run",
+      id: run.runId,
+      label: run.toolId || run.runId,
+      referenceLabel: `${run.toolId || "run"} · ${run.status}`,
+      status: run.status,
+      description: `${run.status} · ${formatRunAge(run.metadata?.startedAt)}`,
+    }));
+
+    return [...toolItems, ...systemItems, ...runItems];
+  }, [tools, systems, runs]);
+
+  const isLoadingMentions = isLoadingTools || isLoadingSystems || isLoadingRuns;
+
+  // Text is the source of truth: deleting "@customer-sync" by hand drops the reference too.
+  const handleInputChange = useCallback((next: string) => {
+    setInput(next);
+    setReferences((prev) => (prev.length ? reconcileReferences(next, prev) : prev));
+  }, []);
+
+  const handleMentionSelect = useCallback((item: MentionItem) => {
+    setReferences((prev) => dedupeReferences([...prev, mentionItemToReference(item)]));
+  }, []);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const scrollTriggerRef = useRef<ScrollToBottomTriggerRef>(null);
@@ -478,10 +628,12 @@ function AgentInterfaceContent({
   const onSendMessage = useCallback(async () => {
     if (!input.trim() || input.length > MAX_MESSAGE_LENGTH) return;
     const content = input;
+    const sentReferences = reconcileReferences(content, references);
     setInput("");
+    setReferences([]);
     scrollTriggerRef.current?.scrollToBottom();
-    await handleSendMessage(content);
-  }, [input, handleSendMessage]);
+    await handleSendMessage(content, sentReferences.length ? sentReferences : undefined);
+  }, [input, references, handleSendMessage]);
 
   const handleStopStreaming = useCallback(() => {
     stopStreaming();
@@ -566,6 +718,13 @@ function AgentInterfaceContent({
                     handleSaveEdit={handleSaveEdit}
                     handleCancelEdit={handleCancelEdit}
                     filePayloads={filePayloads}
+                    missingReferenceKeys={missingReferenceKeys}
+                    editingReferences={editingReferences}
+                    setEditingReferences={setEditingReferences}
+                    mentionItems={mentionItems}
+                    isLoadingMentions={isLoadingMentions}
+                    mentionGroupHints={MENTION_GROUP_HINTS}
+                    onMentionQueryChange={handleMentionQueryChange}
                   />
                 ))}
             </>
@@ -577,7 +736,13 @@ function AgentInterfaceContent({
 
       <AgentInputArea
         value={input}
-        onChange={setInput}
+        onChange={handleInputChange}
+        mentionItems={mentionItems}
+        isLoadingMentions={isLoadingMentions}
+        mentionGroupHints={MENTION_GROUP_HINTS}
+        onMentionSelect={handleMentionSelect}
+        onMentionQueryChange={handleMentionQueryChange}
+        references={references}
         onSend={onSendMessage}
         onStop={handleStopStreaming}
         isLoading={isLoading}

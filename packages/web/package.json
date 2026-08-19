@@ -9,6 +9,7 @@
     "start-local": "dotenv -e .env.local -- next start -p ${WEB_PORT:-3001}",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
     "type-check-strict": "tsc --noEmit --project tsconfig.ci.json"
   },
   "dependencies": {

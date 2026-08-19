@@ -3,6 +3,7 @@ import {
   ExecutionFileEnvelope,
   Message,
   ConnectionProtocol,
+  MessageReference,
   SuperglueClient,
   Tool,
 } from "@superglue/shared";
@@ -173,6 +174,7 @@ export interface AgentRequest {
   playgroundDraft?: DraftLookup;
   systemPlaygroundContext?: SystemPlaygroundContext;
   accessRulesContext?: AccessRulesContext;
+  references?: MessageReference[];
 }
 
 export interface ValidatedAgentRequest {
@@ -189,6 +191,7 @@ export interface ValidatedAgentRequest {
   playgroundDraft?: DraftLookup;
   systemPlaygroundContext?: SystemPlaygroundContext;
   accessRulesContext?: AccessRulesContext;
+  references?: MessageReference[];
 }
 
 export interface PrepareMessagesResult {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Message, ToolCall } from "@superglue/shared";
+import { Message, MessageReference, ToolCall } from "@superglue/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UseAgentMessagesReturn } from "./types";
 import {
@@ -17,6 +17,7 @@ export function useAgentMessages(
   const [isLoading, setIsLoading] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
+  const [editingReferences, setEditingReferences] = useState<MessageReference[]>([]);
   const messagesRef = useRef<Message[]>(messages);
 
   useEffect(() => {
@@ -408,14 +409,20 @@ export function useAgentMessages(
     [stopDrip, streamDripBufferRef],
   );
 
-  const handleEditMessage = useCallback((messageId: string, content: string) => {
-    setEditingMessageId(messageId);
-    setEditingContent(content);
-  }, []);
+  const handleEditMessage = useCallback(
+    (messageId: string, content: string, references?: MessageReference[]) => {
+      setEditingMessageId(messageId);
+      setEditingContent(content);
+      // Seeded from the original message so its mentions survive the edit round trip.
+      setEditingReferences(references ?? []);
+    },
+    [],
+  );
 
   const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null);
     setEditingContent("");
+    setEditingReferences([]);
   }, []);
 
   const findAndResumeMessageWithTool = useCallback(
@@ -452,6 +459,8 @@ export function useAgentMessages(
     setEditingMessageId,
     editingContent,
     setEditingContent,
+    editingReferences,
+    setEditingReferences,
     handleEditMessage,
     handleCancelEdit,
     findAndResumeMessageWithTool,

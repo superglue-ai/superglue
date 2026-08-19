@@ -1,0 +1,270 @@
+import { describe, expect, it } from "vitest";
+import type { MessageReference } from "@superglue/shared";
+import {
+  dedupeReferences,
+  isInsideMentionToken,
+  sanitizeReferences,
+  findMentionQuery,
+  findTokenAt,
+  insertMention,
+  mentionToken,
+  mentionTokenText,
+  reconcileReferences,
+  scanMentionTokens,
+  splitByMentions,
+} from "./mentions";
+
+const toolRef: MessageReference = { type: "tool", id: "customer-sync", label: "Customer Sync" };
+const systemRef: MessageReference = { type: "system", id: "public_api_3", label: "Public API 3" };
+const runRef: MessageReference = {
+  type: "run",
+  id: "4d19f789-cd0d-4430-b2e3-ac859127feac",
+  label: "customer-sync · FAILED",
+  status: "FAILED",
+};
+
+describe("findMentionQuery", () => {
+  it("should detect the query when the caret sits inside an @ token", () => {
+    expect(findMentionQuery("Why did @cust", 13)).toEqual({ start: 8, query: "cust" });
+  });
+
+  it("should detect a bare @ at the start of the text", () => {
+    expect(findMentionQuery("@", 1)).toEqual({ start: 0, query: "" });
+  });
+
+  it("should return null when there is no @ before the caret", () => {
+    expect(findMentionQuery("no mention here", 15)).toBeNull();
+  });
+
+  it("should not trigger when the @ is part of a word, like an email address", () => {
+    const text = "mail me at max@firma.de";
+    expect(findMentionQuery(text, text.length)).toBeNull();
+  });
+
+  it("should close once the user types whitespace after the query", () => {
+    expect(findMentionQuery("@cust omer", 10)).toBeNull();
+  });
+
+  it("should return null when the caret is out of bounds", () => {
+    expect(findMentionQuery("@cust", -1)).toBeNull();
+    expect(findMentionQuery("@cust", 99)).toBeNull();
+  });
+});
+
+describe("mentionToken", () => {
+  it("should use the id for tools", () => {
+    expect(mentionToken(toolRef)).toBe("customer-sync");
+  });
+
+  it("should use the display name for systems", () => {
+    expect(mentionToken(systemRef)).toBe("Public API 3");
+  });
+
+  it("should fall back to the id when a system has no label", () => {
+    expect(mentionToken({ type: "system", id: "gmail", label: "" })).toBe("gmail");
+  });
+
+  it("should shorten run UUIDs behind a run: prefix", () => {
+    expect(mentionToken(runRef)).toBe("run:4d19f789");
+  });
+
+  it("should prepend the trigger in mentionTokenText", () => {
+    expect(mentionTokenText(toolRef)).toBe("@customer-sync");
+  });
+});
+
+describe("insertMention", () => {
+  it("should replace the in-progress token and place the caret after it", () => {
+    const result = insertMention("Why did @cust fail?", 8, 13, toolRef);
+    expect(result.text).toBe("Why did @customer-sync  fail?");
+    expect(result.caret).toBe("Why did @customer-sync ".length);
+  });
+
+  it("should insert multi-word system tokens when the label contains spaces", () => {
+    const result = insertMention("Is @pub up?", 3, 7, systemRef);
+    expect(result.text).toBe("Is @Public API 3  up?");
+  });
+});
+
+describe("reconcileReferences", () => {
+  it("should keep references whose token still appears in the text", () => {
+    const kept = reconcileReferences("Why did @customer-sync fail?", [toolRef, runRef]);
+    expect(kept).toEqual([toolRef]);
+  });
+
+  it("should drop every reference when all tokens were deleted", () => {
+    expect(reconcileReferences("nothing left", [toolRef, systemRef, runRef])).toEqual([]);
+  });
+
+  it("should match runs by their shortened token", () => {
+    expect(reconcileReferences("see @run:4d19f789 please", [runRef])).toEqual([runRef]);
+  });
+});
+
+describe("dedupeReferences", () => {
+  it("should remove duplicate references while keeping the first occurrence", () => {
+    expect(dedupeReferences([toolRef, systemRef, toolRef])).toEqual([toolRef, systemRef]);
+  });
+
+  it("should keep different types with the same id apart", () => {
+    const asSystem: MessageReference = { type: "system", id: "customer-sync", label: "X" };
+    expect(dedupeReferences([toolRef, asSystem])).toEqual([toolRef, asSystem]);
+  });
+});
+
+describe("splitByMentions", () => {
+  it("should return one plain segment when there are no references", () => {
+    expect(splitByMentions("hello", [])).toEqual([{ text: "hello" }]);
+  });
+
+  it("should tag mention tokens with their reference", () => {
+    expect(splitByMentions("Why did @customer-sync fail?", [toolRef])).toEqual([
+      { text: "Why did " },
+      { text: "@customer-sync", reference: toolRef },
+      { text: " fail?" },
+    ]);
+  });
+
+  it("should prefer the longer token when one token is a prefix of another", () => {
+    const short: MessageReference = { type: "tool", id: "sync", label: "sync" };
+    const long: MessageReference = { type: "tool", id: "sync-orders", label: "sync-orders" };
+    expect(splitByMentions("@sync-orders", [short, long])).toEqual([
+      { text: "@sync-orders", reference: long },
+    ]);
+  });
+
+  it("should tag every occurrence when the same token appears twice", () => {
+    const segments = splitByMentions("@customer-sync and @customer-sync", [toolRef]);
+    expect(segments.filter((s) => s.reference)).toHaveLength(2);
+  });
+});
+
+describe("findTokenAt", () => {
+  const text = "Why did @customer-sync fail?";
+
+  it("should return the token range when the index is inside a token", () => {
+    expect(findTokenAt(text, [toolRef], 12)).toEqual({
+      start: 8,
+      end: 22,
+      reference: toolRef,
+    });
+  });
+
+  it("should hit at the first character and miss right after the token", () => {
+    expect(findTokenAt(text, [toolRef], 8)).not.toBeNull();
+    expect(findTokenAt(text, [toolRef], 22)).toBeNull();
+  });
+
+  it("should return null in plain text", () => {
+    expect(findTokenAt(text, [toolRef], 2)).toBeNull();
+  });
+
+  it("should find the second occurrence of a repeated token", () => {
+    const twice = "@customer-sync then @customer-sync";
+    expect(findTokenAt(twice, [toolRef], 25)).toEqual({
+      start: 20,
+      end: 34,
+      reference: toolRef,
+    });
+  });
+});
+
+// Reproduction tests for the review findings. Written before the fix - each of these
+// fails on the original implementation and pins the corrected behavior.
+describe("findTokenAt review findings", () => {
+  const short: MessageReference = { type: "tool", id: "sync", label: "sync" };
+  const long: MessageReference = { type: "tool", id: "sync-orders", label: "sync-orders" };
+
+  it("should return the longer token when a shorter reference is its prefix", () => {
+    // refs deliberately ordered short-first - the order that triggered the bug
+    const hit = findTokenAt("run @sync-orders now", [short, long], 6);
+    expect(hit).toEqual({ start: 4, end: 16, reference: long });
+  });
+
+  it("should not match a token inside an email address", () => {
+    const ref: MessageReference = { type: "tool", id: "customer-sync", label: "customer-sync" };
+    expect(findTokenAt("mail ops@customer-sync.io", [ref], 12)).toBeNull();
+  });
+});
+
+describe("reconcileReferences review findings", () => {
+  const short: MessageReference = { type: "tool", id: "sync", label: "sync" };
+  const long: MessageReference = { type: "tool", id: "sync-orders", label: "sync-orders" };
+
+  it("should drop a reference whose token is only a prefix of another token", () => {
+    expect(reconcileReferences("run @sync-orders now", [short, long])).toEqual([long]);
+  });
+
+  it("should not keep a reference that only appears inside an email address", () => {
+    expect(reconcileReferences("mail ops@sync.io please", [short])).toEqual([]);
+  });
+});
+
+describe("sanitizeReferences", () => {
+  it("should drop malformed entries and keep valid ones", () => {
+    const input = [
+      null,
+      42,
+      { id: "no-type" },
+      { type: "weird", id: "bad-type" },
+      { type: "tool", id: "" },
+      { type: "tool", id: "customer-sync", label: "Customer Sync" },
+    ];
+    expect(sanitizeReferences(input)).toEqual([
+      {
+        type: "tool",
+        id: "customer-sync",
+        label: "Customer Sync",
+        status: undefined,
+        icon: undefined,
+      },
+    ]);
+  });
+
+  it("should fall back to the id when the label is missing", () => {
+    expect(sanitizeReferences([{ type: "system", id: "gmail" }])[0].label).toBe("gmail");
+  });
+
+  it("should return an empty array for non-array input", () => {
+    expect(sanitizeReferences(undefined)).toEqual([]);
+    expect(sanitizeReferences("not an array")).toEqual([]);
+  });
+});
+
+describe("isInsideMentionToken", () => {
+  const text = "Why did @customer-sync fail?";
+  // token spans [8, 22)
+
+  it("should be true for a caret strictly inside the token", () => {
+    expect(isInsideMentionToken(text, [toolRef], 12)).toBe(true);
+    expect(isInsideMentionToken(text, [toolRef], 21)).toBe(true);
+  });
+
+  it("should be false at the token edges so re-selection after the token still works", () => {
+    expect(isInsideMentionToken(text, [toolRef], 8)).toBe(false);
+    expect(isInsideMentionToken(text, [toolRef], 22)).toBe(false);
+  });
+
+  it("should be false in plain text and with no references", () => {
+    expect(isInsideMentionToken(text, [toolRef], 3)).toBe(false);
+    expect(isInsideMentionToken(text, [], 12)).toBe(false);
+  });
+});
+
+describe("equal-token references (same display name)", () => {
+  const sysA: MessageReference = { type: "system", id: "gmail_eu", label: "Gmail" };
+  const sysB: MessageReference = { type: "system", id: "gmail_us", label: "Gmail" };
+
+  it("should keep both same-named references when their token appears twice", () => {
+    expect(reconcileReferences("@Gmail and @Gmail ", [sysA, sysB])).toEqual([sysA, sysB]);
+  });
+
+  it("should assign the occurrences to distinct references", () => {
+    const ids = scanMentionTokens("@Gmail and @Gmail", [sysA, sysB]).map((m) => m.reference.id);
+    expect(new Set(ids)).toEqual(new Set(["gmail_eu", "gmail_us"]));
+  });
+
+  it("should drop only the surplus reference when one occurrence remains", () => {
+    expect(reconcileReferences("only @Gmail left", [sysA, sysB])).toEqual([sysA]);
+  });
+});

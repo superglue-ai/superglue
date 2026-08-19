@@ -1,4 +1,4 @@
-import { ExecutionFileEnvelope, Message, ToolCall } from "@superglue/shared";
+import { ExecutionFileEnvelope, Message, MessageReference, ToolCall } from "@superglue/shared";
 import { Conversation } from "../ConversationHistory";
 import { AgentType } from "@/src/lib/agent/registries/agent-registry";
 import {
@@ -38,7 +38,9 @@ export interface UseAgentMessagesReturn {
   setEditingMessageId: React.Dispatch<React.SetStateAction<string | null>>;
   editingContent: string;
   setEditingContent: React.Dispatch<React.SetStateAction<string>>;
-  handleEditMessage: (messageId: string, content: string) => void;
+  editingReferences: MessageReference[];
+  setEditingReferences: React.Dispatch<React.SetStateAction<MessageReference[]>>;
+  handleEditMessage: (messageId: string, content: string, references?: MessageReference[]) => void;
   handleCancelEdit: () => void;
   findAndResumeMessageWithTool: (toolCallId: string) => Message | null;
 }
@@ -70,6 +72,7 @@ export interface UseAgentRequestReturn {
       hiddenStarterMessage?: string;
       hideUserMessage?: boolean;
       resumeToolCallId?: string;
+      references?: MessageReference[];
     },
   ) => Promise<void>;
   resetFileTracking: () => void;
