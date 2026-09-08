@@ -6,8 +6,8 @@ export interface AuthContext {
   backendUrl: string;
 }
 
-/** Constant-time comparison for bearer tokens (CWE-208). */
-export function tokensMatchConstantTime(token: string, expected: string): boolean {
+/** Constant-time comparison for bearer tokens. */
+function tokensMatchConstantTime(token: string, expected: string): boolean {
   const tokenBuf = Buffer.from(token);
   const expectedBuf = Buffer.from(expected);
   if (tokenBuf.length !== expectedBuf.length) return false;
