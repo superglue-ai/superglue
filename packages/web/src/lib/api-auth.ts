@@ -1,8 +1,17 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 
 export interface AuthContext {
   token: string;
   backendUrl: string;
+}
+
+/** Constant-time comparison for bearer tokens (CWE-208). */
+export function tokensMatchConstantTime(token: string, expected: string): boolean {
+  const tokenBuf = Buffer.from(token);
+  const expectedBuf = Buffer.from(expected);
+  if (tokenBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(tokenBuf, expectedBuf);
 }
 
 export async function authenticateNextJSApiRequest(
@@ -34,7 +43,7 @@ export async function authenticateNextJSApiRequest(
     return null;
   }
 
-  if (token !== envToken) return null;
+  if (!tokensMatchConstantTime(token, envToken)) return null;
 
   const backendUrl = process.env.API_ENDPOINT || "http://localhost:3002";
   return {
