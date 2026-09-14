@@ -95,7 +95,7 @@ export async function callAxios(
       const durationMs = Date.now() - startTs;
 
       if (response.status === 429) {
-        let waitTime = 0;
+        let waitTime = NaN;
         if (response.headers["retry-after"]) {
           const retryAfter = response.headers["retry-after"];
           if (/^\d+$/.test(retryAfter)) {
@@ -104,7 +104,11 @@ export async function callAxios(
             const retryDate = new Date(retryAfter);
             waitTime = retryDate.getTime() - Date.now();
           }
-        } else {
+        }
+        // A missing, unparseable, zero or already-elapsed Retry-After gives no usable delay.
+        // Fall back to exponential backoff so the retry loop always waits and the
+        // rate-limit wait budget below is actually consumed.
+        if (!Number.isFinite(waitTime) || waitTime <= 0) {
           waitTime = Math.min(
             Math.pow(4, rateLimitRetryCount) * 1000 + Math.random() * 100,
             3600000,
