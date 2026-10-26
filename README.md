@@ -7,9 +7,9 @@
 
 ## Why we're deprecating it
 
-This repo used to be the core of superglue. Over the last months almost all of our work went into the hosted version, and the two drifted apart a lot. Much of what superglue does today isn't in here anymore (scheduling, org and user management, system discovery, run history and more), and keeping a stripped down copy in sync was taking time without giving anyone much in return.
+superglue started as a general purpose integration tool, and that's what this repo still is. Since then we've focused on implementation projects: moving a company onto a new system like NetSuite, Sage Intacct or Business Central, migrating the legacy data, and keeping everything in sync after go-live. Most of what we build for that lives in the hosted version and wouldn't make much sense as a generic integration engine.
 
-So we'd rather be honest about it and point you to the version we work on every day.
+The two versions drifted apart a lot along the way, and keeping a stripped down copy in sync was taking time without giving anyone much in return. We'd rather point you to the version we work on every day.
 
 ## Where to go instead
 
