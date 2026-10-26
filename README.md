@@ -2,100 +2,27 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
-<h2 align="center">superglue's AI agents connect, migrate and implement enterprise systems. Cloud-hosted or on your own infrastructure.</h2>
-<div align="center">
-  
-[![Y Combinator](https://img.shields.io/badge/Y%20Combinator-W25-orange?style=flat-square)](https://www.ycombinator.com/companies/superglue)
-[![Client SDK](https://img.shields.io/npm/v/@superglue/client?style=flat-square&logo=npm)](https://www.npmjs.com/package/@superglue/client)
-[![Docker](https://img.shields.io/docker/pulls/superglueai/superglue?style=flat-square&logo=Docker)](https://hub.docker.com/r/superglueai/superglue)
-[![Weave Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fapp.workweave.ai%2Fapi%2Frepository%2Fbadge%2Forg_0S2o9PLamHvNsTjHbszc38vC%2F914997268&cacheSeconds=3600&labelColor=#EC6341)](https://app.workweave.ai/reports/repository/org_0S2o9PLamHvNsTjHbszc38vC/914997268)
+> [!IMPORTANT]
+> **This repository is deprecated and no longer maintained.** superglue lives on as a hosted product. Sign up at [app.superglue.cloud](https://app.superglue.cloud) or read more at [superglue.ai](https://superglue.ai).
 
-</div>
+## Why we're deprecating it
 
-## What is superglue?
+superglue has changed a lot since we first put this code out. Our focus moved over time, and almost all of our work now goes into the hosted version. The two drifted apart along the way, so this repo no longer reflects what superglue is or does today.
 
-[superglue](https://superglue.ai) learns how your systems work from your company's knowledge. It performs the implementation that normally requires human coordination and engineering work.
+Keeping a stripped down copy in sync was taking time without giving anyone much in return. We'd rather point you to the version we work on every day.
 
-- Implement NetSuite, Sage Intacct, SAP, Business Central or Acumatica in days. Agents map and migrate legacy data, configure the system, and keep data in sync post go-live.
-- Connect ERP, CRM, databases, and internal systems to AI platforms like Claude. Create governed data access for AI agents and track data usage across your org.
-- Connect customer systems, import historical data and get new integrations live in hours. Let agents manage the entire implementation process end-to-end.
+## Where to go instead
 
-## Some example usecases
+- **Use superglue:** sign up at [app.superglue.cloud](https://app.superglue.cloud). You can start with a free trial.
+- **Run it in your own infrastructure:** we still deploy superglue on customer infrastructure for enterprise teams. [Book a call](https://cal.com/superglue/superglue-demo) and we'll walk through it.
+- **Docs:** [docs.superglue.cloud](https://docs.superglue.cloud)
 
-| Scenario                                                 | Without superglue                                                                                | With superglue                                                                        |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Sage Intacct migration for a client                      | Excel transforms by hand, 10-15 cleanup iterations per GL history, 140 hours on a single project | Describe the mapping in plain English, 185 accounts migrated in under 1 hour          |
-| Connect internal systems to AI use cases                 | Custom programming per connection, weeks per integration                                         | 100+ AI use cases connected in weeks, 9 teams building their own tools                |
-| Customer onboarding across diverse tech stacks           | Build and maintain a separate connector per CRM, notetaker, ticketing system                     | One integration layer, onboarding in days instead of weeks                            |
-| University data flows across CRM, fundraising, databases | Every change requires a developer, months-long testing cycles                                    | Business users own implementations, months reduced to days, full governance preserved |
+## If you're running this code today
 
-## Supported systems
+Nothing breaks. The code stays here and the license stays the same, so an existing deployment keeps running. We won't ship new features, bug fixes or security patches to this repo though, and we won't be reviewing new issues or pull requests.
 
-superglue works with any REST, GraphQL, SOAP, file-based, or database system.
-
-**ERP & Accounting:** Sage Intacct, NetSuite, SAP, Dynamics 365, Business Central, Acumatica, QuickBooks, Xero
-
-**CRM & Sales:** Salesforce, HubSpot, Attio, Gong
-
-**Databases:** Postgres, MongoDB, Microsoft SQL Server, Redis, Supabase, PlanetScale, Snowflake, Databricks
-
-**Project Management:** Jira, Asana, Monday, ClickUp, Linear, Trello, Notion, Confluence
-
-**Communication:** Slack, Gmail, Zoom, Discord, Telegram, WhatsApp, Intercom, Twilio
-
-**Payments & Billing:** Stripe, PayPal, Square, Adyen, SumUp, Razorpay, Plaid, Ramp
-
-**E-commerce:** Shopify, BigCommerce, PrestaShop, Squarespace
-
-**HR & Payroll:** Workday, Gusto
-
-**DevOps & Cloud:** AWS, Google Cloud, Firebase, GitHub, GitLab, Bitbucket, CircleCI, Heroku, Netlify, Vercel
-
-**Analytics & Monitoring:** Google Analytics, Amplitude, Segment, Mixpanel, Looker, PostHog, Datadog, Sentry
-
-**Marketing & Ads:** Google Ads, Meta Ads, LinkedIn, Mailchimp, Klaviyo
-
-**File Systems & Protocols:** FTP, SFTP, SMB, Google Drive, Google Sheets, Dropbox, Nextcloud
-
-**Support & Ticketing:** Zendesk, Freshdesk, Help Scout, ServiceNow, PagerDuty
-
-**Content & CMS:** WordPress, Contentful, Sanity, Prismic, Figma
-
-**Identity & Auth:** Auth0, Okta
-
-**AI & LLM:** OpenAI, Anthropic, Gemini, Hugging Face, Pinecone, Elasticsearch, Algolia
-
-**Construction & Vertical:** Procore, Coupa, DocuSign
-
-... and any system with an API, database, or file connection.
-
-## Quick Start
-
-### Option 1: Sign up to [superglue](https://app.superglue.cloud) and start building immediately
-
-### Option 2: [Self-host](https://docs.superglue.cloud/getting-started/setup#self-hosted) for maximum control and customization
-
-## 📖 Documentation
-
-For detailed documentation, visit [docs.superglue.cloud](https://docs.superglue.cloud).
-
-## 🤝 Contributing
-
-We love contributions! Before making contributions, we ask that all users read through our [contribution guide](https://github.com/superglue-ai/superglue/blob/main/CONTRIBUTING.md) and sign the Contributor License Agreement (CLA). When creating new issues or pull requests, please ensure compliance with the contribution guide.
-
-[//]: # "To contribute to the docs, check out the /docs folder."
+If you want help moving over to the hosted version, or you'd like to keep self-hosting with support from us, [get in touch](https://cal.com/superglue/superglue-demo).
 
 ## License
 
-superglue is FSL licensed. The superglue client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
-
-## Next Steps
-
-- [Join our Discord](https://discord.gg/vUKnuhHtfW)
-- [Read our docs](https://docs.superglue.cloud/)
-- [Talk to us](https://cal.com/superglue/superglue-demo)
-
-Text us! <br>
-[![Twitter Adina](https://img.shields.io/twitter/follow/adinagoerres?style=flat-square&logo=X)](https://twitter.com/adinagoerres)
-[![Twitter Stefan](https://img.shields.io/twitter/follow/sfaistenauer?style=flat-square&logo=X)](https://twitter.com/sfaistenauer)
-[![Twitter](https://img.shields.io/twitter/follow/superglue_d?style=social)](https://twitter.com/superglue_d)
+superglue is FSL licensed (FSL-1.1-Apache-2.0). The client SDKs are MIT licensed. See [LICENSE](LICENSE) for details.
