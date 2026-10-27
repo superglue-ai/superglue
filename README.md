@@ -2,6 +2,8 @@
   <img src="https://github.com/user-attachments/assets/be0e65d4-dcd8-4133-9841-b08799e087e7" width="350" alt="superglue_logo_white">
 </p>
 
+superglue runs enterprise software implementations with AI agents. The agents migrate data out of legacy systems, configure ERPs such as NetSuite, Sage Intacct and Workday, and build and run the integrations that keep systems in sync after go-live. superglue is for implementation consultants and partner firms, and it runs in our cloud or on the customer's own infrastructure.
+
 > [!IMPORTANT]
 > **This repository is deprecated and no longer maintained.** superglue lives on as a hosted product. Sign up at [app.superglue.cloud](https://app.superglue.cloud) or read more at [superglue.ai](https://superglue.ai).
 
