@@ -4,7 +4,7 @@
   "exports": "./workflow-executor.ts",
   "tasks": {
     "check": "deno check workflow-executor.ts",
-    "run": "deno run --allow-net --allow-env --allow-sys=hostname --deny-read --deny-write --deny-run workflow-executor.ts"
+    "run": "deno run --allow-net --allow-import=cdn.sheetjs.com --allow-env --allow-sys=hostname --deny-read --deny-write --deny-run workflow-executor.ts"
   },
   "imports": {
     "@msgpack/msgpack": "npm:@msgpack/msgpack@^3.0.0",
@@ -14,7 +14,7 @@
     "ssh2-sftp-client": "npm:ssh2-sftp-client@9.1.0",
     "basic-ftp": "npm:basic-ftp@5.3.0",
     "@awo00/smb2": "npm:@awo00/smb2@1.0.5",
-    "xlsx": "npm:xlsx@0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs",
     "js-yaml": "npm:js-yaml@4.1.0",
     "jszip": "npm:jszip@3.10.1",
     "papaparse": "npm:papaparse@5.4.1",

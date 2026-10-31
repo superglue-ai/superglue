@@ -27,8 +27,7 @@
     "npm:sax@1.4.1": "1.4.1",
     "npm:ssh2-sftp-client@*": "12.1.1",
     "npm:stream-json@1.8.0": "1.8.0",
-    "npm:unpdf@1.4.0": "1.4.0",
-    "npm:xlsx@0.18.5": "0.18.5"
+    "npm:unpdf@1.4.0": "1.4.0"
   },
   "jsr": {
     "@db/postgres@0.19.5": {
@@ -270,9 +269,6 @@
         "event-target-shim"
       ]
     },
-    "adler-32@1.3.1": {
-      "integrity": "sha512-ynZ4w/nUUv5rrsR8UUGoe1VC9hZj6V5hU9Qw1HlMDJGEJw5S7TfTErWTjMys6M7vr0YWcPqs3qAr4ss0nDfP+A=="
-    },
     "agent-base@7.1.4": {
       "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="
     },
@@ -358,18 +354,8 @@
         "run-applescript"
       ]
     },
-    "cfb@1.2.2": {
-      "integrity": "sha512-KfdUZsSOw19/ObEWasvBP/Ac4reZvAGauZhs6S/gqNhXhI7cKwvlH7ulj+dOEYnca4bm4SGo8C1bTAQvnTjgQA==",
-      "dependencies": [
-        "adler-32",
-        "crc-32"
-      ]
-    },
     "cluster-key-slot@1.1.2": {
       "integrity": "sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA=="
-    },
-    "codepage@1.15.0": {
-      "integrity": "sha512-3g6NUTPd/YtuuGrhMnOMRjFc+LJw/bnMp3+0r/Wcz3IXUuCosKRJvMphm5+Q+bvTVGcJJuRvVLuYba+WojaFaA=="
     },
     "commander@11.1.0": {
       "integrity": "sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ=="
@@ -393,10 +379,6 @@
         "nan"
       ],
       "scripts": true
-    },
-    "crc-32@1.2.2": {
-      "integrity": "sha512-ROmzCKrTnOwybPcJApAA6WBWij23HVfGVNKqqrZpuyZOHqK2CwHSvpGuyt/UNNvaIjEd8X5IFGp4Mh+Ie1IHJQ==",
-      "bin": true
     },
     "css-select@5.2.2": {
       "integrity": "sha512-TizTzUddG/xYLA3NXodFM0fSbNizXjOKhqiQQwvhlspadZokn1KDy0NZFS0wuEubIYAV5/c1/lAr0TaaFXEXzw==",
@@ -494,9 +476,6 @@
     },
     "fast-uri@3.1.0": {
       "integrity": "sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA=="
-    },
-    "frac@1.1.2": {
-      "integrity": "sha512-w/XBfkibaTl3YDqASwfDUqkna4Z2p9cFSr1aHDt0WoMTECnRfBOv2WArlZILlqgWlmdIlALXGpM2AOhEk5W3IA=="
     },
     "he@1.2.0": {
       "integrity": "sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==",
@@ -896,12 +875,6 @@
     "sprintf-js@1.1.3": {
       "integrity": "sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA=="
     },
-    "ssf@0.11.2": {
-      "integrity": "sha512-+idbmIXoYET47hH+d7dfm2epdOMUDjqcB4648sTZ+t2JwoyBFL/insLfB/racrDmsKB3diwsDA696pZMieAC5g==",
-      "dependencies": [
-        "frac"
-      ]
-    },
     "ssh2-sftp-client@12.1.1": {
       "integrity": "sha512-wYVDgwkpcKG2iPGQQ+QR33xkWqLFIaVrYvA+uON4pmxTPaPuB81f1aooUEPN75e/9DCK6rrKYXb6zR6zP3+EtA==",
       "dependencies": [
@@ -988,30 +961,11 @@
       "integrity": "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==",
       "bin": true
     },
-    "wmf@1.0.2": {
-      "integrity": "sha512-/p9K7bEh0Dj6WbXg4JG0xvLQmIadrner1bi45VMJTfnbVHsc7yIajZyoSoK60/dtVBs12Fm6WkUI5/3WAVsNMw=="
-    },
-    "word@0.3.0": {
-      "integrity": "sha512-OELeY0Q61OXpdUfTp+oweA/vtLVg5VDOXh+3he3PNzLGG/y0oylSOC1xRVj0+l4vQ3tj/bB1HVHv1ocXkQceFA=="
-    },
     "wsl-utils@0.1.0": {
       "integrity": "sha512-h3Fbisa2nKGPxCpm89Hk33lBLsnaGBvctQopaBSOW/uIs6FTe1ATyAnKFJrzVs9vpGdsTe73WF3V4lIsk4Gacw==",
       "dependencies": [
         "is-wsl"
       ]
-    },
-    "xlsx@0.18.5": {
-      "integrity": "sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==",
-      "dependencies": [
-        "adler-32",
-        "cfb",
-        "codepage",
-        "crc-32",
-        "ssf",
-        "wmf",
-        "word"
-      ],
-      "bin": true
     },
     "xmlbuilder@10.1.1": {
       "integrity": "sha512-OyzrcFLL/nb6fMGHbiRDuPup9ljBycsdCypwuyg5AAHvyWzGfChJpCXMG88AGTIMFhGZ9RccFN1e6lhg3hkwKg=="
@@ -1019,6 +973,10 @@
     "xtend@4.0.2": {
       "integrity": "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="
     }
+  },
+  "remote": {
+    "https://cdn.sheetjs.com/xlsx-0.20.2/package/types/index.d.ts": "d5886b9467c8dda8ed0821612dcc6fca9f2d832512a8b937b3484d93f3636d1a",
+    "https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs": "a09fb310fce98bc4f53e75ae4854384b49d790bb3b0c15a38e9a93014020dc96"
   },
   "workspace": {
     "dependencies": [
@@ -1033,8 +991,7 @@
       "npm:papaparse@5.4.1",
       "npm:pg@8.11.3",
       "npm:sax@1.4.1",
-      "npm:ssh2-sftp-client@9.1.0",
-      "npm:xlsx@0.18.5"
+      "npm:ssh2-sftp-client@9.1.0"
     ]
   }
 }
