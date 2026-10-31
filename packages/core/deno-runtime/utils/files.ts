@@ -10,7 +10,8 @@ import { gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import * as XLSX from "npm:xlsx@0.18.5";
+// @deno-types="https://cdn.sheetjs.com/xlsx-0.20.2/package/types/index.d.ts"
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs";
 import yaml from "npm:js-yaml@4.1.0";
 import JSZip from "npm:jszip@3.10.1";
 import Papa from "npm:papaparse@5.4.1";
