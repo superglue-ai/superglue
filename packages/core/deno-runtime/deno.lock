@@ -13,8 +13,7 @@
     "npm:@msgpack/msgpack@3": "3.1.3",
     "npm:ajv-formats@3": "3.0.1_ajv@8.18.0",
     "npm:ajv@8": "8.18.0",
-    "npm:basic-ftp@*": "5.3.0",
-    "npm:basic-ftp@5.3.0": "5.3.0",
+    "npm:basic-ftp@6.2.1": "6.2.1",
     "npm:htmlparser2@9.1.0": "9.1.0",
     "npm:ioredis@*": "5.10.1",
     "npm:js-yaml@4.1.0": "4.1.0",
@@ -312,8 +311,8 @@
     "base64-js@1.5.1": {
       "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
     },
-    "basic-ftp@5.3.0": {
-      "integrity": "sha512-5K9eNNn7ywHPsYnFwjKgYH8Hf8B5emh7JKcPaVjjrMJFQQwGpwowEnZNEtHs7DfR7hCZsmaK3VA4HUK0YarT+w=="
+    "basic-ftp@6.2.1": {
+      "integrity": "sha512-bK67isD+lKq46AU8vNtjvMaT2ZqAOAmNCbxUHlFBRD4k15NWxyEjmaKtZPlgce58So4BNTjITGQOVTjL9y0ECA=="
     },
     "bcrypt-pbkdf@1.0.2": {
       "integrity": "sha512-qeFIXtP4MSoi6NLqO12WfqARWWuCKi2Rn/9hJLEmtB5yTNr9DqFWkJRCf2qShWzPeAMRnOgCrq0sg/KLv5ES9w==",
@@ -1024,7 +1023,7 @@
     "dependencies": [
       "npm:@awo00/smb2@1.0.5",
       "npm:@msgpack/msgpack@3",
-      "npm:basic-ftp@5.3.0",
+      "npm:basic-ftp@6.2.1",
       "npm:htmlparser2@9.1.0",
       "npm:ioredis@5.3.2",
       "npm:js-yaml@4.1.0",
