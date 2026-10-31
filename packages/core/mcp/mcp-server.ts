@@ -355,6 +355,41 @@ The portal allows users to authenticate with all available systems that require 
 
 export const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
+/** A session that has sent no request for this long is treated as dead. The
+ *  SDK's StreamableHTTPServerTransport has no idle timeout of its own, and a
+ *  client that opens sessions and never sends DELETE otherwise leaves every
+ *  transport and its tool catalogue in this map for the life of the process. */
+const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const SESSION_SWEEP_INTERVAL_MS = 60 * 1000;
+
+const transportLastUsed = new WeakMap<StreamableHTTPServerTransport, number>();
+
+function touchTransport(transport: StreamableHTTPServerTransport) {
+  transportLastUsed.set(transport, Date.now());
+}
+
+export function reapIdleSessions(now: number = Date.now()): number {
+  const cutoff = now - SESSION_IDLE_TIMEOUT_MS;
+  let reaped = 0;
+
+  for (const [sessionId, transport] of Object.entries(transports)) {
+    if ((transportLastUsed.get(transport) ?? 0) >= cutoff) continue;
+
+    delete transports[sessionId];
+    transport.close().catch((error: unknown) => {
+      logMessage("warn", `MCP: closing idle session ${sessionId} failed: ${error}`, {});
+    });
+    reaped += 1;
+  }
+
+  return reaped;
+}
+
+const sessionReaper = setInterval(reapIdleSessions, SESSION_SWEEP_INTERVAL_MS);
+
+// Do not hold the process open for the sweep alone (tests, CLI runs).
+sessionReaper.unref?.();
+
 export const mcpHandler = async (
   req: IncomingMessage & { body?: any; authInfo?: any },
   res: ServerResponse,
@@ -364,11 +399,13 @@ export const mcpHandler = async (
 
   if (sessionId && transports[sessionId]) {
     transport = transports[sessionId];
+    touchTransport(transport);
   } else if (!sessionId && isInitializeRequest(req.body)) {
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sessionId) => {
         transports[sessionId] = transport;
+        touchTransport(transport);
       },
     });
 
@@ -396,5 +433,6 @@ export const mcpHandler = async (
     return;
   }
 
+  touchTransport(transport);
   await transport.handleRequest(req, res, req.body);
 };
