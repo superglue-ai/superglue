@@ -85,6 +85,9 @@ export class DenoWorker {
         [
           "run",
           "--allow-net",
+          // The Deno runtime loads xlsx from the SheetJS CDN: the npm registry
+          // stopped at 0.18.5, which is the vulnerable copy.
+          "--allow-import=deno.land:443,jsr.io:443,esm.sh:443,raw.esm.sh:443,cdn.jsdelivr.net:443,raw.githubusercontent.com:443,gist.githubusercontent.com:443,cdn.sheetjs.com:443",
           // Defense-in-depth: block well-known cloud metadata endpoints at the
           // Deno permission layer (in addition to the SSRF fetch override).
           // Local/private ranges can't be expressed as CIDRs here and would break
