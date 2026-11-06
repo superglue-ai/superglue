@@ -55,7 +55,7 @@ export type ProtocolOptions = {
 };
 
 /**
- * The default request timeout, in miliseconds.
+ * The default request timeout, in milliseconds.
  */
 export const DEFAULT_REQUEST_TIMEOUT_MSEC = 600000;
 
