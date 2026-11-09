@@ -364,8 +364,31 @@ const SESSION_SWEEP_INTERVAL_MS = 60 * 1000;
 
 const transportLastUsed = new WeakMap<StreamableHTTPServerTransport, number>();
 
+/** A request still being served keeps the session alive on its own: the SDK
+ *  holds a GET open for the life of the client's SSE stream, so "last request
+ *  start" alone cannot tell an abandoned session from a connected one. */
+const transportRequestsInFlight = new WeakMap<StreamableHTTPServerTransport, number>();
+
 function touchTransport(transport: StreamableHTTPServerTransport) {
   transportLastUsed.set(transport, Date.now());
+}
+
+function beginTransportRequest(transport: StreamableHTTPServerTransport) {
+  transportRequestsInFlight.set(
+    transport,
+    (transportRequestsInFlight.get(transport) ?? 0) + 1,
+  );
+}
+
+function endTransportRequest(transport: StreamableHTTPServerTransport) {
+  const remaining = (transportRequestsInFlight.get(transport) ?? 1) - 1;
+  if (remaining > 0) {
+    transportRequestsInFlight.set(transport, remaining);
+    return;
+  }
+  transportRequestsInFlight.delete(transport);
+  // The session was in use until this response finished, whenever it started.
+  touchTransport(transport);
 }
 
 export function reapIdleSessions(now: number = Date.now()): number {
@@ -373,6 +396,7 @@ export function reapIdleSessions(now: number = Date.now()): number {
   let reaped = 0;
 
   for (const [sessionId, transport] of Object.entries(transports)) {
+    if ((transportRequestsInFlight.get(transport) ?? 0) > 0) continue;
     if ((transportLastUsed.get(transport) ?? 0) >= cutoff) continue;
 
     delete transports[sessionId];
@@ -434,5 +458,10 @@ export const mcpHandler = async (
   }
 
   touchTransport(transport);
-  await transport.handleRequest(req, res, req.body);
+  beginTransportRequest(transport);
+  try {
+    await transport.handleRequest(req, res, req.body);
+  } finally {
+    endTransportRequest(transport);
+  }
 };

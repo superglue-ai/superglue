@@ -1,5 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { createMcpServer, AuthenticateInputSchema } from "./mcp-server.js";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import {
+  createMcpServer,
+  AuthenticateInputSchema,
+  mcpHandler,
+  reapIdleSessions,
+  transports,
+} from "./mcp-server.js";
 import { truncateToolExecutionResult } from "./mcp-server-utils.js";
 
 // Mock dependencies
@@ -272,5 +278,86 @@ describe("truncateToolExecutionResult", () => {
     // Should hit the hard truncate
     expect(output).toContain("... [truncated]");
     expect(output.length).toBeLessThanOrEqual(20100); // limit + truncation message
+  });
+});
+
+describe("reapIdleSessions", () => {
+  const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+  const MINUTE_MS = 60 * 1000;
+
+  const makeReq = (sessionId: string) =>
+    ({ headers: { "mcp-session-id": sessionId }, body: {} }) as any;
+  const makeRes = () => ({ writeHead: vi.fn(), end: vi.fn() }) as any;
+  const makeTransport = (handleRequest: () => Promise<void>) =>
+    ({
+      sessionId: undefined,
+      handleRequest: vi.fn(handleRequest),
+      close: vi.fn().mockResolvedValue(undefined),
+    }) as any;
+
+  afterEach(() => {
+    for (const sessionId of Object.keys(transports)) {
+      delete transports[sessionId];
+    }
+  });
+
+  it("reaps a session idle past the timeout and closes it after deleting it", async () => {
+    const sessionId = "session-idle";
+    const transport = makeTransport(async () => {});
+    transports[sessionId] = transport;
+
+    await mcpHandler(makeReq(sessionId), makeRes());
+
+    // Still inside the window: alive.
+    expect(reapIdleSessions(Date.now() + IDLE_TIMEOUT_MS - MINUTE_MS)).toBe(0);
+    expect(transports[sessionId]).toBe(transport);
+
+    // Past the window: deleted from the map first, then closed.
+    expect(reapIdleSessions(Date.now() + IDLE_TIMEOUT_MS + MINUTE_MS)).toBe(1);
+    expect(transports[sessionId]).toBeUndefined();
+    expect(transport.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reap a transport with an open SSE response, however old", async () => {
+    const sessionId = "session-streaming";
+    let releaseStream!: () => void;
+    const streamOpen = new Promise<void>((resolve) => {
+      releaseStream = resolve;
+    });
+    const transport = makeTransport(() => streamOpen);
+    transports[sessionId] = transport;
+
+    const handled = mcpHandler(makeReq(sessionId), makeRes());
+    expect(transport.handleRequest).toHaveBeenCalledTimes(1);
+
+    // The GET has been open for over an hour with no further request: the
+    // session is live and must survive the sweep.
+    expect(reapIdleSessions(Date.now() + 61 * MINUTE_MS)).toBe(0);
+    expect(transports[sessionId]).toBe(transport);
+
+    releaseStream();
+    await handled;
+
+    // The response finishing counts as activity: idle time starts there.
+    expect(reapIdleSessions(Date.now() + IDLE_TIMEOUT_MS - MINUTE_MS)).toBe(0);
+    expect(reapIdleSessions(Date.now() + IDLE_TIMEOUT_MS + MINUTE_MS)).toBe(1);
+    expect(transport.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a later request refresh the idle window", async () => {
+    const sessionId = "session-touched";
+    const transport = makeTransport(async () => {});
+    transports[sessionId] = transport;
+
+    await mcpHandler(makeReq(sessionId), makeRes());
+    const firstUse = Date.now();
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await mcpHandler(makeReq(sessionId), makeRes());
+
+    // The first request is past its cutoff at `firstUse + timeout + 1`, but the
+    // second touch moved the deadline.
+    expect(reapIdleSessions(firstUse + IDLE_TIMEOUT_MS + 1)).toBe(0);
+    expect(reapIdleSessions(Date.now() + IDLE_TIMEOUT_MS + MINUTE_MS)).toBe(1);
   });
 });
