@@ -484,6 +484,22 @@ const runToolConfig: RouteHandler = async (request, reply) => {
   if (toolValidation.valid === false) {
     return sendError(reply, 400, toolValidation.error);
   }
+  // EE: Enforce RBAC on the systems this inline tool references. Without this,
+  // a restricted user could submit an inline config referencing a system their
+  // role forbids; its stored credentials are loaded into the execution and
+  // exposed to transform steps, bypassing per-system access control.
+  const permCheck = await checkToolExecutionPermissionAsync(
+    {
+      userId: authReq.authInfo.userId,
+      orgId: authReq.authInfo.orgId,
+      roles: authReq.authInfo.roles,
+      dataStore: authReq.datastore,
+    },
+    { id: tool.id, systemIds: getToolSystemIds(tool) },
+  );
+  if (!permCheck.allowed) {
+    return sendError(reply, 403, permCheck.error || "Not authorized to execute this tool");
+  }
 
   // Lazy resolve user email - only fetch if tool config references sg_auth_email
   const userEmail = await resolveUserEmailIfNeeded({
